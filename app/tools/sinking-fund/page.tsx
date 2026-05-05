@@ -65,9 +65,15 @@ export default function SinkingFundPage() {
   useEffect(() => {
     if (inputs.goalType !== 'down-payment') return;
     if (!plan?.inputs.homeTarget || plan.inputs.homeTarget <= 0) return;
-    if (inputs.targetAmount === plan.inputs.homeTarget) return;
-    setInputs({ targetAmount: plan.inputs.homeTarget, goalName: 'House Down Payment' });
-  }, [inputs.goalType, inputs.targetAmount, plan?.inputs.homeTarget, setInputs]);
+    const timelineMonths = Math.max(1, plan.inputs.homeTimelineMonths || 36);
+    const syncedTargetDate = addMonths(currentYm(), timelineMonths);
+    if (inputs.targetAmount === plan.inputs.homeTarget && inputs.targetDate === syncedTargetDate) return;
+    setInputs({
+      targetAmount: plan.inputs.homeTarget,
+      targetDate: syncedTargetDate,
+      goalName: 'House Down Payment',
+    });
+  }, [inputs.goalType, inputs.targetAmount, inputs.targetDate, plan?.inputs.homeTarget, plan?.inputs.homeTimelineMonths, setInputs]);
 
   const chartData = useMemo(
     () =>

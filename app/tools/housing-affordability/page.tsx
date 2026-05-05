@@ -1,9 +1,10 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Home, Users, ChevronLeft } from 'lucide-react';
 import { useFinWiseStore } from '@/lib/store';
+import { usePlanStore } from '@/lib/planStore';
 import { getPropertyTaxRate } from '@/lib/stateTax';
 import { computeUnifiedMonthlyFlow } from '@/lib/calculations';
 import { computeHousingAffordability } from '@/lib/calculations/housingAffordability';
@@ -16,6 +17,8 @@ export default function HousingAffordabilityPage() {
   const budgetInputs = useFinWiseStore((s) => s.budgetInputs);
   const debts = useFinWiseStore((s) => s.debts);
   const planLastUpdated = useFinWiseStore((s) => s.planLastUpdated);
+  const plan = usePlanStore((s) => s.plan);
+  const didSeedDownPaymentFromPlan = useRef(false);
 
   const [partnerMonthlyIncome, setPartnerMonthlyIncome] = useState(0);
   const [partnerMonthlyDebt, setPartnerMonthlyDebt] = useState(0);
@@ -29,6 +32,15 @@ export default function HousingAffordabilityPage() {
     getPropertyTaxRate(paycheckInputs.state || 'Massachusetts')
   );
   const [annualHomeInsuranceRate, setAnnualHomeInsuranceRate] = useState(0.005);
+
+  useEffect(() => {
+    const homeGoal = plan?.inputs?.homeTarget ?? 0;
+    if (didSeedDownPaymentFromPlan.current) return;
+    if (homeGoal > 0) {
+      setDownPaymentCash(homeGoal);
+      didSeedDownPaymentFromPlan.current = true;
+    }
+  }, [plan?.inputs?.homeTarget]);
 
   const flow = useMemo(
     () => computeUnifiedMonthlyFlow(paycheckInputs, paycheckResults, budgetInputs, debts),
@@ -100,7 +112,12 @@ export default function HousingAffordabilityPage() {
             suffix="%"
             step={0.05}
           />
-          <Field label="Down payment cash" value={downPaymentCash} onChange={setDownPaymentCash} step={5000} />
+          <Field
+            label={`Down payment cash${plan?.inputs?.homeTarget ? ' (seeded from plan goal)' : ''}`}
+            value={downPaymentCash}
+            onChange={setDownPaymentCash}
+            step={5000}
+          />
           <Field
             label="Down payment % target"
             value={downPaymentPct * 100}

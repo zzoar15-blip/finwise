@@ -59,6 +59,7 @@ export interface StoreBudgetInputs {
   brokerageMonthly: number;
   rothIraMonthly: number;
   emergencyFundMonthly: number;
+  homeDownPaymentMonthly: number;
 }
 
 export interface StoreInvestmentInputs {
@@ -101,7 +102,7 @@ export const DEFAULT_PAYCHECK_RESULTS: StorePaycheckResults = {
 export const DEFAULT_BUDGET_INPUTS: StoreBudgetInputs = {
   investmentIncome: 0, housing: 0, utilities: 0, insurance: 0, groceries: 0, dining: 0,
   transportation: 0, subscriptions: 0, phone: 0, healthGym: 0, travel: 0, misc: 0,
-  brokerageMonthly: 0, rothIraMonthly: 0, emergencyFundMonthly: 0,
+  brokerageMonthly: 0, rothIraMonthly: 0, emergencyFundMonthly: 0, homeDownPaymentMonthly: 0,
 };
 
 export const DEFAULT_INVESTMENT_INPUTS: StoreInvestmentInputs = {
@@ -175,13 +176,18 @@ export function computeTotalExpenses(budget: StoreBudgetInputs): number {
 
 /** Voluntary savings/transfers from net pay (checking), not payroll withholdings. */
 export function computeOptionalMonthlySavings(budget: StoreBudgetInputs): number {
-  return budget.brokerageMonthly + budget.rothIraMonthly + budget.emergencyFundMonthly;
+  return (
+    budget.brokerageMonthly +
+    budget.rothIraMonthly +
+    budget.emergencyFundMonthly +
+    budget.homeDownPaymentMonthly
+  );
 }
 
 export function computeTotalSavings(paycheckResults: StorePaycheckResults, paycheckInputs: StorePaycheckInputs, budget: StoreBudgetInputs): number {
   return paycheckResults.k401TraditionalAnnual / 12 + paycheckResults.k401RothAnnual / 12 +
     paycheckInputs.hsaAnnual / 12 + paycheckInputs.fsaAnnual / 12 +
-    budget.brokerageMonthly + budget.rothIraMonthly + budget.emergencyFundMonthly;
+    budget.brokerageMonthly + budget.rothIraMonthly + budget.emergencyFundMonthly + budget.homeDownPaymentMonthly;
 }
 
 /**
@@ -212,7 +218,7 @@ export function computeSavingsRate(
     results.k401TraditionalAnnual + results.k401RothAnnual +
     paycheckInputs.hsaAnnual + paycheckInputs.fsaAnnual;
   const optionalAnnual =
-    (budget.brokerageMonthly + budget.rothIraMonthly + budget.emergencyFundMonthly) * 12;
+    (budget.brokerageMonthly + budget.rothIraMonthly + budget.emergencyFundMonthly + budget.homeDownPaymentMonthly) * 12;
   return ((payrollAnnual + optionalAnnual) / grossAnnual) * 100;
 }
 

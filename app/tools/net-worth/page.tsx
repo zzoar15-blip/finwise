@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ChevronLeft, Plus, Trash2, Wallet } from 'lucide-react';
 import {
@@ -30,6 +30,9 @@ export default function NetWorthPage() {
   const setAssets = useFinWiseStore((s) => s.setNetWorthAssets);
   const setLiabilities = useFinWiseStore((s) => s.setNetWorthLiabilities);
   const addSnapshot = useFinWiseStore((s) => s.addNetWorthSnapshot);
+  const paycheck = useFinWiseStore((s) => s.paycheckResults);
+  const budget = useFinWiseStore((s) => s.budgetInputs);
+  const [assumedReturnPct, setAssumedReturnPct] = useState(7);
 
   const totals = useMemo(() => computeNetWorthTotals(assets, liabilities), [assets, liabilities]);
 
@@ -42,6 +45,26 @@ export default function NetWorthPage() {
   );
 
   const chartData = useMemo(() => history.map((h) => ({ date: h.date, netWorth: h.netWorth })), [history]);
+  const syncedContributionMonthly =
+    (paycheck.k401TraditionalAnnual + paycheck.k401RothAnnual) / 12 +
+    budget.rothIraMonthly +
+    budget.brokerageMonthly;
+
+  const forecastData = useMemo(() => {
+    const points: Array<{ month: string; netWorth: number }> = [];
+    const now = new Date();
+    const monthlyReturn = Math.max(0, assumedReturnPct) / 100 / 12;
+    let projected = totals.netWorth;
+    for (let i = 1; i <= 60; i += 1) {
+      projected = (projected + syncedContributionMonthly) * (1 + monthlyReturn);
+      const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+      points.push({
+        month: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+        netWorth: projected,
+      });
+    }
+    return points;
+  }, [totals.netWorth, syncedContributionMonthly, assumedReturnPct]);
 
   function updateAsset(id: string, patch: Partial<(typeof assets)[number]>) {
     setAssets(assets.map((a) => (a.id === id ? { ...a, ...patch } : a)));
@@ -191,6 +214,44 @@ export default function NetWorthPage() {
               </LineChart>
             </ResponsiveContainer>
           )}
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle>Projected Net Worth (5 years)</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Metric label="Synced Monthly Contributions" value={formatCurrency(syncedContributionMonthly)} />
+            <Metric label="Assumed Annual Return" value={`${assumedReturnPct.toFixed(1)}%`} />
+            <Metric label="Projected 5Y Net Worth" value={formatCurrency(forecastData[forecastData.length - 1]?.netWorth ?? totals.netWorth)} isNet />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">Assumed annual return (%)</label>
+            <input
+              type="range"
+              min={3}
+              max={12}
+              step={0.5}
+              value={assumedReturnPct}
+              onChange={(e) => setAssumedReturnPct(Number(e.target.value))}
+              className="w-full accent-[#3b82f6]"
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Forecast uses synced contribution channels: 401(k), Roth IRA, and Brokerage from your Budget/Paycheck setup.
+          </p>
+          <ResponsiveContainer width="100%" height={260}>
+            <LineChart data={forecastData}>
+              <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+              <XAxis dataKey="month" tickFormatter={(v: string) => v.slice(2)} />
+              <YAxis tickFormatter={(v) => (typeof v === 'number' ? formatCurrency(v) : String(v))} width={96} />
+              <Tooltip formatter={(v) => (typeof v === 'number' ? formatCurrency(v) : String(v))} />
+              <ReferenceLine y={totals.netWorth} stroke="#94a3b8" strokeDasharray="3 3" />
+              <Line type="monotone" dataKey="netWorth" stroke="#22c55e" strokeWidth={2.5} dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
         </CardContent>
       </Card>
     </div>

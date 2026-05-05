@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { simulateInvestment } from '@/lib/calculations/invest';
 import type { InvestInputs, InvestResult } from '@/lib/calculations/invest';
@@ -42,6 +42,14 @@ import {
 import { TrendingUp, DollarSign, Calendar, Percent, ChevronLeft, Info } from 'lucide-react';
 
 type Tab = 'charts' | 'milestones' | 'targets';
+type FocusType = 'income' | 'growth';
+
+type InvestScenarioPreset = {
+  id: string;
+  name: string;
+  detail: string;
+  values: InvestInputs;
+};
 
 function SliderRow({
   label,
@@ -120,14 +128,22 @@ export default function InvestPage() {
     [paycheckInputs, paycheckResults, budgetInputs, debts],
   );
   const availableForInvesting = Math.max(0, flow.monthlySurplus);
+  const syncedContributionMonthly =
+    (flow.paycheck.k401TraditionalAnnual + flow.paycheck.k401RothAnnual) / 12 +
+    budgetInputs.rothIraMonthly +
+    budgetInputs.brokerageMonthly;
 
   // Default tax rate from paycheck if complete
   const defaultTaxRate = flow.paycheck.isComplete
     ? Math.round(flow.paycheck.marginalCombinedRate * 100)
     : investmentInputs.taxRate;
 
-  const [monthlyBuy, setMonthlyBuyState] = useState(
-    investmentInputs.monthlyBuy > 0 ? investmentInputs.monthlyBuy : Math.round(availableForInvesting / 50) * 50
+  const [additionalMonthlyBuy, setAdditionalMonthlyBuy] = useState(
+    Math.max(
+      0,
+      (investmentInputs.monthlyBuy > 0 ? investmentInputs.monthlyBuy : Math.round(availableForInvesting / 50) * 50) -
+        syncedContributionMonthly
+    )
   );
   const [annualBonus, setAnnualBonusState] = useState(investmentInputs.annualBonus);
   const [dividendYield, setDividendYieldState] = useState(investmentInputs.dividendYield);
@@ -137,8 +153,14 @@ export default function InvestPage() {
   const [years, setYearsState] = useState(investmentInputs.years);
   const [annualAppreciation, setAnnualAppreciationState] = useState(investmentInputs.annualAppreciation);
   const [tab, setTab] = useState<Tab>('charts');
+  const [focusType, setFocusType] = useState<FocusType>('income');
 
-  function setMonthlyBuy(v: number) { setMonthlyBuyState(v); setInvestmentInputs({ monthlyBuy: v }); }
+  const monthlyBuy = Math.max(0, syncedContributionMonthly + additionalMonthlyBuy);
+  function setExtraMonthlyBuy(v: number) {
+    const safe = Math.max(0, v);
+    setAdditionalMonthlyBuy(safe);
+    setInvestmentInputs({ monthlyBuy: Math.max(0, syncedContributionMonthly + safe) });
+  }
   function setAnnualBonus(v: number) { setAnnualBonusState(v); setInvestmentInputs({ annualBonus: v }); }
   function setDividendYield(v: number) { setDividendYieldState(v); setInvestmentInputs({ dividendYield: v }); }
   function setTaxRate(v: number) { setTaxRateState(v); setInvestmentInputs({ taxRate: v }); }
@@ -146,6 +168,102 @@ export default function InvestPage() {
   function setPayFrequency(v: 'monthly' | 'quarterly') { setPayFrequencyState(v); setInvestmentInputs({ payFrequency: v }); }
   function setYears(v: number) { setYearsState(v); setInvestmentInputs({ years: v }); }
   function setAnnualAppreciation(v: number) { setAnnualAppreciationState(v); setInvestmentInputs({ annualAppreciation: v }); }
+
+  useEffect(() => {
+    setInvestmentInputs({ monthlyBuy: Math.max(0, syncedContributionMonthly + additionalMonthlyBuy) });
+  }, [syncedContributionMonthly, additionalMonthlyBuy, setInvestmentInputs]);
+
+  const scenarioPresets = useMemo<InvestScenarioPreset[]>(() => {
+    const baseMonthly = Math.max(
+      100,
+      Math.round(
+        (syncedContributionMonthly > 0
+          ? syncedContributionMonthly
+          : availableForInvesting > 0
+            ? availableForInvesting
+            : 600) / 50
+      ) * 50
+    );
+    const baseTax = Math.max(10, Math.min(50, defaultTaxRate || 24));
+    if (focusType === 'income') {
+      return [
+        {
+          id: 'income-steady',
+          name: 'Steady Income',
+          detail: 'Higher yield, lower appreciation, monthly distributions',
+          values: {
+            monthlyBuy: baseMonthly,
+            annualBonus: 0,
+            dividendYield: 7.5,
+            taxRate: baseTax,
+            qualifiedPercent: 65,
+            payFrequency: 'monthly',
+            years: 7,
+            annualAppreciation: 2.5,
+          },
+        },
+        {
+          id: 'income-hybrid',
+          name: 'Income + Growth',
+          detail: 'Balanced yield with moderate growth assumptions',
+          values: {
+            monthlyBuy: baseMonthly,
+            annualBonus: 2000,
+            dividendYield: 5.5,
+            taxRate: baseTax,
+            qualifiedPercent: 75,
+            payFrequency: 'quarterly',
+            years: 8,
+            annualAppreciation: 4,
+          },
+        },
+      ];
+    }
+    return [
+      {
+        id: 'growth-core',
+        name: 'Core Growth',
+        detail: 'Lower starting yield, stronger long-run appreciation',
+        values: {
+          monthlyBuy: baseMonthly,
+          annualBonus: 2000,
+          dividendYield: 2.2,
+          taxRate: baseTax,
+          qualifiedPercent: 90,
+          payFrequency: 'quarterly',
+          years: 10,
+          annualAppreciation: 7.5,
+        },
+      },
+      {
+        id: 'growth-aggressive',
+        name: 'Aggressive Growth',
+        detail: 'Max growth tilt with small dividend component',
+        values: {
+          monthlyBuy: baseMonthly + 100,
+          annualBonus: 5000,
+          dividendYield: 1.5,
+          taxRate: baseTax,
+          qualifiedPercent: 95,
+          payFrequency: 'quarterly',
+          years: 10,
+          annualAppreciation: 9,
+        },
+      },
+    ];
+  }, [focusType, syncedContributionMonthly, availableForInvesting, defaultTaxRate]);
+
+  function applyScenario(values: InvestInputs) {
+    setAdditionalMonthlyBuy(Math.max(0, values.monthlyBuy - syncedContributionMonthly));
+    setAnnualBonusState(values.annualBonus);
+    setDividendYieldState(values.dividendYield);
+    setTaxRateState(values.taxRate);
+    setQualifiedPercentState(values.qualifiedPercent);
+    setPayFrequencyState(values.payFrequency);
+    setYearsState(values.years);
+    setAnnualAppreciationState(values.annualAppreciation);
+    setInvestmentInputs(values);
+  }
 
   const inputs: InvestInputs = useMemo(
     () => ({
@@ -244,18 +362,70 @@ export default function InvestPage() {
             <CardTitle>Investment Settings</CardTitle>
           </CardHeader>
           <CardContent className="space-y-5">
+            <div className="space-y-2">
+              <Label className="text-sm text-muted-foreground">What are you optimizing for?</Label>
+              <div className="grid grid-cols-2 gap-2 rounded-lg border p-1">
+                <button
+                  onClick={() => setFocusType('income')}
+                  className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                    focusType === 'income' ? 'bg-[#3b82f6] text-white' : 'text-muted-foreground hover:bg-muted'
+                  }`}
+                >
+                  Income Focus
+                </button>
+                <button
+                  onClick={() => setFocusType('growth')}
+                  className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                    focusType === 'growth' ? 'bg-[#3b82f6] text-white' : 'text-muted-foreground hover:bg-muted'
+                  }`}
+                >
+                  Growth Focus
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-2 rounded-xl border border-border p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Suggested Scenarios
+              </p>
+              <div className="grid gap-2">
+                {scenarioPresets.map((scenario) => (
+                  <button
+                    key={scenario.id}
+                    onClick={() => applyScenario(scenario.values)}
+                    className="rounded-lg border border-border bg-background px-3 py-2 text-left transition-colors hover:bg-muted"
+                  >
+                    <p className="text-sm font-semibold">{scenario.name}</p>
+                    <p className="text-xs text-muted-foreground">{scenario.detail}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <SliderRow
-              label="Monthly Buy Amount"
-              value={monthlyBuy}
-              display={formatCurrency(monthlyBuy)}
+              label="Additional Monthly Buy"
+              value={additionalMonthlyBuy}
+              display={formatCurrency(additionalMonthlyBuy)}
               min={0}
               max={5000}
               step={50}
-              onChange={setMonthlyBuy}
+              onChange={setExtraMonthlyBuy}
               note={availableForInvesting > 0 && flow.paycheck.isComplete
                 ? `Budget surplus after debts: ${formatCurrency(availableForInvesting)}/mo`
                 : undefined}
             />
+            <div className="rounded-lg border border-border bg-muted/20 p-3 text-xs text-muted-foreground">
+              <p>
+                Synced baseline from Budget/Paycheck:
+                <span className="ml-1 font-semibold text-foreground">{formatCurrency(syncedContributionMonthly)}/mo</span>
+              </p>
+              <p className="mt-1">
+                401(k): {formatCurrency((flow.paycheck.k401TraditionalAnnual + flow.paycheck.k401RothAnnual) / 12)} | Roth IRA: {formatCurrency(budgetInputs.rothIraMonthly)} | Brokerage: {formatCurrency(budgetInputs.brokerageMonthly)}
+              </p>
+              <p className="mt-1">
+                Total modeled monthly investment: <span className="font-semibold text-foreground">{formatCurrency(monthlyBuy)}</span>
+              </p>
+            </div>
             <SliderRow
               label="Annual Bonus (February)"
               value={annualBonus}

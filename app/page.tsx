@@ -238,6 +238,14 @@ function DashboardPageContent() {
 
   function handleUpdatePlan(inputs: PlanInputs) {
     const periods = PAY_PERIODS[inputs.payPeriod] || 26;
+    const homeGoalMonthly =
+      inputs.goals.includes('save-home') && inputs.homeTarget > 0
+        ? Math.ceil(inputs.homeTarget / Math.max(1, inputs.homeTimelineMonths || 36))
+        : 0;
+    const emergencyGoalMonthly =
+      inputs.goals.includes('emergency-fund') && inputs.emergencyFundTarget > 0
+        ? Math.ceil(inputs.emergencyFundTarget / 12)
+        : 0;
     // Keep Plan and calculator stores synchronized so metrics match across pages.
     setPaycheckInputs({
       annualSalary: inputs.annualSalary,
@@ -269,6 +277,8 @@ function DashboardPageContent() {
       healthGym: inputs.expenses.health,
       travel: inputs.expenses.travel,
       misc: inputs.expenses.misc,
+      emergencyFundMonthly: emergencyGoalMonthly,
+      homeDownPaymentMonthly: homeGoalMonthly,
     });
     setDebts(
       inputs.debts.map((d) => ({

@@ -91,6 +91,8 @@ export interface PlanMetrics {
   // Emergency fund
   emergencyFundMonthsCovered: number; // months of expenses covered by surplus
   emergencyFundDate: string | null;
+  homeMonthlyContribution: number;
+  emergencyMonthlyContribution: number;
 }
 
 function sumExpenses(e: PlanInputs['expenses']): number {
@@ -211,6 +213,8 @@ function buildPriorities(
   const surplus = metrics.monthlySurplus ?? 0;
   const debtResult = metrics.debtResult;
   const debtFreeDate = metrics.debtFreeDate;
+  const homeMonthlyContribution = metrics.homeMonthlyContribution ?? 0;
+  const emergencyMonthlyContribution = metrics.emergencyMonthlyContribution ?? 0;
 
   if (inputs.goals.includes('pay-debt') && debtResult && inputs.debts.length > 0) {
     const months = debtResult.monthsToPayoff;
@@ -227,8 +231,10 @@ function buildPriorities(
   }
 
   if (inputs.goals.includes('emergency-fund')) {
-    const monthsToFund = inputs.emergencyFundTarget > 0 && surplus > 0
-      ? Math.ceil(inputs.emergencyFundTarget / surplus)
+    const effectiveEmergencySavings =
+      emergencyMonthlyContribution > 0 ? emergencyMonthlyContribution : Math.max(0, surplus);
+    const monthsToFund = inputs.emergencyFundTarget > 0 && effectiveEmergencySavings > 0
+      ? Math.ceil(inputs.emergencyFundTarget / effectiveEmergencySavings)
       : null;
     const covered = metrics.emergencyFundMonthsCovered ?? 0;
     cards.push({
@@ -236,7 +242,7 @@ function buildPriorities(
       rank: rank++,
       headline: `Build $${inputs.emergencyFundTarget.toLocaleString()} emergency fund`,
       body: monthsToFund
-        ? `Saving $${Math.round(surplus).toLocaleString()}/mo, you'll hit your target in ${monthsToFund} months. Current coverage: ${covered.toFixed(1)} months of expenses.`
+        ? `Currently allocating $${Math.round(effectiveEmergencySavings).toLocaleString()}/mo, you'll hit your target in ${monthsToFund} months. Current coverage: ${covered.toFixed(1)} months of expenses.`
         : 'Set a savings rate in your plan to see your timeline.',
       action: 'See timeline',
       href: '/forecast',
@@ -263,13 +269,14 @@ function buildPriorities(
   }
 
   if (inputs.goals.includes('save-home') && inputs.homeTarget > 0) {
-    const monthsNeeded = surplus > 0 ? Math.ceil(inputs.homeTarget / surplus) : null;
+    const effectiveHomeSavings = homeMonthlyContribution > 0 ? homeMonthlyContribution : Math.max(0, surplus);
+    const monthsNeeded = effectiveHomeSavings > 0 ? Math.ceil(inputs.homeTarget / effectiveHomeSavings) : null;
     cards.push({
       goal: 'save-home',
       rank: rank++,
       headline: `Save $${inputs.homeTarget.toLocaleString()} for a home`,
       body: monthsNeeded
-        ? `At $${Math.round(surplus).toLocaleString()}/mo savings you'll hit your target in ${monthsNeeded} months${inputs.homeTimelineMonths ? ` (goal: ${inputs.homeTimelineMonths} months)` : ''}.`
+        ? `Currently allocating $${Math.round(effectiveHomeSavings).toLocaleString()}/mo toward your home fund, you'll hit your target in ${monthsNeeded} months${inputs.homeTimelineMonths ? ` (goal: ${inputs.homeTimelineMonths} months)` : ''}.`
         : 'Update your expenses to free up more savings.',
       action: 'View forecast',
       href: '/forecast',
@@ -387,6 +394,14 @@ export function computePlanMetrics(inputs: PlanInputs): PlanMetrics {
   const monthlyBonus = inputs.annualBonus / 12;
   const totalMonthlyExpenses = sumExpenses(inputs.expenses);
   const monthlySurplus = monthlyTakeHome + monthlyBonus - totalMonthlyExpenses;
+  const homeMonthlyContribution =
+    inputs.goals.includes('save-home') && inputs.homeTarget > 0
+      ? Math.ceil(inputs.homeTarget / Math.max(1, inputs.homeTimelineMonths || 36))
+      : 0;
+  const emergencyMonthlyContribution =
+    inputs.goals.includes('emergency-fund') && inputs.emergencyFundTarget > 0
+      ? Math.ceil(inputs.emergencyFundTarget / 12)
+      : 0;
   const savingsRate = monthlyTakeHome > 0 ? (monthlySurplus / monthlyTakeHome) * 100 : 0;
 
   const effectiveTotalRate =
@@ -465,6 +480,8 @@ export function computePlanMetrics(inputs: PlanInputs): PlanMetrics {
     taxEfficiencyScore,
     taxSuggestions,
     emergencyFundMonthsCovered,
+    homeMonthlyContribution,
+    emergencyMonthlyContribution,
   };
   const priorities = buildPriorities(inputs, partialMetrics);
 
@@ -499,6 +516,8 @@ export function computePlanMetrics(inputs: PlanInputs): PlanMetrics {
     projection,
     emergencyFundMonthsCovered,
     emergencyFundDate,
+    homeMonthlyContribution,
+    emergencyMonthlyContribution,
   };
 }
 
@@ -584,6 +603,8 @@ export function mergePlanMetricsWithUnifiedBudget(
     taxEfficiencyScore: base.taxEfficiencyScore,
     taxSuggestions: base.taxSuggestions,
     emergencyFundMonthsCovered,
+    homeMonthlyContribution: budgetInputs.homeDownPaymentMonthly,
+    emergencyMonthlyContribution: budgetInputs.emergencyFundMonthly,
   };
   const priorities = buildPriorities(inputs, partialMetrics);
 
@@ -670,5 +691,7 @@ export function mergePlanMetricsWithUnifiedBudget(
     projection,
     emergencyFundMonthsCovered,
     emergencyFundDate,
+    homeMonthlyContribution: budgetInputs.homeDownPaymentMonthly,
+    emergencyMonthlyContribution: budgetInputs.emergencyFundMonthly,
   };
 }

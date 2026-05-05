@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { formatCurrency } from '@/lib/format';
 import { useFinWiseStore } from '@/lib/store';
+import { usePlanStore } from '@/lib/planStore';
 import {
   Card,
   CardContent,
@@ -137,6 +138,7 @@ export default function BudgetPage() {
   const setBudgetInputs = useFinWiseStore((s) => s.setBudgetInputs);
   const debts = useFinWiseStore((s) => s.debts);
   const planLastUpdated = useFinWiseStore((s) => s.planLastUpdated);
+  const plan = usePlanStore((s) => s.plan);
 
   const pr = getEffectivePaycheckResults(paycheckInputs, paycheckResults);
   const pi = paycheckInputs;
@@ -153,6 +155,29 @@ export default function BudgetPage() {
   const cashOutflows = flow.cashOutflows;
   const monthlySurplus = flow.monthlySurplus;
   const savingsRate = flow.savingsRate;
+  const syncedHomeGoalMonthly = useMemo(() => {
+    const target = plan?.inputs?.homeTarget ?? 0;
+    const hasHomeGoal = plan?.inputs?.goals?.includes('save-home') ?? false;
+    if (!hasHomeGoal || target <= 0) return 0;
+    return Math.ceil(target / Math.max(1, plan?.inputs?.homeTimelineMonths || 36));
+  }, [plan?.inputs?.goals, plan?.inputs?.homeTarget, plan?.inputs?.homeTimelineMonths]);
+  const syncedEmergencyGoalMonthly = useMemo(() => {
+    const target = plan?.inputs?.emergencyFundTarget ?? 0;
+    const hasEmergencyGoal = plan?.inputs?.goals?.includes('emergency-fund') ?? false;
+    if (!hasEmergencyGoal || target <= 0) return 0;
+    return Math.ceil(target / 12);
+  }, [plan?.inputs?.goals, plan?.inputs?.emergencyFundTarget]);
+
+  useEffect(() => {
+    if (syncedHomeGoalMonthly <= 0) return;
+    if (budgetInputs.homeDownPaymentMonthly === syncedHomeGoalMonthly) return;
+    setBudgetInputs({ homeDownPaymentMonthly: syncedHomeGoalMonthly });
+  }, [syncedHomeGoalMonthly, budgetInputs.homeDownPaymentMonthly, setBudgetInputs]);
+  useEffect(() => {
+    if (syncedEmergencyGoalMonthly <= 0) return;
+    if (budgetInputs.emergencyFundMonthly === syncedEmergencyGoalMonthly) return;
+    setBudgetInputs({ emergencyFundMonthly: syncedEmergencyGoalMonthly });
+  }, [syncedEmergencyGoalMonthly, budgetInputs.emergencyFundMonthly, setBudgetInputs]);
 
   // Chart data — optional savings + debt + living; housing called out in pie
   const pieData = [
@@ -200,6 +225,7 @@ export default function BudgetPage() {
       ['Roth IRA', bi.rothIraMonthly, bi.rothIraMonthly * 12],
       ['Brokerage', bi.brokerageMonthly, bi.brokerageMonthly * 12],
       ['Emergency Fund', bi.emergencyFundMonthly, bi.emergencyFundMonthly * 12],
+      ['Home Down Payment Fund', bi.homeDownPaymentMonthly, bi.homeDownPaymentMonthly * 12],
       ['Payroll savings (401k/HSA/FSA; in net pay)', payrollSavingsMonthly, payrollSavingsMonthly * 12],
       ['Savings from bank (surplus calc)', optionalSavings, optionalSavings * 12],
       ['Total savings (all channels)', payrollSavingsMonthly + optionalSavings, (payrollSavingsMonthly + optionalSavings) * 12],
@@ -339,6 +365,13 @@ export default function BudgetPage() {
                 label="Emergency Fund"
                 value={bi.emergencyFundMonthly}
                 onChange={(v) => setBudgetInputs({ emergencyFundMonthly: v })}
+                badge={syncedEmergencyGoalMonthly > 0 ? 'Synced from Plan Goal' : undefined}
+              />
+              <BudgetRow
+                label="Home Down Payment Fund"
+                value={bi.homeDownPaymentMonthly}
+                onChange={(v) => setBudgetInputs({ homeDownPaymentMonthly: v })}
+                badge={syncedHomeGoalMonthly > 0 ? 'Synced from Plan Goal' : undefined}
               />
 
               {/* EXPENSES */}
