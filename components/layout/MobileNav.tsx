@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, FileText, Calculator, CreditCard, Sparkles,
-  Home, PiggyBank, Wallet,
+  Home, PiggyBank, Wallet, HousePlus, CarFront,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -14,6 +14,8 @@ const MOBILE_NAV = [
   { href: '/paycheck', label: 'Paycheck', icon: Calculator },
   { href: '/debt', label: 'Debt', icon: CreditCard },
   { href: '/tools/net-worth', label: 'Net Worth', icon: Wallet },
+  { href: '/tools/housing-affordability', label: 'Afford', icon: HousePlus },
+  { href: '/tools/car-affordability', label: 'Car', icon: CarFront },
   { href: '/tools/rent-vs-buy', label: 'Rent/Buy', icon: Home },
   { href: '/tools/sinking-fund', label: 'Fund', icon: PiggyBank },
   { href: '/advisor', label: 'Advisor', icon: Sparkles },

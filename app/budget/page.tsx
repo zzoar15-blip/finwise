@@ -220,6 +220,12 @@ export default function BudgetPage() {
           <Link href="/tools/rent-vs-buy" className="text-sm text-blue-600 hover:underline">
             Wondering if you can afford to buy? →
           </Link>
+          <Link href="/tools/housing-affordability" className="ml-3 text-sm text-blue-600 hover:underline">
+            Calculate your realistic affordability →
+          </Link>
+          <Link href="/tools/car-affordability" className="ml-3 text-sm text-blue-600 hover:underline">
+            Run car loan vs lease calculator →
+          </Link>
         </div>
         <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto">
           <Button
