@@ -14,7 +14,9 @@ import {
   computeOptionalMonthlySavings,
   computeSavingsRate,
   computeTotalExpenses,
+  getTotalTransportation,
 } from '@/lib/calculations';
+import { formatCurrency } from '@/lib/format';
 import type { PlanInputs, PlanDebt, Goal } from '@/types/plan';
 import type { ActionChecklistItem } from '@/types/plan';
 
@@ -99,8 +101,15 @@ export interface PlanMetrics {
     cashflow: number;
     debt: number;
     emergency: number;
-    investing: number;
+    savings: number;
     tax: number;
+  };
+  healthScoreTips: {
+    cashflow: string;
+    debt: string;
+    emergency: string;
+    savings: string;
+    tax: string;
   };
   goalWarnings: Array<{
     id: string;
@@ -123,37 +132,278 @@ function clampScore(n: number): number {
   return Math.max(0, Math.min(100, Math.round(n)));
 }
 
-function scoreFromRange(value: number, min: number, max: number): number {
-  if (max <= min) return 0;
-  const normalized = (value - min) / (max - min);
-  return clampScore(normalized * 100);
+/** Tax efficiency 0–100: HSA up to 35, 401(k) 25 or 40 if maxed, FSA up to 15, commuter up to 10. */
+function taxEfficiencyScoreBuckets(
+  annualHSA: number,
+  annual401kDeferral: number,
+  annualFSA: number,
+  annualCommuter: number,
+): number {
+  const HSA_MAX = 4300;
+  const K401_MAX = 23500;
+  const FSA_MAX = 3300;
+  const COMMUTER_MAX = 3780;
+  const hsaPts = Math.min(35, (annualHSA / Math.max(HSA_MAX, 1)) * 35);
+  let k401Pts = 0;
+  if (annual401kDeferral > 0) {
+    k401Pts = annual401kDeferral >= K401_MAX * 0.99 ? 40 : 25;
+  }
+  const fsaPts = annualFSA > 0 ? Math.min(15, (annualFSA / Math.max(FSA_MAX, 1)) * 15) : 0;
+  const commuterPts = Math.min(10, (annualCommuter / Math.max(COMMUTER_MAX, 1)) * 10);
+  return clampScore(Math.round(hsaPts + k401Pts + fsaPts + commuterPts));
 }
 
-function buildHealthScore(metrics: {
+function scoreCashflowHealth(surplusRate: number): number {
+  if (surplusRate >= 0.2) return 100;
+  if (surplusRate >= 0.1) return 75;
+  if (surplusRate >= 0.05) return 50;
+  if (surplusRate > 0) return 25;
+  return 0;
+}
+
+function scoreDebtHealth(totalDebt: number, netPayMonthly: number): number {
+  if (totalDebt === 0) return 100;
+  const annualIncome = netPayMonthly * 12;
+  if (annualIncome <= 0) return 0;
+  const dti = totalDebt / annualIncome;
+  if (dti < 0.1) return 75;
+  if (dti < 0.2) return 50;
+  if (dti < 0.35) return 25;
+  return 0;
+}
+
+function scoreEmergencyHealth(monthsCovered: number): number {
+  if (monthsCovered >= 6) return 100;
+  if (monthsCovered >= 3) return 75;
+  if (monthsCovered >= 1) return 50;
+  if (monthsCovered > 0) return 25;
+  return 0;
+}
+
+function scoreSavingsRateHealth(savingsRate: number): number {
+  if (savingsRate >= 0.2) return 100;
+  if (savingsRate >= 0.15) return 75;
+  if (savingsRate >= 0.1) return 50;
+  if (savingsRate >= 0.05) return 25;
+  return 0;
+}
+
+function findBiggestBudgetCategory(b: StoreBudgetInputs): { name: string; amount: number } {
+  const transport = getTotalTransportation(b);
+  const entries: [string, number][] = [
+    ['Housing / rent', b.housing],
+    ['Utilities', b.utilities],
+    ['Insurance', b.insurance],
+    ['Groceries', b.groceries],
+    ['Dining out', b.dining],
+    ['Transportation', transport],
+    ['Subscriptions', b.subscriptions],
+    ['Phone', b.phone],
+    ['Health / gym', b.healthGym],
+    ['Travel', b.travel],
+    ['Miscellaneous', b.misc],
+  ];
+  return entries.reduce<{ name: string; amount: number }>(
+    (a, x) => (x[1] > a.amount ? { name: x[0], amount: x[1] } : a),
+    { name: entries[0][0], amount: entries[0][1] },
+  );
+}
+
+function findBiggestPlanExpenseCategory(e: PlanInputs['expenses']): { name: string; amount: number } {
+  const transport = e.carPayment + e.carInsurance + e.gas + e.otherTransport;
+  const entries: [string, number][] = [
+    ['Housing / rent', e.housing],
+    ['Utilities', e.utilities],
+    ['Groceries', e.groceries],
+    ['Dining out', e.dining],
+    ['Transportation', transport],
+    ['Subscriptions', e.subscriptions],
+    ['Phone', e.phone],
+    ['Health', e.health],
+    ['Travel', e.travel],
+    ['Miscellaneous', e.misc],
+  ];
+  return entries.reduce<{ name: string; amount: number }>(
+    (a, x) => (x[1] > a.amount ? { name: x[0], amount: x[1] } : a),
+    { name: entries[0][0], amount: entries[0][1] },
+  );
+}
+
+function buildHealthScoreTips(args: {
+  netPayMonthly: number;
   monthlySurplus: number;
-  monthlyTakeHome: number;
+  surplusRate: number;
+  savingsRateOfNet: number;
+  totalMonthlySavings: number;
+  cashflowScore: number;
+  debtScore: number;
+  emergencyScore: number;
+  savingsScore: number;
+  taxScore: number;
   totalDebtBalance: number;
-  monthlyDebtMinimums: number;
-  emergencyFundMonthsCovered: number;
-  monthlyInvestCapacity: number;
+  debts: Debt[];
+  debtStrategy: 'avalanche' | 'snowball';
+  monthlyExpenses: number;
+  emergencyBalance: number;
+  emergencyMonthly: number;
+  budget: StoreBudgetInputs | null;
+  planExpenses: PlanInputs['expenses'] | null;
+  hsaAnnual: number;
+  k401TraditionalAnnual: number;
+  marginalCombinedRate: number;
+  grossAnnual: number;
+  /** If true, marginalCombinedRate already includes payroll tax (~7.65%) — omit extra FICA in HSA tip */
+  marginalIncludesFica: boolean;
+}): PlanMetrics['healthScoreTips'] {
+  const HSA_MAX = 4300;
+  const K401_MAX = 23500;
+
+  let cashflow: string;
+  if (args.cashflowScore === 100) {
+    cashflow = `Great cashflow — your ${(args.surplusRate * 100).toFixed(0)}% surplus rate exceeds the 20% target.`;
+  } else {
+    const cat = args.budget
+      ? findBiggestBudgetCategory(args.budget)
+      : args.planExpenses
+        ? findBiggestPlanExpenseCategory(args.planExpenses)
+        : { name: 'your largest discretionary category', amount: 0 };
+    const reduction = cat.amount * 0.2;
+    if (cat.amount > 0) {
+      cashflow = `Reducing ${cat.name} (${formatCurrency(cat.amount)}/mo) by 20% adds ${formatCurrency(Math.round(reduction))} to your monthly surplus.`;
+    } else {
+      const targetSurplus = args.netPayMonthly * 0.2;
+      const surplusGap = Math.max(0, targetSurplus - args.monthlySurplus);
+      cashflow =
+        surplusGap > 0
+          ? `Aim for about ${formatCurrency(Math.round(surplusGap))}/mo more surplus to reach a 20% surplus rate on net pay.`
+          : 'Build a detailed budget to find your biggest expense category and redirect dollars to surplus.';
+    }
+  }
+
+  let debt: string;
+  if (args.totalDebtBalance === 0 || args.debtScore === 100) {
+    debt = 'Debt-free! This gives your financial health a major boost.';
+  } else if (args.debts.length === 0 || !args.debts.some((d) => d.balance > 0)) {
+    debt = 'Add your debts in the Debt Simulator to model payoff timing and interest savings.';
+  } else {
+    const minR = simulateDebtPayoff(args.debts, 0, 0, 2, args.debtStrategy);
+    const extraR = simulateDebtPayoff(args.debts, 200, 0, 2, args.debtStrategy);
+    const monthsSaved = Math.max(0, minR.monthsToPayoff - extraR.monthsToPayoff);
+    const interestSaved = Math.max(0, minR.totalInterestPaid - extraR.totalInterestPaid);
+    debt = `Your ${formatCurrency(args.totalDebtBalance)} debt is a major drag on wealth building. Paying ${formatCurrency(200)}/mo extra could finish it ${monthsSaved} months sooner, saving ${formatCurrency(Math.round(interestSaved))} in interest.`;
+  }
+
+  const target3Months = args.monthlyExpenses * 3;
+  const gapTo3Months = Math.max(0, target3Months - args.emergencyBalance);
+  let emergency: string;
+  if (args.emergencyScore === 100) {
+    emergency = 'You have 6+ months of expenses saved. Excellent cushion.';
+  } else if (args.emergencyMonthly > 0 && gapTo3Months > 0) {
+    const monthsToTarget = Math.ceil(gapTo3Months / args.emergencyMonthly);
+    const targetDate = addMonths(new Date(), monthsToTarget);
+    emergency = `At ${formatCurrency(args.emergencyMonthly)}/mo you'll reach 3 months coverage by ${targetDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}. You need ${formatCurrency(Math.round(gapTo3Months))} more.`;
+  } else {
+    emergency = `You need ${formatCurrency(Math.round(target3Months))} for 3 months of expenses (${formatCurrency(Math.round(args.monthlyExpenses))}/mo). Add an emergency fund line in your budget to track progress.`;
+  }
+
+  const targetMonthlySav = args.netPayMonthly * 0.2;
+  const gapSavings = Math.max(0, targetMonthlySav - args.totalMonthlySavings);
+  let savings: string;
+  if (args.savingsScore === 100) {
+    savings = `Your ${(args.savingsRateOfNet * 100).toFixed(0)}% savings rate vs net pay is excellent. You're building wealth aggressively.`;
+  } else if (gapSavings === 0) {
+    savings = 'Close to the 20% target — keep it up.';
+  } else {
+    savings = `Adding ${formatCurrency(Math.round(gapSavings))}/mo more to savings reaches the 20% target. Consider redirecting part of your ${formatCurrency(Math.round(Math.max(0, args.monthlySurplus)))} surplus.`;
+  }
+
+  const hsaGap = Math.max(0, HSA_MAX - args.hsaAnnual);
+  const marginalForIncomeTax = args.marginalIncludesFica
+    ? Math.max(0, args.marginalCombinedRate - 0.0765)
+    : args.marginalCombinedRate;
+  const hsaMarginalStack = args.marginalIncludesFica
+    ? args.marginalCombinedRate
+    : args.marginalCombinedRate + 0.0765;
+  const hsaTaxSavings = hsaGap * hsaMarginalStack;
+  const k401Gap = Math.max(0, K401_MAX - args.k401TraditionalAnnual);
+  const k401TaxSavings = k401Gap * marginalForIncomeTax;
+  const onePctTaxApprox = args.grossAnnual * 0.01 * marginalForIncomeTax;
+
+  let tax: string;
+  if (args.taxScore >= 100) {
+    tax = "You're maximizing your tax-advantaged accounts. Excellent.";
+  } else if (hsaGap > 0 && hsaTaxSavings >= k401TaxSavings && hsaTaxSavings > 0) {
+    tax = `Maxing your HSA (add ${formatCurrency(Math.round(hsaGap / 12))}/mo) saves about ${formatCurrency(Math.round(hsaTaxSavings))}/yr in taxes. HSA is triple tax-advantaged.`;
+  } else if (k401Gap > 0) {
+    tax = `Increasing traditional 401(k) toward the limit (~${formatCurrency(Math.round(k401Gap / 12))}/mo left) saves about ${formatCurrency(Math.round(k401TaxSavings))}/yr vs ordinary income tax. Boosting deferral by 1% saves ~${formatCurrency(Math.round(onePctTaxApprox))}/yr.`;
+  } else {
+    tax = "You're in good shape on core tax shelters; revisit during open enrollment.";
+  }
+
+  return { cashflow, debt, emergency, savings, tax };
+}
+
+function buildFinancialHealthPackage(args: {
+  netPayMonthly: number;
+  monthlySurplus: number;
+  totalDebtBalance: number;
+  debts: Debt[];
+  debtStrategy: 'avalanche' | 'snowball';
+  monthlyExpenses: number;
+  emergencyMonthsCovered: number;
+  emergencyBalance: number;
+  emergencyMonthly: number;
+  totalMonthlySavingsHealth: number;
   taxEfficiencyScore: number;
-}): PlanMetrics['healthScoreBreakdown'] & { total: number } {
-  const cashflowRatio = metrics.monthlyTakeHome > 0 ? metrics.monthlySurplus / metrics.monthlyTakeHome : 0;
-  const cashflow = scoreFromRange(cashflowRatio, -0.1, 0.25);
-  const debtLoad = metrics.monthlyTakeHome > 0 ? metrics.monthlyDebtMinimums / metrics.monthlyTakeHome : 0;
-  const debt =
-    metrics.totalDebtBalance <= 0
-      ? 100
-      : scoreFromRange(0.45 - debtLoad, 0, 0.4);
-  const emergency = scoreFromRange(metrics.emergencyFundMonthsCovered, 0, 6);
-  const investRatio = metrics.monthlyTakeHome > 0 ? metrics.monthlyInvestCapacity / metrics.monthlyTakeHome : 0;
-  const investing =
-    metrics.monthlyInvestCapacity <= 0
-      ? 15
-      : scoreFromRange(investRatio, 0, 0.2);
-  const tax = clampScore(metrics.taxEfficiencyScore);
-  const total = clampScore(cashflow * 0.32 + debt * 0.24 + emergency * 0.2 + investing * 0.14 + tax * 0.1);
-  return { total, cashflow, debt, emergency, investing, tax };
+  budget: StoreBudgetInputs | null;
+  planExpenses: PlanInputs['expenses'] | null;
+  hsaAnnual: number;
+  k401TraditionalAnnual: number;
+  marginalCombinedRate: number;
+  grossAnnual: number;
+  marginalIncludesFica: boolean;
+}): { total: number; breakdown: PlanMetrics['healthScoreBreakdown']; tips: PlanMetrics['healthScoreTips'] } {
+  const net = Math.max(0, args.netPayMonthly);
+  const surplusRate = net > 0 ? args.monthlySurplus / net : 0;
+  const savingsRateOfNet = net > 0 ? args.totalMonthlySavingsHealth / net : 0;
+  const cashflow = scoreCashflowHealth(surplusRate);
+  const debt = scoreDebtHealth(args.totalDebtBalance, net);
+  const emergency = scoreEmergencyHealth(args.emergencyMonthsCovered);
+  const savings = scoreSavingsRateHealth(savingsRateOfNet);
+  const tax = clampScore(args.taxEfficiencyScore);
+  const total = clampScore(
+    cashflow * 0.3 + debt * 0.25 + emergency * 0.2 + savings * 0.15 + tax * 0.1,
+  );
+  const tips = buildHealthScoreTips({
+    netPayMonthly: net,
+    monthlySurplus: args.monthlySurplus,
+    surplusRate,
+    savingsRateOfNet,
+    totalMonthlySavings: args.totalMonthlySavingsHealth,
+    cashflowScore: cashflow,
+    debtScore: debt,
+    emergencyScore: emergency,
+    savingsScore: savings,
+    taxScore: tax,
+    totalDebtBalance: args.totalDebtBalance,
+    debts: args.debts,
+    debtStrategy: args.debtStrategy,
+    monthlyExpenses: args.monthlyExpenses,
+    emergencyBalance: args.emergencyBalance,
+    emergencyMonthly: args.emergencyMonthly,
+    budget: args.budget,
+    planExpenses: args.planExpenses,
+    hsaAnnual: args.hsaAnnual,
+    k401TraditionalAnnual: args.k401TraditionalAnnual,
+    marginalCombinedRate: args.marginalCombinedRate,
+    grossAnnual: args.grossAnnual,
+    marginalIncludesFica: args.marginalIncludesFica,
+  });
+  return {
+    total,
+    breakdown: { cashflow, debt, emergency, savings, tax },
+    tips,
+  };
 }
 
 function buildGoalWarnings(inputs: PlanInputs, metrics: {
@@ -351,15 +601,16 @@ function taxEfficiency(inputs: PlanInputs, paycheckResult: PaycheckResult, perio
         : inputs.annualSalary <= 200000
           ? 12
           : 15;
-
-  // Scores (out of 100)
-  const hsaScore = Math.min(annualHSA / HSA_MAX, 1) * 40;
   const k401Raw = inputs.traditional401kPct + inputs.roth401kPct;
-  const k401Score = Math.min(k401Raw / k401TargetPct, 1) * 35;
-  const fsaScore = Math.min(annualFSA / FSA_MAX, 1) * 15;
-  const commuterScore = Math.min(annualCommuter / COMMUTER_MAX, 1) * 10;
 
-  const totalScore = clampScore(hsaScore + k401Score + fsaScore + commuterScore);
+  const annual401kDeferral =
+    (paycheckResult.traditional401k + paycheckResult.roth401k) * periods;
+  const totalScore = taxEfficiencyScoreBuckets(
+    annualHSA,
+    annual401kDeferral,
+    annualFSA,
+    annualCommuter,
+  );
 
   const suggestions: TaxSuggestion[] = [];
 
@@ -733,14 +984,32 @@ export function computePlanMetrics(
     emergencyMonthlyContribution,
   };
   const priorities = buildPriorities(inputs, partialMetrics);
-  const health = buildHealthScore({
+  const annualHSAWizard = inputs.hsaPerPeriod * periods;
+  const trad401AnnualWizard = paycheckResult.traditional401k * periods;
+  const roth401AnnualWizard = paycheckResult.roth401k * periods;
+  const totalMonthlySavingsHealthWizard =
+    trad401AnnualWizard / 12 + roth401AnnualWizard / 12 + annualHSAWizard / 12;
+  const wizardMarginalCombined =
+    paycheckResult.marginalFederalRate + paycheckResult.stateEffectiveRate + 0.0765;
+  const healthPkg = buildFinancialHealthPackage({
+    netPayMonthly: monthlyTakeHome,
     monthlySurplus,
-    monthlyTakeHome,
     totalDebtBalance,
-    monthlyDebtMinimums,
-    emergencyFundMonthsCovered,
-    monthlyInvestCapacity,
+    debts,
+    debtStrategy: debtOverrides.strategy ?? 'avalanche',
+    monthlyExpenses: totalMonthlyExpenses,
+    emergencyMonthsCovered: emergencyFundMonthsCovered,
+    emergencyBalance: inputs.currentEmergencyFund,
+    emergencyMonthly: emergencyMonthlyContribution,
+    totalMonthlySavingsHealth: totalMonthlySavingsHealthWizard,
     taxEfficiencyScore,
+    budget: null,
+    planExpenses: inputs.expenses,
+    hsaAnnual: annualHSAWizard,
+    k401TraditionalAnnual: trad401AnnualWizard,
+    marginalCombinedRate: wizardMarginalCombined,
+    grossAnnual: inputs.annualSalary,
+    marginalIncludesFica: true,
   });
   const goalWarnings = buildGoalWarnings(inputs, {
     monthlySurplus,
@@ -792,14 +1061,9 @@ export function computePlanMetrics(
     emergencyFundDate,
     homeMonthlyContribution,
     emergencyMonthlyContribution,
-    financialHealthScore: health.total,
-    healthScoreBreakdown: {
-      cashflow: health.cashflow,
-      debt: health.debt,
-      emergency: health.emergency,
-      investing: health.investing,
-      tax: health.tax,
-    },
+    financialHealthScore: healthPkg.total,
+    healthScoreBreakdown: healthPkg.breakdown,
+    healthScoreTips: healthPkg.tips,
     goalWarnings,
     actionChecklist,
   };
@@ -886,28 +1150,80 @@ export function mergePlanMetricsWithUnifiedBudget(
     });
   }
 
+  const periodsUnified = PAY_PERIODS[paycheckInputs.payPeriod];
+  const paycheckCalcForTax = calculatePaycheck({
+    annualSalary: paycheckInputs.annualSalary,
+    payPeriod: paycheckInputs.payPeriod,
+    filingStatus: paycheckInputs.filingStatus,
+    state: paycheckInputs.state,
+    nycResident: paycheckInputs.nycResident,
+    traditional401kPct: paycheckInputs.k401TraditionalPct,
+    roth401kPct: paycheckInputs.k401RothPct,
+    hsaPerPeriod: paycheckInputs.hsaAnnual / periodsUnified,
+    fsaPerPeriod: paycheckInputs.fsaAnnual / periodsUnified,
+    healthInsurancePerPeriod: paycheckInputs.healthInsuranceAnnual / periodsUnified,
+    dentalPerPeriod: (paycheckInputs.dentalAnnual + paycheckInputs.visionAnnual) / periodsUnified,
+    commuterBenefitPerPeriod: paycheckInputs.commuterAnnual / periodsUnified,
+    otherPreTaxPerPeriod: paycheckInputs.otherPreTaxAnnual / periodsUnified,
+    otherPostTaxPerPeriod: paycheckInputs.otherPostTaxAnnual / periodsUnified,
+  });
+  const taxInputsUnified: PlanInputs = {
+    ...inputs,
+    annualSalary: paycheckInputs.annualSalary,
+    traditional401kPct: paycheckInputs.k401TraditionalPct,
+    roth401kPct: paycheckInputs.k401RothPct,
+    hsaPerPeriod: paycheckInputs.hsaAnnual / periodsUnified,
+    fsaPerPeriod: paycheckInputs.fsaAnnual / periodsUnified,
+    commuterBenefitPerPeriod: paycheckInputs.commuterAnnual / periodsUnified,
+  };
+  const { score: unifiedTaxScore, suggestions: unifiedTaxSuggestions } = taxEfficiency(
+    taxInputsUnified,
+    paycheckCalcForTax,
+    periodsUnified,
+  );
+
+  const totalMonthlySavingsHealthUnified =
+    paycheckResults.k401TraditionalAnnual / 12 +
+    paycheckResults.k401RothAnnual / 12 +
+    paycheckInputs.hsaAnnual / 12 +
+    budgetInputs.rothIraMonthly +
+    budgetInputs.brokerageMonthly +
+    budgetInputs.emergencyFundMonthly;
+
+  const healthUnified = buildFinancialHealthPackage({
+    netPayMonthly: paycheckResults.netPayMonthly,
+    monthlySurplus: unifiedSurplus,
+    totalDebtBalance,
+    debts: unifiedDebts,
+    debtStrategy: debtOverrides.strategy ?? 'avalanche',
+    monthlyExpenses: budgetExpenses,
+    emergencyMonthsCovered: emergencyFundMonthsCovered,
+    emergencyBalance: inputs.currentEmergencyFund,
+    emergencyMonthly: budgetInputs.emergencyFundMonthly,
+    totalMonthlySavingsHealth: totalMonthlySavingsHealthUnified,
+    taxEfficiencyScore: unifiedTaxScore,
+    budget: budgetInputs,
+    planExpenses: null,
+    hsaAnnual: paycheckInputs.hsaAnnual,
+    k401TraditionalAnnual: paycheckResults.k401TraditionalAnnual,
+    marginalCombinedRate: paycheckResults.marginalCombinedRate,
+    grossAnnual: paycheckResults.grossAnnual,
+    marginalIncludesFica: true,
+  });
+
   const partialMetrics: Partial<PlanMetrics> = {
     monthlySurplus: unifiedSurplus,
     debtResult,
     debtFreeDate,
     monthlyInvestCapacity,
     investResult,
-    taxEfficiencyScore: base.taxEfficiencyScore,
-    taxSuggestions: base.taxSuggestions,
+    taxEfficiencyScore: unifiedTaxScore,
+    taxSuggestions: unifiedTaxSuggestions,
     emergencyFundMonthsCovered,
     homeMonthlyContribution: budgetInputs.homeDownPaymentMonthly,
     emergencyMonthlyContribution: budgetInputs.emergencyFundMonthly,
   };
   const priorities = buildPriorities(inputs, partialMetrics);
-  const health = buildHealthScore({
-    monthlySurplus: unifiedSurplus,
-    monthlyTakeHome: monthlyIncome,
-    totalDebtBalance,
-    monthlyDebtMinimums: debtMins,
-    emergencyFundMonthsCovered,
-    monthlyInvestCapacity,
-    taxEfficiencyScore: base.taxEfficiencyScore,
-  });
   const goalWarnings = buildGoalWarnings(inputs, {
     monthlySurplus: unifiedSurplus,
     emergencyFundMonthsCovered,
@@ -922,7 +1238,7 @@ export function mergePlanMetricsWithUnifiedBudget(
     homeMonthlyContribution: budgetInputs.homeDownPaymentMonthly,
     monthlyInvestCapacity,
     debtResult,
-    taxSuggestions: base.taxSuggestions,
+    taxSuggestions: unifiedTaxSuggestions,
     goalWarnings,
   });
 
@@ -1010,14 +1326,11 @@ export function mergePlanMetricsWithUnifiedBudget(
     emergencyFundDate,
     homeMonthlyContribution: budgetInputs.homeDownPaymentMonthly,
     emergencyMonthlyContribution: budgetInputs.emergencyFundMonthly,
-    financialHealthScore: health.total,
-    healthScoreBreakdown: {
-      cashflow: health.cashflow,
-      debt: health.debt,
-      emergency: health.emergency,
-      investing: health.investing,
-      tax: health.tax,
-    },
+    taxEfficiencyScore: unifiedTaxScore,
+    taxSuggestions: unifiedTaxSuggestions,
+    financialHealthScore: healthUnified.total,
+    healthScoreBreakdown: healthUnified.breakdown,
+    healthScoreTips: healthUnified.tips,
     goalWarnings,
     actionChecklist,
   };

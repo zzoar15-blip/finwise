@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
@@ -38,6 +38,10 @@ import type { WaterfallEntry, TaxSuggestion, PriorityCard } from '@/lib/planCalc
 import type { AIInsight, PlanInputs, PlanExpenses } from '@/types/plan';
 import { formatCurrency } from '@/lib/format';
 import { useFinWiseStore } from '@/lib/store';
+import type { Debt } from '@/lib/calculations/debt';
+import { calcDebtAcceleration } from '@/lib/calculations/debtAcceleration';
+import { futureValueMonthlyContributions } from '@/lib/calculations/futureValueMonthly';
+import type { StoreBudgetInputs } from '@/lib/calculations';
 import { getEffectivePaycheckResults, getTotalTransportation } from '@/lib/calculations';
 import { PDFDownloadButton } from '@/components/pdf/PDFDownloadButton';
 import { PlanPDF } from '@/lib/pdf/PlanPDF';
@@ -83,6 +87,31 @@ function formatMonthYear(ym: string): string {
   });
 }
 
+function formatMonthYearFromDate(d: Date): string {
+  return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+}
+
+function findBiggestBudgetLine(b: StoreBudgetInputs): { name: string; amount: number } {
+  const transport = getTotalTransportation(b);
+  const pairs: [string, number][] = [
+    ['Housing / rent', b.housing],
+    ['Utilities', b.utilities],
+    ['Insurance', b.insurance],
+    ['Groceries', b.groceries],
+    ['Dining out', b.dining],
+    ['Transportation', transport],
+    ['Subscriptions', b.subscriptions],
+    ['Phone', b.phone],
+    ['Health / gym', b.healthGym],
+    ['Travel', b.travel],
+    ['Miscellaneous', b.misc],
+  ];
+  return pairs.reduce<{ name: string; amount: number }>(
+    (best, [name, amount]) => (amount > best.amount ? { name, amount } : best),
+    { name: pairs[0][0], amount: pairs[0][1] },
+  );
+}
+
 function yAxisK(v: number): string {
   if (Math.abs(v) >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
   if (Math.abs(v) >= 1_000) return `$${(v / 1_000).toFixed(0)}k`;
@@ -111,6 +140,79 @@ function scoreColor(score: number): string {
   if (score >= 80) return '#22c55e';
   if (score >= 50) return '#f59e0b';
   return '#ef4444';
+}
+
+/** Health breakdown bar + ring fill (0–100 subscores and overall). */
+function getHealthBarFillColor(score: number): string {
+  if (score >= 80) return '#16a34a';
+  if (score >= 60) return '#3b82f6';
+  if (score >= 40) return '#d97706';
+  return '#dc2626';
+}
+
+function healthOverallMessage(score: number): string {
+  if (score <= 40) return 'Your finances need attention — focus on the priorities below.';
+  if (score <= 60) return 'Building a foundation — a few changes make a big difference.';
+  if (score <= 80) return "You're on solid ground — optimize to accelerate.";
+  return 'Excellent financial health — stay the course and keep growing.';
+}
+
+function OverallHealthRing({ score }: { score: number }) {
+  const color = getHealthBarFillColor(score);
+  const r = 56;
+  const c = 2 * Math.PI * r;
+  const progress = (Math.max(0, Math.min(100, score)) / 100) * c;
+  return (
+    <div className="relative mx-auto h-[140px] w-[140px] shrink-0">
+      <svg width="140" height="140" viewBox="0 0 140 140" className="absolute inset-0">
+        <circle cx="70" cy="70" r={r} stroke="#e2e8f0" strokeWidth={10} fill="none" />
+        <circle
+          cx="70"
+          cy="70"
+          r={r}
+          stroke={color}
+          strokeWidth={10}
+          fill="none"
+          strokeDasharray={`${progress} ${c - progress}`}
+          strokeLinecap="round"
+          transform="rotate(-90 70 70)"
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center pt-1">
+        <span className="text-[32px] font-bold leading-none text-[#0f172a]">{score}</span>
+        <span className="mt-1 text-sm text-[#94a3b8]">/ 100</span>
+      </div>
+    </div>
+  );
+}
+
+function HealthScoreBar({ score }: { score: number }) {
+  const w = Math.max(0, Math.min(100, score));
+  const fill = getHealthBarFillColor(score);
+  return (
+    <div className="relative" style={{ marginTop: 8, marginBottom: 4 }}>
+      <div
+        style={{
+          height: 8,
+          borderRadius: 4,
+          backgroundColor: '#e2e8f0',
+          width: '100%',
+        }}
+      />
+      <div
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          height: 8,
+          borderRadius: 4,
+          width: `${w}%`,
+          backgroundColor: fill,
+          transition: 'width 0.6s ease',
+        }}
+      />
+    </div>
+  );
 }
 
 function savingsRateColor(rate: number): string {
@@ -278,7 +380,7 @@ function HealthScoreRing({
   debt: number;
   emergency: number;
 }) {
-  const color = score <= 40 ? '#dc2626' : score <= 60 ? '#d97706' : score <= 80 ? '#3b82f6' : '#16a34a';
+  const color = getHealthBarFillColor(score);
   const r = 34;
   const c = 2 * Math.PI * r;
   const progress = (Math.max(0, Math.min(100, score)) / 100) * c;
@@ -491,12 +593,15 @@ export default function PlanPage() {
   const paycheckInputs = useFinWiseStore((s) => s.paycheckInputs);
   const budgetInputs = useFinWiseStore((s) => s.budgetInputs);
   const finWiseDebts = useFinWiseStore((s) => s.debts);
+  const investmentInputsStore = useFinWiseStore((s) => s.investmentInputs);
 
   const [loading, setLoading] = useState(true);
   const [insightsLoading, setInsightsLoading] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
   const [insightsError, setInsightsError] = useState<string | null>(null);
-  const [whatIfExtraPay, setWhatIfExtraPay] = useState(200);
+  const [whatIfExtraPay, setWhatIfExtraPay] = useState(0);
+  const [debtSliderUserTouched, setDebtSliderUserTouched] = useState(false);
+  const debtSliderSeededRef = useRef(false);
   const [whatIfExpenseCutPct, setWhatIfExpenseCutPct] = useState(10);
   const [whatIfInvestBoost, setWhatIfInvestBoost] = useState(150);
 
@@ -609,6 +714,45 @@ export default function PlanPage() {
     setActionChecklist(metrics.actionChecklist);
   }, [metrics.actionChecklist, setActionChecklist]);
 
+  const whatIfDebtsForAccel = useMemo<Debt[]>(
+    () =>
+      finWiseDebts
+        .filter((d) => (d.balance ?? 0) > 0 && (d.minPayment ?? 0) >= 0)
+        .map((d) => ({
+          id: d.id,
+          name: d.name,
+          balance: d.balance,
+          apr: typeof d.apr === 'number' ? d.apr : 0,
+          minPayment: Math.max(0, d.minPayment ?? 0),
+        })),
+    [finWiseDebts],
+  );
+
+  const debtAcceleration = useMemo(
+    () => calcDebtAcceleration(whatIfDebtsForAccel, whatIfExtraPay),
+    [whatIfDebtsForAccel, whatIfExtraPay],
+  );
+
+  const unifiedBudgetHeroForSeed = effectivePaycheckResults.isComplete;
+
+  useEffect(() => {
+    if (debtSliderUserTouched || debtSliderSeededRef.current) return;
+    if (!(unifiedBudgetHeroForSeed || metrics.monthlySurplus > 0)) return;
+    debtSliderSeededRef.current = true;
+    const capped = Math.min(500, Math.max(0, metrics.monthlySurplus));
+    const snapped = Math.min(2000, Math.floor(capped / 50) * 50);
+    const t = window.setTimeout(() => {
+      setWhatIfExtraPay(snapped);
+    }, 0);
+    return () => window.clearTimeout(t);
+  }, [metrics.monthlySurplus, unifiedBudgetHeroForSeed, debtSliderUserTouched]);
+
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('What-if debts:', finWiseDebts);
+    }
+  }, [finWiseDebts]);
+
   // Invest metrics: prefer investProfile simulation, else use computed
   const investMetrics = useMemo(() => {
     if (!investProfile) return null;
@@ -703,9 +847,31 @@ export default function PlanPage() {
     projection,
     financialHealthScore,
     healthScoreBreakdown,
+    healthScoreTips,
     goalWarnings,
     actionChecklist,
   } = metrics;
+
+  const whatIfExpenseBase = metrics.totalMonthlyExpenses;
+  const whatIfExpenseCutDollars = Math.max(0, (whatIfExpenseBase * whatIfExpenseCutPct) / 100);
+  const whatIfSurplusAfterExpenseTrim = monthlySurplus + whatIfExpenseCutDollars;
+  const whatIfExpenseAnnualImpact = whatIfExpenseCutDollars * 12;
+
+  const investGrowthRatePct =
+    investmentInputsStore.annualAppreciation > 0 ? investmentInputsStore.annualAppreciation : 8;
+  const whatIfInvestmentFv5Y = futureValueMonthlyContributions(
+    whatIfInvestBoost,
+    investGrowthRatePct,
+    60,
+  );
+
+  const debtMinMonthlyTotal = whatIfDebtsForAccel.reduce((s, d) => s + d.minPayment, 0);
+  const whatIfSurplusAfterDebtPaidOff = monthlySurplus + debtMinMonthlyTotal + whatIfExtraPay;
+
+  const biggestBudgetExpense = findBiggestBudgetLine(budgetInputs);
+
+  const whatIfAnnualCombined =
+    whatIfExpenseCutDollars * 12 + whatIfInvestBoost * 12;
 
   const insightItems = aiInsightsCache?.items ?? [];
   const insightsFresh = Boolean(aiInsightsCache);
@@ -773,17 +939,32 @@ export default function PlanPage() {
     setShareCopied(true);
     setTimeout(() => setShareCopied(false), 2000);
   }
-  const whatIfExpenseBase = metrics.totalMonthlyExpenses;
-  const whatIfExpenseCutDollars = Math.max(0, (whatIfExpenseBase * whatIfExpenseCutPct) / 100);
-  const whatIfSurplusAfterCut = monthlySurplus + whatIfExpenseCutDollars;
-  const whatIfAnnualCashCreated = (whatIfExpenseCutDollars + whatIfInvestBoost) * 12;
-  const whatIfDebtMonthsSaved = hasDebts && debtResult
-    ? Math.max(0, Math.round((whatIfExtraPay / Math.max(1, totalDebtBalance)) * debtResult.monthsToPayoff * 0.9))
-    : 0;
-  const whatIfPotentialInvestAfter5Y = Math.max(
-    0,
-    (whatIfInvestBoost + Math.max(0, whatIfExpenseCutDollars)) * 12 * 5 * 1.15,
-  );
+
+  const debtAccelBanner =
+    whatIfExtraPay <= 0
+      ? {
+          className: 'border-slate-200 bg-slate-50 text-slate-600',
+          label: 'Add an extra monthly payment to see payoff acceleration.',
+        }
+      : debtAcceleration.monthsSaved > 12
+        ? {
+            className: 'border-green-200 bg-green-50 text-green-800',
+            label: 'Great acceleration',
+          }
+        : debtAcceleration.monthsSaved > 6
+          ? {
+              className: 'border-blue-200 bg-blue-50 text-blue-800',
+              label: 'Good progress',
+            }
+          : debtAcceleration.monthsSaved > 0
+            ? {
+                className: 'border-amber-200 bg-amber-50 text-amber-900',
+                label: 'Some benefit',
+              }
+            : {
+                className: 'border-amber-100 bg-amber-50/80 text-amber-950',
+                label: 'No extra months saved at this payment versus minimums alone.',
+              };
 
   return (
     <div className="mx-auto max-w-5xl space-y-8 print:space-y-6">
@@ -922,60 +1103,48 @@ export default function PlanPage() {
             />
           </div>
 
-          <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Health score breakdown</p>
-            <p className="mt-1 text-sm text-slate-700">
-              {financialHealthScore < 40
-                ? 'Your finances need attention — start with the priorities below.'
-                : financialHealthScore <= 60
-                ? "You're building a foundation — a few changes make a big difference."
-                : financialHealthScore <= 80
-                ? "You're on solid ground — optimize to accelerate."
-                : 'Excellent financial health — stay the course.'}
+          <div className="mt-4 rounded-xl border border-solid border-[#e2e8f0] bg-white p-6">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#94a3b8]">
+              Health score breakdown
             </p>
-            {[
-              {
-                label: 'Cashflow',
-                score: healthScoreBreakdown.cashflow,
-                tip: `Reducing dining (${formatCurrency(effectiveInputs.expenses.dining)}/mo) by 20% adds ${formatCurrency(effectiveInputs.expenses.dining * 0.2)} to surplus.`,
-              },
-              {
-                label: 'Debt',
-                score: healthScoreBreakdown.debt,
-                tip: hasDebts
-                  ? `Your largest debt is ${formatCurrency(Math.max(...effectiveInputs.debts.map((d) => d.balance), 0))}. Paying ${formatCurrency(200)}/mo extra can materially accelerate payoff.`
-                  : 'No debt drag currently. Keep balances at zero.',
-              },
-              {
-                label: 'Emergency fund',
-                score: healthScoreBreakdown.emergency,
-                tip: `You need ${formatCurrency(Math.max(0, effectiveInputs.emergencyFundTarget - effectiveInputs.currentEmergencyFund))} more to reach target runway.`,
-              },
-              {
-                label: 'Savings rate',
-                score: Math.round((savingsRate / 20) * 100),
-                tip: savingsRate < 20 ? `Increasing savings by ${formatCurrency(Math.max(0, (0.2 * monthlyTakeHome) - (monthlyInvestCapacity || 0)))} /mo helps move toward 20%+.` : 'Savings rate is in a strong range.',
-              },
-              {
-                label: 'Tax efficiency',
-                score: taxEfficiencyScore,
-                tip: taxSuggestions[0] ? `${taxSuggestions[0].label} could save about ${formatCurrency(taxSuggestions[0].additionalSavings)}/yr.` : 'Tax allocation is already close to optimized.',
-              },
-            ].map((item) => (
-              <div key={item.label} className="mt-3">
-                <div className="flex items-center justify-between text-xs text-slate-600">
-                  <span>{item.label}</span>
-                  <span className="font-semibold">{Math.max(0, Math.min(100, Math.round(item.score)))}/100</span>
-                </div>
-                <div className="mt-1 h-2 w-full rounded-full bg-slate-100">
+            <p className="mt-2 text-base font-semibold text-[#0f172a]">
+              {healthOverallMessage(financialHealthScore)}
+            </p>
+            <div className="mt-6 flex justify-center border-b border-[#e2e8f0] pb-6">
+              <OverallHealthRing score={Math.round(financialHealthScore)} />
+            </div>
+            <div>
+              {(
+                [
+                  { label: 'Cashflow', score: healthScoreBreakdown.cashflow, tip: healthScoreTips.cashflow },
+                  { label: 'Debt', score: healthScoreBreakdown.debt, tip: healthScoreTips.debt },
+                  { label: 'Emergency fund', score: healthScoreBreakdown.emergency, tip: healthScoreTips.emergency },
+                  { label: 'Savings rate', score: healthScoreBreakdown.savings, tip: healthScoreTips.savings },
+                  { label: 'Tax efficiency', score: healthScoreBreakdown.tax, tip: healthScoreTips.tax },
+                ] as const
+              ).map((item, idx) => {
+                const s = Math.max(0, Math.min(100, Math.round(item.score)));
+                const barColor = getHealthBarFillColor(s);
+                return (
                   <div
-                    className="h-2 rounded-full bg-blue-500"
-                    style={{ width: `${Math.max(0, Math.min(100, Math.round(item.score)))}%` }}
-                  />
-                </div>
-                <p className="mt-1 text-xs text-slate-500">{item.tip}</p>
-              </div>
-            ))}
+                    key={item.label}
+                    className={`border-[#e2e8f0] py-5 ${idx > 0 ? 'border-t border-solid' : ''}`}
+                  >
+                    <div className="flex items-baseline justify-between gap-4">
+                      <span className="text-sm font-medium text-[#0f172a]">{item.label}</span>
+                      <span className="shrink-0 tabular-nums">
+                        <span className="text-sm font-bold" style={{ color: barColor }}>
+                          {s}
+                        </span>
+                        <span className="text-sm font-semibold text-[#94a3b8]">/100</span>
+                      </span>
+                    </div>
+                    <HealthScoreBar score={s} />
+                    <p className="mt-1 text-xs italic leading-relaxed text-[#64748b]">{item.tip}</p>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
@@ -1649,60 +1818,142 @@ export default function PlanPage() {
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="grid gap-4 lg:grid-cols-3">
-                <div className="rounded-lg border border-border p-3 space-y-2">
+                <div className="rounded-lg border border-border p-3 flex flex-col gap-3">
                   <p className="text-sm font-semibold">Debt acceleration</p>
-                  <p className="text-xs text-muted-foreground">Extra monthly payment</p>
-                  <input
-                    type="range"
-                    min={0}
-                    max={1500}
-                    step={25}
-                    value={whatIfExtraPay}
-                    onChange={(e) => setWhatIfExtraPay(Number(e.target.value))}
-                    className="w-full accent-[#3b82f6]"
-                  />
-                  <p className="text-sm font-medium tabular-nums">{formatCurrency(whatIfExtraPay)}/mo</p>
-                  <p className="text-xs text-muted-foreground">
-                    Estimated payoff acceleration: {hasDebts ? `${whatIfDebtMonthsSaved} months sooner` : 'No debts to accelerate'}
-                  </p>
+                  {whatIfDebtsForAccel.length === 0 ? (
+                    <div className="space-y-2 text-sm text-muted-foreground">
+                      <p>Add your debts to see payoff acceleration.</p>
+                      <Link href="/debt" className="text-[#3b82f6] font-medium hover:underline inline-flex items-center gap-1">
+                        Go to Debt
+                        <ChevronRight className="size-4" />
+                      </Link>
+                    </div>
+                  ) : (
+                    <>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Extra monthly payment</p>
+                        <input
+                          type="range"
+                          min={0}
+                          max={2000}
+                          step={50}
+                          value={whatIfExtraPay}
+                          onChange={(e) => {
+                            setDebtSliderUserTouched(true);
+                            setWhatIfExtraPay(Number(e.target.value));
+                          }}
+                          className="w-full accent-[#3b82f6]"
+                        />
+                      </div>
+                      <p className="text-lg font-bold tabular-nums" style={{ color: '#0f172a' }}>
+                        {formatCurrency(whatIfExtraPay)}/mo extra
+                      </p>
+                      <div className="space-y-2 text-sm">
+                        <div>
+                          <p className="text-xs text-muted-foreground">Debt-free by</p>
+                          <p className="font-semibold tabular-nums">
+                            {formatMonthYearFromDate(debtAcceleration.newPayoffDate)}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {debtAcceleration.monthsSaved > 0
+                              ? `${debtAcceleration.monthsSaved} months sooner than minimum payments`
+                              : whatIfExtraPay <= 0
+                                ? 'Same as minimum-payment schedule until you add extra.'
+                                : 'Same timeline as minimums at this extra amount.'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Interest saved</p>
+                          <p className="font-semibold tabular-nums text-green-700">
+                            {formatCurrency(debtAcceleration.interestSaved)}
+                          </p>
+                          <p className="text-xs text-muted-foreground">vs. paying minimums only</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">New monthly surplus after payoff</p>
+                          <p className="font-semibold tabular-nums">
+                            {formatCurrency(whatIfSurplusAfterDebtPaidOff)}/mo freed up starting{' '}
+                            {formatMonthYearFromDate(debtAcceleration.newPayoffDate)}
+                          </p>
+                        </div>
+                      </div>
+                      <div
+                        className={`rounded-md border px-2 py-1.5 text-xs font-medium ${debtAccelBanner.className}`}
+                      >
+                        {debtAccelBanner.label}
+                      </div>
+                    </>
+                  )}
                 </div>
-                <div className="rounded-lg border border-border p-3 space-y-2">
+                <div className="rounded-lg border border-border p-3 space-y-3">
                   <p className="text-sm font-semibold">Expense optimization</p>
-                  <p className="text-xs text-muted-foreground">Trim total expenses by</p>
-                  <input
-                    type="range"
-                    min={0}
-                    max={25}
-                    step={1}
-                    value={whatIfExpenseCutPct}
-                    onChange={(e) => setWhatIfExpenseCutPct(Number(e.target.value))}
-                    className="w-full accent-[#3b82f6]"
-                  />
-                  <p className="text-sm font-medium tabular-nums">{whatIfExpenseCutPct}% ({formatCurrency(whatIfExpenseCutDollars)}/mo)</p>
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Trim total expenses by</p>
+                    <input
+                      type="range"
+                      min={0}
+                      max={25}
+                      step={1}
+                      value={whatIfExpenseCutPct}
+                      onChange={(e) => setWhatIfExpenseCutPct(Number(e.target.value))}
+                      className="w-full accent-[#3b82f6]"
+                    />
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Trim expenses by:{' '}
+                    <span className="font-semibold text-foreground tabular-nums">
+                      {whatIfExpenseCutPct}%
+                    </span>{' '}
+                    ({formatCurrency(whatIfExpenseCutDollars)}/mo saved)
+                  </p>
+                  <div>
+                    <p className="text-xs text-muted-foreground">New monthly surplus</p>
+                    <p className="text-base font-bold tabular-nums" style={{ color: '#0f172a' }}>
+                      {formatCurrency(whatIfSurplusAfterExpenseTrim)}/mo
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Annual impact</p>
+                    <p className="font-semibold tabular-nums">{formatCurrency(whatIfExpenseAnnualImpact)}</p>
+                  </div>
                   <p className="text-xs text-muted-foreground">
-                    New projected surplus: {formatCurrency(whatIfSurplusAfterCut)}/mo
+                    Biggest trim opportunity:{' '}
+                    <span className="font-medium text-foreground">
+                      {biggestBudgetExpense.name} ({formatCurrency(biggestBudgetExpense.amount)}/mo)
+                    </span>
                   </p>
                 </div>
-                <div className="rounded-lg border border-border p-3 space-y-2">
+                <div className="rounded-lg border border-border p-3 space-y-3">
                   <p className="text-sm font-semibold">Investment contribution</p>
-                  <p className="text-xs text-muted-foreground">Additional monthly invest</p>
-                  <input
-                    type="range"
-                    min={0}
-                    max={1500}
-                    step={25}
-                    value={whatIfInvestBoost}
-                    onChange={(e) => setWhatIfInvestBoost(Number(e.target.value))}
-                    className="w-full accent-[#3b82f6]"
-                  />
-                  <p className="text-sm font-medium tabular-nums">{formatCurrency(whatIfInvestBoost)}/mo</p>
-                  <p className="text-xs text-muted-foreground">
-                    Rough 5-year added value: {formatCurrency(whatIfPotentialInvestAfter5Y)}
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Additional monthly invest</p>
+                    <input
+                      type="range"
+                      min={0}
+                      max={1500}
+                      step={25}
+                      value={whatIfInvestBoost}
+                      onChange={(e) => setWhatIfInvestBoost(Number(e.target.value))}
+                      className="w-full accent-[#3b82f6]"
+                    />
+                  </div>
+                  <p className="text-lg font-bold tabular-nums" style={{ color: '#0f172a' }}>
+                    {formatCurrency(whatIfInvestBoost)}/mo
                   </p>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Rough 5-year added value</p>
+                    <p className="text-base font-semibold tabular-nums text-green-700">
+                      {formatCurrency(whatIfInvestmentFv5Y)}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      @ {investGrowthRatePct}% annual, compounded monthly (60 mo)
+                    </p>
+                  </div>
                 </div>
               </div>
               <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
-                Combined annual impact if applied together: <span className="font-semibold">{formatCurrency(whatIfAnnualCashCreated)}</span>
+                Combined annual impact if applied together:{' '}
+                <span className="font-semibold">{formatCurrency(whatIfAnnualCombined)}</span>
               </div>
             </CardContent>
           </Card>

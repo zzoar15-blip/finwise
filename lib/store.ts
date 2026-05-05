@@ -261,6 +261,25 @@ export const useFinWiseStore = create<FinWiseStore>()(
           },
         } as FinWiseStore;
       },
+      /** Ensure debts persist with the unified profile (explicit list for predictable rehydrates). */
+      partialize: (state: FinWiseStore) => ({
+        paycheckInputs: state.paycheckInputs,
+        paycheckResults: state.paycheckResults,
+        budgetInputs: state.budgetInputs,
+        investmentInputs: state.investmentInputs,
+        debts: state.debts,
+        goals: state.goals,
+        planLastUpdated: state.planLastUpdated,
+        rentVsBuyInputs: state.rentVsBuyInputs,
+        rentVsBuyResults: state.rentVsBuyResults,
+        sinkingFundInputs: state.sinkingFundInputs,
+        sinkingFundResults: state.sinkingFundResults,
+        netWorthAssets: state.netWorthAssets,
+        netWorthLiabilities: state.netWorthLiabilities,
+        netWorthHistory: state.netWorthHistory,
+        forecastScenarios: state.forecastScenarios,
+        forecastBaselineScenarioId: state.forecastBaselineScenarioId,
+      }),
     }
   )
 );
