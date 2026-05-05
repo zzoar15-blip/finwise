@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState, useMemo } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { forecastScenario, findBreakeven, buildConfidenceBands } from '@/lib/calculations/forecast';
@@ -43,7 +43,8 @@ import {
 import { Plus, Trash2, Home, Shield, DollarSign, Timer } from 'lucide-react';
 import { usePlanStore } from '@/lib/planStore';
 import { useFinWiseStore } from '@/lib/store';
-import { computeUnifiedMonthlyFlow } from '@/lib/calculations';
+import { computeSavingsRate, computeUnifiedMonthlyFlow } from '@/lib/calculations';
+import { PageSkeleton } from '@/components/ui/page-skeleton';
 
 const SCENARIO_COLORS = ['#3b82f6', '#22c55e', '#f97316'] as const;
 const CHART_MARGIN = { top: 8, right: 12, left: 4, bottom: 4 } as const;
@@ -167,11 +168,35 @@ function ForecastPageContent() {
   const [investReturn, setInvestReturn] = useState(7);
   const [retireTarget, setRetireTarget] = useState(1_500_000);
   const [retireReturn, setRetireReturn] = useState(7);
+  const didSeedDefaults = useRef(false);
 
   const flow = useMemo(
     () => computeUnifiedMonthlyFlow(paycheckInputs, paycheckResults, budget, debts),
     [paycheckInputs, paycheckResults, budget, debts]
   );
+  const inferredSavingsRate = useMemo(
+    () => Math.max(0, computeSavingsRate(flow.paycheck, paycheckInputs, budget)),
+    [flow.paycheck, paycheckInputs, budget]
+  );
+
+  const seededFromPaycheck = useMemo(
+    () => scenarios.every((s) => s.startingSalary === 80000),
+    [scenarios]
+  );
+
+  useEffect(() => {
+    if (!seededFromPaycheck || scenarios.length === 0 || didSeedDefaults.current) return;
+    const gross = Math.max(50000, paycheckResults.grossAnnual || flow.paycheck.grossAnnual || 80000);
+    didSeedDefaults.current = true;
+    setScenarios(
+      scenarios.map((s) => ({
+        ...s,
+        startingSalary: gross,
+        savingsRate: Math.max(5, Math.round(inferredSavingsRate)),
+        annualRaise: s.annualRaise || 3,
+      }))
+    );
+  }, [seededFromPaycheck, scenarios, paycheckResults.grossAnnual, flow.paycheck.grossAnnual, inferredSavingsRate, setScenarios]);
 
   const results: ScenarioResult[] = useMemo(
     () => scenarios.map((s) => ({ scenario: s, points: forecastScenario(s, 10) })),
@@ -796,17 +821,21 @@ function ForecastPageContent() {
         </CardContent>
       </Card>
 
-      {/* 10-Year Summary Table */}
+      {/* 10-Year Projection Table */}
       <Card>
         <CardHeader>
-          <CardTitle>10-Year Summary Table</CardTitle>
+          <CardTitle>10-Year Projection Table</CardTitle>
         </CardHeader>
         <CardContent>
+          <p className="mb-2 text-xs text-muted-foreground">← Scroll →</p>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border">
                   <th className="py-2 pr-4 text-left font-medium text-muted-foreground">Year</th>
+                  <th className="py-2 px-3 text-right font-medium text-muted-foreground">Salary</th>
+                  <th className="py-2 px-3 text-right font-medium text-muted-foreground">Annual Savings</th>
+                  <th className="py-2 px-3 text-right font-medium text-muted-foreground">401k</th>
                   {scenarios.map((s) => (
                     <th
                       key={s.id}
@@ -821,9 +850,18 @@ function ForecastPageContent() {
               <tbody>
                 {Array.from({ length: 10 }, (_, i) => {
                   const year = i + 1;
+                  const calendarYear = new Date().getFullYear() + i;
+                  const baseSalary = baselineScenario?.startingSalary ?? 0;
+                  const raise = (baselineScenario?.annualRaise ?? 0) / 100;
+                  const salary = baseSalary * Math.pow(1 + raise, i);
+                  const annualSavings = salary * ((baselineScenario?.savingsRate ?? 0) / 100);
+                  const annual401k = Math.min(23500, salary * ((paycheckInputs.k401TraditionalPct ?? 0) / 100));
                   return (
                     <tr key={year} className="border-b border-border/50">
-                      <td className="py-2 pr-4 font-medium tabular-nums">{year}</td>
+                      <td className="py-2 pr-4 font-medium tabular-nums">{calendarYear}</td>
+                      <td className="py-2 px-3 text-right tabular-nums">{formatCurrency(salary)}</td>
+                      <td className="py-2 px-3 text-right tabular-nums">{formatCurrency(annualSavings)}</td>
+                      <td className="py-2 px-3 text-right tabular-nums">{formatCurrency(annual401k)}</td>
                       {results.map((r) => (
                         <td
                           key={r.scenario.id}
@@ -858,7 +896,7 @@ function ForecastPageContent() {
 
 export default function ForecastPage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<PageSkeleton />}>
       <ForecastPageContent />
     </Suspense>
   );

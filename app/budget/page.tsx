@@ -39,6 +39,9 @@ import {
   getEffectivePaycheckResults,
 } from '@/lib/calculations';
 import { SyncMeta } from '@/components/SyncMeta';
+import { EmptyChart } from '@/components/ui/empty-chart';
+import { PieChart as PieIcon, BarChart3 } from 'lucide-react';
+import { HelpTooltip } from '@/components/ui/help-tooltip';
 
 const CHART_COLORS = {
   Debt: '#0f172a',
@@ -349,6 +352,12 @@ export default function BudgetPage() {
                 value={bi.investmentIncome}
                 onChange={(v) => setBudgetInputs({ investmentIncome: v })}
               />
+              <div className="-mt-1 mb-1 pl-1">
+                <HelpTooltip
+                  title="Investment income"
+                  body="Dividend income, interest, or other investment distributions you receive monthly. This supplements your take-home pay."
+                />
+              </div>
               <div className="flex items-center justify-between py-1.5 border-t border-gray-200 mt-1 pt-2.5">
                 <span className="text-sm font-semibold text-gray-700">Total Income</span>
                 <span className="text-sm font-bold text-gray-800 tabular-nums">
@@ -486,7 +495,13 @@ export default function BudgetPage() {
                   </span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-muted-foreground">Savings rate (% of gross)</span>
+                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                    Savings rate (% of gross)
+                    <HelpTooltip
+                      title="Savings rate"
+                      body="Percentage of take-home pay going to savings and investments. Financial advisors generally recommend 20%+."
+                    />
+                  </span>
                   <span className={`inline-flex h-5 items-center rounded-full px-2 text-xs font-semibold ${savingsRateColor(savingsRate)}`}>
                     {savingsRate.toFixed(1)}%
                   </span>
@@ -506,6 +521,16 @@ export default function BudgetPage() {
               </p>
             </CardHeader>
             <CardContent>
+              {pieData.length === 0 ? (
+                <EmptyChart
+                  icon={PieIcon}
+                  title="No budget data yet"
+                  description="Add your expenses to see the breakdown"
+                  ctaLabel="Set up budget"
+                  ctaHref="/budget"
+                  height={220}
+                />
+              ) : (
               <ResponsiveContainer width="100%" height={220}>
                 <PieChart>
                   <Pie
@@ -556,6 +581,7 @@ export default function BudgetPage() {
                   />
                 </PieChart>
               </ResponsiveContainer>
+              )}
             </CardContent>
           </Card>
 
@@ -564,6 +590,16 @@ export default function BudgetPage() {
               <CardTitle>Category Breakdown</CardTitle>
             </CardHeader>
             <CardContent>
+              {barData.length === 0 ? (
+                <EmptyChart
+                  icon={BarChart3}
+                  title="No budget data yet"
+                  description="Add your expenses to see the breakdown"
+                  ctaLabel="Set up budget"
+                  ctaHref="/budget"
+                  height={240}
+                />
+              ) : (
               <ResponsiveContainer width="100%" height={240}>
                 <BarChart data={barData} margin={{ top: 4, right: 8, left: 8, bottom: 4 }}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
@@ -580,6 +616,7 @@ export default function BudgetPage() {
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
+              )}
             </CardContent>
           </Card>
 

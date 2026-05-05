@@ -5,11 +5,12 @@ import Link from 'next/link';
 import { useFinWiseStore } from '@/lib/store';
 import { usePlanStore } from '@/lib/planStore';
 import { getPropertyTaxRate } from '@/lib/stateTax';
-import { computeUnifiedMonthlyFlow } from '@/lib/calculations';
+import { computeBudgetSurplus, computeUnifiedMonthlyFlow } from '@/lib/calculations';
 import { computeHousingAffordability } from '@/lib/calculations/housingAffordability';
 import { formatCurrency } from '@/lib/format';
 import { SyncMeta } from '@/components/SyncMeta';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { HelpTooltip } from '@/components/ui/help-tooltip';
 
 export default function HousingAffordabilityPage() {
   const paycheckInputs = useFinWiseStore((s) => s.paycheckInputs);
@@ -49,7 +50,8 @@ export default function HousingAffordabilityPage() {
     () =>
       computeHousingAffordability({
         flow,
-        currentHousing: budgetInputs.housing,
+        trueSurplus: computeBudgetSurplus(paycheckResults, budgetInputs, debts),
+        existingHousingCosts: budgetInputs.housing + budgetInputs.utilities + budgetInputs.insurance,
         partnerMonthlyIncome,
         partnerMonthlyGrossIncome,
         partnerMonthlyDebt,
@@ -67,7 +69,9 @@ export default function HousingAffordabilityPage() {
       }),
     [
       flow,
-      budgetInputs.housing,
+      paycheckResults,
+      budgetInputs,
+      debts,
       partnerMonthlyIncome,
       partnerMonthlyGrossIncome,
       partnerMonthlyDebt,
@@ -194,13 +198,28 @@ export default function HousingAffordabilityPage() {
           </div>
 
           <div className="rounded-xl border bg-card p-4">
-            <h3 className="mb-2 text-base font-semibold">How the limit is calculated</h3>
-            <Row label="Cashflow-based max" value={affordability.maxByCashflow} />
-            <Row label="28% gross income max (housing)" value={affordability.maxByFrontEndRatio} />
-            <Row label="36% gross income max (housing + debt)" value={affordability.maxByBackEndRatio} />
-            <Row label="Buffer-adjusted cashflow limit" value={affordability.availableForHousingAfterBuffer} />
-            <Row label="Household monthly income" value={affordability.monthlyIncomeHousehold} />
-            <Row label="Current non-housing outflows + savings target" value={affordability.nonHousingOutflows} />
+            <h3 className="mb-2 flex items-center gap-2 text-base font-semibold">
+              How the limit is calculated
+              <HelpTooltip
+                title="PITI"
+                body="Principal + Interest + Taxes + Insurance. The true all-in monthly cost of homeownership beyond just the mortgage payment."
+              />
+              <HelpTooltip
+                title="Front-end DTI"
+                body="Debt-to-income ratio including only housing costs. Lenders typically want this below 28%."
+              />
+              <HelpTooltip
+                title="Back-end DTI"
+                body="Total debt-to-income ratio including all monthly debt payments. Lenders typically want this below 43%."
+              />
+            </h3>
+            <Row label="Monthly surplus (from budget)" value={Math.max(0, affordability.availableForHousing - (budgetInputs.housing + budgetInputs.utilities + budgetInputs.insurance))} />
+            <Row label="Current housing costs (replacing)" value={budgetInputs.housing + budgetInputs.utilities + budgetInputs.insurance} />
+            <Row label="Available for housing" value={affordability.availableForHousing} />
+            <Row label="Cashflow-based max (PITI)" value={affordability.maxByCashflow} />
+            <Row label="Income-ratio max (28% rule)" value={affordability.maxByFrontEndRatio} />
+            <Row label="BINDING MAX" value={affordability.recommendedMonthlyHousing} />
+            <div className="my-1 border-t border-border" />
             <Row label="Estimated monthly principal + interest" value={affordability.estimatedMonthlyMortgagePI} />
             <Row label="Estimated monthly tax" value={affordability.estimatedMonthlyTax} />
             <Row label="Estimated monthly insurance" value={affordability.estimatedMonthlyInsurance} />
@@ -224,6 +243,14 @@ export default function HousingAffordabilityPage() {
                 Complete your paycheck inputs to unlock a more realistic affordability range.
               </p>
             ) : null}
+          </div>
+
+          <div className="rounded-xl border bg-card p-4">
+            <h3 className="mb-2 text-base font-semibold">How this affects your budget</h3>
+            <Row label="Current monthly surplus" value={Math.max(0, affordability.availableForHousing - (budgetInputs.housing + budgetInputs.utilities + budgetInputs.insurance))} />
+            <Row label="Remove old housing costs" value={budgetInputs.housing + budgetInputs.utilities + budgetInputs.insurance} />
+            <Row label="Add new housing costs" value={-affordability.recommendedMonthlyHousing} />
+            <Row label="New monthly surplus" value={Math.max(0, affordability.availableForHousing - affordability.recommendedMonthlyHousing)} />
           </div>
 
           <div className="rounded-xl border bg-card p-4 text-sm text-muted-foreground">

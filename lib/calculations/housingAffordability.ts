@@ -7,7 +7,8 @@ function safeNumber(value: number): number {
 
 export interface HousingAffordabilityInputs {
   flow: UnifiedMonthlyFlow;
-  currentHousing: number;
+  trueSurplus: number;
+  existingHousingCosts: number;
   partnerMonthlyIncome: number;
   partnerMonthlyGrossIncome?: number;
   partnerMonthlyDebt: number;
@@ -31,6 +32,7 @@ export interface HousingAffordabilityResults {
   monthlyIncomeHousehold: number;
   monthlyGrossHousehold: number;
   nonHousingOutflows: number;
+  availableForHousing: number;
   availableForHousingAfterBuffer: number;
   maxByCashflow: number;
   maxByFrontEndRatio: number;
@@ -149,13 +151,12 @@ export function computeHousingAffordability(inputs: HousingAffordabilityInputs):
   const monthlyIncomeHousehold = safeNumber(inputs.flow.monthlyIncome) + partnerIncome;
   const monthlyGrossHousehold = safeNumber(inputs.flow.paycheck.grossAnnual) / 12 + partnerGross;
 
-  const nonHousingOutflows =
-    Math.max(0, safeNumber(inputs.flow.cashOutflows) - safeNumber(inputs.currentHousing)) +
-    partnerDebt +
-    desiredSavings;
-  const maxByCashflowRaw = Math.max(0, monthlyIncomeHousehold - nonHousingOutflows);
-  const availableForHousingAfterBuffer = Math.max(0, maxByCashflowRaw * (1 - safetyBufferPct));
+  const trueSurplus = Math.max(0, safeNumber(inputs.trueSurplus));
+  const existingHousingCosts = Math.max(0, safeNumber(inputs.existingHousingCosts));
+  const availableForHousing = Math.max(0, trueSurplus + existingHousingCosts);
+  const availableForHousingAfterBuffer = Math.max(0, availableForHousing * (1 - Math.max(safetyBufferPct, 0.15)));
   const maxByCashflow = availableForHousingAfterBuffer;
+  const nonHousingOutflows = Math.max(0, monthlyIncomeHousehold - availableForHousing) + partnerDebt + desiredSavings;
   const maxByFrontEndRatio = Math.max(0, monthlyGrossHousehold * frontEndDti);
   const maxByBackEndRatio =
     Math.max(0, monthlyGrossHousehold * backEndDti - (safeNumber(inputs.flow.debtMinimums) + partnerDebt));
@@ -201,6 +202,7 @@ export function computeHousingAffordability(inputs: HousingAffordabilityInputs):
     monthlyIncomeHousehold,
     monthlyGrossHousehold,
     nonHousingOutflows,
+    availableForHousing,
     availableForHousingAfterBuffer,
     maxByCashflow,
     maxByFrontEndRatio,

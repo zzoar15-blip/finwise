@@ -74,6 +74,11 @@ export default function SettingsPage() {
     router.push('/');
   }
 
+  function handleRestartSetup() {
+    updateSettings({ acceptedInstitutionalDisclosure: true });
+    router.push('/?wizard=true');
+  }
+
   return (
     <div className="mx-auto max-w-[1280px] space-y-8">
       <PageHeader
@@ -133,6 +138,18 @@ export default function SettingsPage() {
           <CardDescription>Export or permanently delete your FinWise data.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="flex items-start justify-between gap-4 rounded-lg border border-blue-100 bg-blue-50 p-4">
+            <div>
+              <p className="text-sm font-medium text-blue-900">Restart setup wizard</p>
+              <p className="mt-0.5 text-xs text-blue-700">
+                Re-run onboarding to refresh salary, budget, debts, and goals.
+              </p>
+            </div>
+            <Button variant="outline" size="sm" onClick={handleRestartSetup} className="shrink-0 border-blue-200 text-blue-800">
+              Restart setup
+            </Button>
+          </div>
+
           <div className="flex items-start justify-between gap-4 rounded-lg border border-gray-100 bg-gray-50 p-4">
             <div>
               <p className="text-sm font-medium text-gray-800">Export all data</p>

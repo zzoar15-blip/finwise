@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -23,6 +23,8 @@ import { downloadCsv, downloadXlsxFromAoa } from '@/lib/export';
 import { PDFDownloadButton } from '@/components/pdf/PDFDownloadButton';
 import { SimpleRowsPDF } from '@/lib/pdf/SimpleRowsPDF';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { EmptyChart } from '@/components/ui/empty-chart';
+import { DollarSign } from 'lucide-react';
 
 export default function NetWorthPage() {
   const assets = useFinWiseStore((s) => s.netWorthAssets);
@@ -33,7 +35,36 @@ export default function NetWorthPage() {
   const addSnapshot = useFinWiseStore((s) => s.addNetWorthSnapshot);
   const paycheck = useFinWiseStore((s) => s.paycheckResults);
   const budget = useFinWiseStore((s) => s.budgetInputs);
+  const debts = useFinWiseStore((s) => s.debts);
   const [assumedReturnPct, setAssumedReturnPct] = useState(7);
+  const [monthsSaved, setMonthsSaved] = useState(12);
+
+  useEffect(() => {
+    const autoDebtLiabilities = debts.map((d) => ({
+      id: `auto-debt-${d.id}`,
+      name: d.name,
+      amount: d.balance,
+      category: 'Debt',
+    }));
+    const manual = liabilities.filter((l) => !l.id.startsWith('auto-debt-'));
+    const merged = [...autoDebtLiabilities, ...manual];
+    const same =
+      merged.length === liabilities.length &&
+      merged.every((m, i) => liabilities[i]?.id === m.id && liabilities[i]?.amount === m.amount && liabilities[i]?.name === m.name);
+    if (!same) setLiabilities(merged);
+  }, [debts, liabilities, setLiabilities]);
+
+  useEffect(() => {
+    const emergencyFundEstimate = budget.emergencyFundMonthly * monthsSaved;
+    const existing = assets.find((a) => a.id === 'auto-emergency-fund');
+    if (!existing) {
+      setAssets([{ id: 'auto-emergency-fund', name: 'Emergency Fund (est.)', amount: emergencyFundEstimate, category: 'Cash' }, ...assets]);
+      return;
+    }
+    if (existing.amount !== emergencyFundEstimate) {
+      setAssets(assets.map((a) => (a.id === 'auto-emergency-fund' ? { ...a, amount: emergencyFundEstimate } : a)));
+    }
+  }, [budget.emergencyFundMonthly, monthsSaved, assets, setAssets]);
 
   const totals = useMemo(() => computeNetWorthTotals(assets, liabilities), [assets, liabilities]);
 
@@ -192,7 +223,12 @@ export default function NetWorthPage() {
         </CardHeader>
         <CardContent>
           {chartData.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Save your first snapshot to start tracking trends.</p>
+            <EmptyChart
+              icon={DollarSign}
+              title="Start tracking your net worth"
+              description="Add your assets and liabilities to see your net worth over time"
+              height={240}
+            />
           ) : (
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={chartData}>
@@ -229,6 +265,10 @@ export default function NetWorthPage() {
               onChange={(e) => setAssumedReturnPct(Number(e.target.value))}
               className="w-full accent-[#3b82f6]"
             />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">Emergency fund months saved (estimate)</label>
+            <Input type="number" min={1} max={120} value={monthsSaved} onChange={(e) => setMonthsSaved(Math.max(1, Number(e.target.value) || 1))} />
           </div>
           <p className="text-xs text-muted-foreground">
             Forecast uses synced contribution channels: 401(k), Roth IRA, and Brokerage from your Budget/Paycheck setup.

@@ -14,6 +14,8 @@ import { usePlanStore } from '@/lib/planStore';
 import { computeUnifiedMonthlyFlow } from '@/lib/calculations';
 import { SyncMeta } from '@/components/SyncMeta';
 import { EmptyState } from '@/components/ui/empty-state';
+import { EmptyChart } from '@/components/ui/empty-chart';
+import { HelpTooltip } from '@/components/ui/help-tooltip';
 import {
   Card,
   CardContent,
@@ -40,6 +42,7 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
+  ReferenceLine,
 } from 'recharts';
 import { Plus, Trash2, Calendar, Clock, TrendingDown, Sparkles, Lightbulb, CreditCard } from 'lucide-react';
 
@@ -133,6 +136,14 @@ export default function DebtPage() {
     () => simulateDebtPayoff(debts, monthlyOverpayment, annualBonus, bonusMonth, strategy),
     [debts, monthlyOverpayment, annualBonus, bonusMonth, strategy],
   );
+  const avalancheResult: DebtResult = useMemo(
+    () => simulateDebtPayoff(debts, monthlyOverpayment, annualBonus, bonusMonth, 'avalanche'),
+    [debts, monthlyOverpayment, annualBonus, bonusMonth]
+  );
+  const snowballResult: DebtResult = useMemo(
+    () => simulateDebtPayoff(debts, monthlyOverpayment, annualBonus, bonusMonth, 'snowball'),
+    [debts, monthlyOverpayment, annualBonus, bonusMonth]
+  );
 
   const sensitivity: SensitivityRow[] = useMemo(
     () =>
@@ -171,6 +182,9 @@ export default function DebtPage() {
   }
 
   const hasDebts = debts.length > 0 && debts.some((d) => d.balance > 0);
+  const debtInputErrors = debts
+    .map((d) => (d.minPayment > d.balance && d.balance > 0 ? `${d.name}: minimum payment cannot exceed balance.` : null))
+    .filter(Boolean) as string[];
 
   function buildExportRows(): (string | number)[][] {
     const headers = ['Month', 'Date', ...debts.map((d) => d.name), 'Total Balance ($)', 'Cumulative Interest ($)'];
@@ -228,6 +242,9 @@ export default function DebtPage() {
             />
           )}
 
+          {debts.length > 0 && (
+            <p className="text-xs text-muted-foreground">← Scroll →</p>
+          )}
           {debts.length > 0 && (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -355,6 +372,22 @@ export default function DebtPage() {
                 Snowball (Lowest Balance First)
               </button>
             </div>
+            <div className="pt-1 text-xs text-muted-foreground space-y-1">
+              <div className="flex items-center gap-1.5">
+                <HelpTooltip
+                  title="Avalanche method"
+                  body="Pay minimums on all debts, then put extra money toward the highest interest rate debt first. Minimizes total interest paid."
+                />
+                <span>Avalanche method</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <HelpTooltip
+                  title="Snowball method"
+                  body="Pay minimums on all debts, then put extra money toward the smallest balance first. Builds momentum through quick wins."
+                />
+                <span>Snowball method</span>
+              </div>
+            </div>
           </div>
 
           {/* Budget surplus callout */}
@@ -364,6 +397,18 @@ export default function DebtPage() {
               <p>
                 Based on your budget you have ~<strong>{formatCurrency(surplus)}</strong> available for extra payments
               </p>
+            </div>
+          )}
+          {monthlyOverpayment > Math.max(0, surplus) && (
+            <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              This exceeds your monthly surplus — make sure this is sustainable.
+            </div>
+          )}
+          {debtInputErrors.length > 0 && (
+            <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {debtInputErrors.map((e) => (
+                <p key={e}>{e}</p>
+              ))}
             </div>
           )}
 
@@ -489,6 +534,41 @@ export default function DebtPage() {
         </Card>
       </div>
 
+      {hasDebts && (
+        <Card className="shadow-sm">
+          <CardHeader>
+            <CardTitle>Avalanche vs Snowball Comparison</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-lg border p-3">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Avalanche</p>
+                <p className="text-sm">Payoff: <span className="font-semibold">{formatDebtFreeDate(avalancheResult.debtFreeDate)}</span></p>
+                <p className="text-sm">Interest: <span className="font-semibold">{formatCurrency(avalancheResult.totalInterestPaid)}</span></p>
+                <p className="text-sm">Savings vs min: <span className="font-semibold">{formatCurrency(avalancheResult.interestSavedVsMinimum)}</span></p>
+              </div>
+              <div className="rounded-lg border p-3">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Snowball</p>
+                <p className="text-sm">Payoff: <span className="font-semibold">{formatDebtFreeDate(snowballResult.debtFreeDate)}</span></p>
+                <p className="text-sm">Interest: <span className="font-semibold">{formatCurrency(snowballResult.totalInterestPaid)}</span></p>
+                <p className="text-sm">Savings vs min: <span className="font-semibold">{formatCurrency(snowballResult.interestSavedVsMinimum)}</span></p>
+              </div>
+            </div>
+            <p className="mt-3 text-sm text-muted-foreground">
+              {avalancheResult.totalInterestPaid <= snowballResult.totalInterestPaid
+                ? `Avalanche saves you ${formatCurrency(snowballResult.totalInterestPaid - avalancheResult.totalInterestPaid)} more in interest.`
+                : `Snowball saves you ${formatCurrency(avalancheResult.totalInterestPaid - snowballResult.totalInterestPaid)} more in interest.`}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Avalanche order: {debts.slice().sort((a, b) => b.apr - a.apr).map((d) => `${d.name} (${d.apr}%)`).join(' -> ') || '—'}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Snowball order: {debts.slice().sort((a, b) => a.balance - b.balance).map((d) => `${d.name} (${formatCurrency(d.balance)})`).join(' -> ') || '—'}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Payoff Progress Chart */}
       <Card>
         <CardHeader>
@@ -496,9 +576,14 @@ export default function DebtPage() {
         </CardHeader>
         <CardContent>
           {!hasDebts || chartData.length === 0 ? (
-            <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">
-              Add debts above to see the payoff chart.
-            </div>
+            <EmptyChart
+              icon={CreditCard}
+              title="No debts added"
+              description="Add your debts to see the payoff timeline"
+              ctaLabel="Add debts"
+              ctaHref="/debt"
+              height={220}
+            />
           ) : (
             <ResponsiveContainer width="100%" height={280}>
               <AreaChart data={chartData} margin={{ top: 4, right: 8, left: 8, bottom: 4 }}>
@@ -522,6 +607,17 @@ export default function DebtPage() {
                   labelFormatter={(l) => String(l)}
                 />
                 <Legend iconSize={10} formatter={(v) => <span className="text-xs">{v}</span>} />
+                {annualBonus > 0 && result.snapshots.length > 0 && (
+                  <ReferenceLine
+                    x={result.snapshots.find((s) => {
+                      const month = Number(s.date.split('-')[1]);
+                      return month === bonusMonth && s.month > 1;
+                    })?.date}
+                    stroke="#16a34a"
+                    strokeDasharray="4 4"
+                    label={{ value: `${formatCurrency(annualBonus)} bonus applied`, fill: '#166534', fontSize: 11 }}
+                  />
+                )}
                 {debts.map((d, i) => (
                   <Area
                     key={d.id}
@@ -550,6 +646,8 @@ export default function DebtPage() {
               Add debts above to see sensitivity analysis.
             </p>
           ) : (
+            <>
+            <p className="mb-2 text-xs text-muted-foreground">← Scroll →</p>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -596,6 +694,7 @@ export default function DebtPage() {
                 </tbody>
               </table>
             </div>
+            </>
           )}
         </CardContent>
       </Card>

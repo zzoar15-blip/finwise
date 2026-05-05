@@ -32,6 +32,7 @@ import { formatCurrency, formatDate } from '@/lib/format';
 import { CATEGORY_ICONS } from '@/lib/constants';
 import type { PlanInputs } from '@/types/plan';
 import { EmptyState } from '@/components/ui/empty-state';
+import { PageSkeleton } from '@/components/ui/page-skeleton';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -216,7 +217,7 @@ function DashboardPageContent() {
   const setGoals = useFinWiseStore((s) => s.setGoals);
 
   const [showWizard, setShowWizard] = useState(
-    wizardOpen && settings.acceptedInstitutionalDisclosure,
+    (wizardOpen || (!plan && settings.acceptedInstitutionalDisclosure)) && settings.acceptedInstitutionalDisclosure,
   );
   const [showDisclosure, setShowDisclosure] = useState(
     wizardOpen && !settings.acceptedInstitutionalDisclosure,
@@ -569,6 +570,42 @@ function DashboardPageContent() {
           </CardContent>
         </Card>
 
+        {(() => {
+          const checks = [
+            { label: 'Paycheck configured', done: !!effectivePaycheckResults.isComplete, href: '/paycheck' },
+            { label: 'Budget set up', done: Object.values(budgetInputs).some((v) => typeof v === 'number' && v > 0), href: '/budget' },
+            { label: 'Debts added', done: debts.length > 0, href: '/debt' },
+            { label: 'Investment goals set', done: budgetInputs.brokerageMonthly > 0 || budgetInputs.rothIraMonthly > 0, href: '/invest' },
+            { label: 'Goals selected', done: (plan?.inputs.goals?.length ?? 0) > 0, href: '/plan' },
+          ];
+          const completed = checks.filter((c) => c.done).length;
+          if (completed === checks.length) return null;
+          return (
+            <Card className="border-slate-200/80 shadow-sm">
+              <CardHeader>
+                <CardTitle>Complete your plan setup</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="h-2 w-full rounded-full bg-slate-100">
+                  <div className="h-2 rounded-full bg-blue-600" style={{ width: `${(completed / checks.length) * 100}%` }} />
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {completed} of {checks.length} complete ({Math.round((completed / checks.length) * 100)}%)
+                </p>
+                <div className="space-y-1">
+                  {checks.map((c) =>
+                    c.done ? (
+                      <div key={c.label} className="text-sm text-gray-500 line-through">✓ {c.label}</div>
+                    ) : (
+                      <Link key={c.label} href={c.href} className="block text-sm font-medium text-slate-900 hover:text-blue-600">→ {c.label}</Link>
+                    )
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })()}
+
         <div>
           <h2 className="mb-1 text-lg font-semibold text-gray-900">Financial Workspace</h2>
           <p className="mb-4 text-sm text-gray-500">Jump to each module with synced assumptions across plan, budget, and forecasting.</p>
@@ -674,7 +711,7 @@ function DashboardPageContent() {
 
 export default function DashboardPage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<PageSkeleton />}>
       <DashboardPageContent />
     </Suspense>
   );

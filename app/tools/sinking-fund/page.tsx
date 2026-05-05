@@ -23,6 +23,7 @@ import { PDFDownloadButton } from '@/components/pdf/PDFDownloadButton';
 import { SimpleRowsPDF } from '@/lib/pdf/SimpleRowsPDF';
 import { SyncMeta } from '@/components/SyncMeta';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { computeBudgetSurplus } from '@/lib/calculations';
 
 const PRESETS: Array<{
   type: SinkingFundGoalType;
@@ -32,8 +33,15 @@ const PRESETS: Array<{
   annualYieldPct: number;
 }> = [
   { type: 'vacation', label: 'Vacation', targetAmount: 6000, months: 12, annualYieldPct: 4 },
+  { type: 'custom', label: 'Emergency fund', targetAmount: 10000, months: 12, annualYieldPct: 4 },
+  { type: 'custom', label: 'Car maintenance', targetAmount: 1800, months: 12, annualYieldPct: 4 },
+  { type: 'custom', label: 'Home repairs', targetAmount: 5000, months: 18, annualYieldPct: 4 },
+  { type: 'custom', label: 'Medical', targetAmount: 2400, months: 12, annualYieldPct: 4 },
+  { type: 'custom', label: 'Holiday gifts', targetAmount: 1200, months: 12, annualYieldPct: 4 },
+  { type: 'custom', label: 'New car', targetAmount: 15000, months: 36, annualYieldPct: 4 },
+  { type: 'custom', label: 'Wedding', targetAmount: 20000, months: 24, annualYieldPct: 4 },
+  { type: 'custom', label: 'Education', targetAmount: 12000, months: 24, annualYieldPct: 4 },
   { type: 'down-payment', label: 'House Down Payment', targetAmount: 50000, months: 36, annualYieldPct: 4.5 },
-  { type: 'custom', label: 'Custom Goal', targetAmount: 10000, months: 18, annualYieldPct: 4 },
 ];
 
 function addMonths(ym: string, offset: number): string {
@@ -61,6 +69,8 @@ export default function SinkingFundPage() {
   const results = useFinWiseStore((s) => s.sinkingFundResults);
   const setInputs = useFinWiseStore((s) => s.setSinkingFundInputs);
   const budgetInputs = useFinWiseStore((s) => s.budgetInputs);
+  const paycheckResults = useFinWiseStore((s) => s.paycheckResults);
+  const debts = useFinWiseStore((s) => s.debts);
   const setBudgetInputs = useFinWiseStore((s) => s.setBudgetInputs);
   const planLastUpdated = useFinWiseStore((s) => s.planLastUpdated);
   const plan = usePlanStore((s) => s.plan);
@@ -83,6 +93,11 @@ export default function SinkingFundPage() {
         : inputs.monthlyContribution;
     return Math.max(0, Math.round(monthly));
   }, [inputs.goalType, inputs.mode, inputs.monthlyContribution, results.requiredMonthlyContribution]);
+  const availableMonthly = useMemo(
+    () => computeBudgetSurplus(paycheckResults, budgetInputs, debts),
+    [paycheckResults, budgetInputs, debts]
+  );
+  const currentAllocation = inputs.mode === 'target-date' ? results.requiredMonthlyContribution : inputs.monthlyContribution;
 
   useEffect(() => {
     if (budgetDrivenMonthly === null) return;
@@ -155,6 +170,16 @@ export default function SinkingFundPage() {
         }
       />
       <div className="px-8"><SyncMeta updatedAt={planLastUpdated} badges={['Unified Flow']} /></div>
+      <div className="px-8">
+        <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
+          Based on your budget, you have <span className="font-semibold">{formatCurrency(availableMonthly)}</span> available to allocate to sinking funds.
+        </div>
+        {currentAllocation > availableMonthly && (
+          <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            ⚠ Your sinking funds ({formatCurrency(currentAllocation)}/mo total) exceed your monthly surplus ({formatCurrency(availableMonthly)}).
+          </div>
+        )}
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-[420px_1fr]">
         <div className="space-y-4">

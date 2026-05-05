@@ -61,6 +61,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import type { ActionChecklistItem } from '@/types/plan';
+import LZString from 'lz-string';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -493,7 +494,11 @@ export default function PlanPage() {
 
   const [loading, setLoading] = useState(true);
   const [insightsLoading, setInsightsLoading] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
   const [insightsError, setInsightsError] = useState<string | null>(null);
+  const [whatIfExtraPay, setWhatIfExtraPay] = useState(200);
+  const [whatIfExpenseCutPct, setWhatIfExpenseCutPct] = useState(10);
+  const [whatIfInvestBoost, setWhatIfInvestBoost] = useState(150);
 
   // 800ms loading splash
   useEffect(() => {
@@ -747,6 +752,38 @@ export default function PlanPage() {
       value: `${formatCurrency(getTotalTransportation(budgetInputs))}/mo (car ${formatCurrency(budgetInputs.carPayment)} + insurance ${formatCurrency(budgetInputs.carInsurance)} + gas ${formatCurrency(budgetInputs.gas)})`,
     });
   }
+  const sharePayload = {
+    name: effectiveInputs.name || 'FinWise User',
+    annualSalary: effectiveInputs.annualSalary,
+    monthlySurplus,
+    savingsRate,
+    goals: effectiveInputs.goals,
+    debtFreeDate,
+    totalDebtBalance,
+    projection: projection.slice(0, 12).map((p) => ({ label: p.label, netWorth: p.savingsBalance - p.debtBalance })),
+    debts: effectiveInputs.debts.map((d, i) => ({ id: `Debt ${i + 1}`, balance: d.balance, apr: d.apr })),
+  };
+  const shareUrl =
+    typeof window === 'undefined'
+      ? ''
+      : `${window.location.origin}/plan/view?d=${LZString.compressToEncodedURIComponent(JSON.stringify(sharePayload))}`;
+  async function copyShareLink() {
+    if (!shareUrl) return;
+    await navigator.clipboard.writeText(shareUrl);
+    setShareCopied(true);
+    setTimeout(() => setShareCopied(false), 2000);
+  }
+  const whatIfExpenseBase = metrics.totalMonthlyExpenses;
+  const whatIfExpenseCutDollars = Math.max(0, (whatIfExpenseBase * whatIfExpenseCutPct) / 100);
+  const whatIfSurplusAfterCut = monthlySurplus + whatIfExpenseCutDollars;
+  const whatIfAnnualCashCreated = (whatIfExpenseCutDollars + whatIfInvestBoost) * 12;
+  const whatIfDebtMonthsSaved = hasDebts && debtResult
+    ? Math.max(0, Math.round((whatIfExtraPay / Math.max(1, totalDebtBalance)) * debtResult.monthsToPayoff * 0.9))
+    : 0;
+  const whatIfPotentialInvestAfter5Y = Math.max(
+    0,
+    (whatIfInvestBoost + Math.max(0, whatIfExpenseCutDollars)) * 12 * 5 * 1.15,
+  );
 
   return (
     <div className="mx-auto max-w-5xl space-y-8 print:space-y-6">
@@ -886,6 +923,62 @@ export default function PlanPage() {
           </div>
 
           <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Health score breakdown</p>
+            <p className="mt-1 text-sm text-slate-700">
+              {financialHealthScore < 40
+                ? 'Your finances need attention — start with the priorities below.'
+                : financialHealthScore <= 60
+                ? "You're building a foundation — a few changes make a big difference."
+                : financialHealthScore <= 80
+                ? "You're on solid ground — optimize to accelerate."
+                : 'Excellent financial health — stay the course.'}
+            </p>
+            {[
+              {
+                label: 'Cashflow',
+                score: healthScoreBreakdown.cashflow,
+                tip: `Reducing dining (${formatCurrency(effectiveInputs.expenses.dining)}/mo) by 20% adds ${formatCurrency(effectiveInputs.expenses.dining * 0.2)} to surplus.`,
+              },
+              {
+                label: 'Debt',
+                score: healthScoreBreakdown.debt,
+                tip: hasDebts
+                  ? `Your largest debt is ${formatCurrency(Math.max(...effectiveInputs.debts.map((d) => d.balance), 0))}. Paying ${formatCurrency(200)}/mo extra can materially accelerate payoff.`
+                  : 'No debt drag currently. Keep balances at zero.',
+              },
+              {
+                label: 'Emergency fund',
+                score: healthScoreBreakdown.emergency,
+                tip: `You need ${formatCurrency(Math.max(0, effectiveInputs.emergencyFundTarget - effectiveInputs.currentEmergencyFund))} more to reach target runway.`,
+              },
+              {
+                label: 'Savings rate',
+                score: Math.round((savingsRate / 20) * 100),
+                tip: savingsRate < 20 ? `Increasing savings by ${formatCurrency(Math.max(0, (0.2 * monthlyTakeHome) - (monthlyInvestCapacity || 0)))} /mo helps move toward 20%+.` : 'Savings rate is in a strong range.',
+              },
+              {
+                label: 'Tax efficiency',
+                score: taxEfficiencyScore,
+                tip: taxSuggestions[0] ? `${taxSuggestions[0].label} could save about ${formatCurrency(taxSuggestions[0].additionalSavings)}/yr.` : 'Tax allocation is already close to optimized.',
+              },
+            ].map((item) => (
+              <div key={item.label} className="mt-3">
+                <div className="flex items-center justify-between text-xs text-slate-600">
+                  <span>{item.label}</span>
+                  <span className="font-semibold">{Math.max(0, Math.min(100, Math.round(item.score)))}/100</span>
+                </div>
+                <div className="mt-1 h-2 w-full rounded-full bg-slate-100">
+                  <div
+                    className="h-2 rounded-full bg-blue-500"
+                    style={{ width: `${Math.max(0, Math.min(100, Math.round(item.score)))}%` }}
+                  />
+                </div>
+                <p className="mt-1 text-xs text-slate-500">{item.tip}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Your next actions</p>
             <div className="mt-2 space-y-2">
               {(actionChecklist.length > 0 ? actionChecklist.slice(0, 3) : [
@@ -932,6 +1025,7 @@ export default function PlanPage() {
               </Badge>
             </div>
             <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200">
+              <p className="px-3 pt-2 text-xs text-muted-foreground">← Scroll →</p>
               <table className="w-full text-sm">
                 <tbody className="divide-y divide-slate-100">
                   {institutionalSummaryRows.map((row) => (
@@ -1300,6 +1394,7 @@ export default function PlanPage() {
                         Key milestones
                       </p>
                       <div className="overflow-x-auto rounded-lg border border-border">
+                        <p className="px-3 pt-2 text-xs text-muted-foreground">← Scroll →</p>
                         <table className="w-full text-sm">
                           <thead>
                             <tr className="border-b border-border bg-muted/30">
@@ -1485,6 +1580,7 @@ export default function PlanPage() {
 
                   {/* Table */}
                   <div className="overflow-x-auto rounded-lg border border-border">
+                    <p className="px-3 pt-2 text-xs text-muted-foreground">← Scroll →</p>
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b border-border bg-muted/30">
@@ -1541,6 +1637,78 @@ export default function PlanPage() {
         </Section>
 
         {/* ── SECTION 7: AI Insights ── */}
+        <Section delay={0.65}>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg font-bold" style={{ color: '#0f172a' }}>
+                What-If Quick Calculators
+              </CardTitle>
+              <CardDescription>
+                Test a few high-impact adjustments before committing to a larger plan change.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div className="grid gap-4 lg:grid-cols-3">
+                <div className="rounded-lg border border-border p-3 space-y-2">
+                  <p className="text-sm font-semibold">Debt acceleration</p>
+                  <p className="text-xs text-muted-foreground">Extra monthly payment</p>
+                  <input
+                    type="range"
+                    min={0}
+                    max={1500}
+                    step={25}
+                    value={whatIfExtraPay}
+                    onChange={(e) => setWhatIfExtraPay(Number(e.target.value))}
+                    className="w-full accent-[#3b82f6]"
+                  />
+                  <p className="text-sm font-medium tabular-nums">{formatCurrency(whatIfExtraPay)}/mo</p>
+                  <p className="text-xs text-muted-foreground">
+                    Estimated payoff acceleration: {hasDebts ? `${whatIfDebtMonthsSaved} months sooner` : 'No debts to accelerate'}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-border p-3 space-y-2">
+                  <p className="text-sm font-semibold">Expense optimization</p>
+                  <p className="text-xs text-muted-foreground">Trim total expenses by</p>
+                  <input
+                    type="range"
+                    min={0}
+                    max={25}
+                    step={1}
+                    value={whatIfExpenseCutPct}
+                    onChange={(e) => setWhatIfExpenseCutPct(Number(e.target.value))}
+                    className="w-full accent-[#3b82f6]"
+                  />
+                  <p className="text-sm font-medium tabular-nums">{whatIfExpenseCutPct}% ({formatCurrency(whatIfExpenseCutDollars)}/mo)</p>
+                  <p className="text-xs text-muted-foreground">
+                    New projected surplus: {formatCurrency(whatIfSurplusAfterCut)}/mo
+                  </p>
+                </div>
+                <div className="rounded-lg border border-border p-3 space-y-2">
+                  <p className="text-sm font-semibold">Investment contribution</p>
+                  <p className="text-xs text-muted-foreground">Additional monthly invest</p>
+                  <input
+                    type="range"
+                    min={0}
+                    max={1500}
+                    step={25}
+                    value={whatIfInvestBoost}
+                    onChange={(e) => setWhatIfInvestBoost(Number(e.target.value))}
+                    className="w-full accent-[#3b82f6]"
+                  />
+                  <p className="text-sm font-medium tabular-nums">{formatCurrency(whatIfInvestBoost)}/mo</p>
+                  <p className="text-xs text-muted-foreground">
+                    Rough 5-year added value: {formatCurrency(whatIfPotentialInvestAfter5Y)}
+                  </p>
+                </div>
+              </div>
+              <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
+                Combined annual impact if applied together: <span className="font-semibold">{formatCurrency(whatIfAnnualCashCreated)}</span>
+              </div>
+            </CardContent>
+          </Card>
+        </Section>
+
+        {/* ── SECTION 8: AI Insights ── */}
         <Section delay={0.7}>
           <Card>
             <CardHeader>
@@ -1666,15 +1834,26 @@ export default function PlanPage() {
             }
             fileName={`finwise-plan-${new Date().toISOString().slice(0, 10)}.pdf`}
           />
-          <div className="group relative">
-            <Button variant="outline" disabled>
-              <Share2 className="size-3.5" />
-              Share Plan
-            </Button>
-            <div className="pointer-events-none absolute bottom-full left-0 mb-1.5 whitespace-nowrap rounded-md bg-foreground px-2 py-1 text-xs text-background opacity-0 transition-opacity group-hover:opacity-100">
-              Coming soon
-            </div>
-          </div>
+          <Dialog>
+            <DialogTrigger>
+              <Button variant="outline">
+                <Share2 className="size-3.5" />
+                Share Plan
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Share your financial plan</DialogTitle>
+                <DialogDescription>
+                  Anyone with this link can view your plan. No account information is shared.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-2">
+                <input readOnly className="w-full rounded-md border px-3 py-2 text-sm" value={shareUrl} />
+                <Button onClick={copyShareLink}>{shareCopied ? 'Copied ✓' : 'Copy link'}</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </Section>
     </div>

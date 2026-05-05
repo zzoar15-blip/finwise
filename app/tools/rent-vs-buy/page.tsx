@@ -22,6 +22,7 @@ import { PDFDownloadButton } from '@/components/pdf/PDFDownloadButton';
 import { computeRentVsBuy } from '@/lib/calculations/rentVsBuy';
 import { RentVsBuyPDF } from '@/lib/pdf/RentVsBuyPDF';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { HelpTooltip } from '@/components/ui/help-tooltip';
 
 const SENTIMENT_STYLES = {
   'strong-buy': 'border-l-[4px] border-l-[#3b82f6] bg-blue-50 text-slate-900',
@@ -298,6 +299,13 @@ export default function RentVsBuyPage() {
             <h2 className="font-semibold">Your finances</h2>
             <Field label="Investment return" value={inputs.investmentReturnRate * 100} suffix="%" step={0.1} min={3} max={12} onValue={(n) => setRentVsBuyInputs({ investmentReturnRate: n / 100 })} range />
             <Field label="Marginal tax rate" value={inputs.marginalTaxRate * 100} suffix="%" step={0.1} min={0} max={50} onValue={(n) => setRentVsBuyInputs({ marginalTaxRate: n / 100 })} />
+            <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+              <HelpTooltip
+                title="Opportunity cost"
+                body="The wealth you forgo by putting money into a down payment instead of investing it. A key factor often ignored in rent vs buy comparisons."
+              />
+              Opportunity cost is included in the model.
+            </p>
             <div className="flex items-center justify-between">
               <span className="text-sm">Itemize deductions</span>
               <div className="flex gap-2">
@@ -337,6 +345,13 @@ export default function RentVsBuyPage() {
               <p className="text-xs font-semibold tracking-[0.08em] text-slate-500">BREAK-EVEN</p>
               <p className="text-[24px] font-bold">
                 {results.breakEvenYear ? `${Math.round(results.breakEvenYear)} years` : 'Never'}
+              </p>
+              <p className="mt-1 text-xs text-slate-500 flex items-center gap-1.5">
+                <HelpTooltip
+                  title="Break-even point"
+                  body="The year at which buying overtakes renting in total net worth. If you move before this point, renting was likely better financially."
+                />
+                Break-even reflects your modeled crossover year.
               </p>
             </div>
           </div>
@@ -419,7 +434,13 @@ export default function RentVsBuyPage() {
           </div>
 
           <div className="rounded-xl border bg-card p-4 space-y-3">
-            <h3 className="font-semibold">Price-to-rent ratio</h3>
+            <h3 className="flex items-center gap-1.5 font-semibold">
+              Price-to-rent ratio
+              <HelpTooltip
+                title="Price-to-rent ratio"
+                body="Home price divided by annual rent. Below 15 generally favors buying; above 20 generally favors renting."
+              />
+            </h3>
             <p className="text-sm">Your ratio: <span className="font-semibold">{results.priceToRentRatio.toFixed(1)}</span></p>
             <div className="h-3 rounded-full bg-gradient-to-r from-green-500 via-amber-400 to-red-600 relative">
               <span className="absolute top-[-4px] h-5 w-1 bg-black" style={{ left: `${Math.min(100, (results.priceToRentRatio / 40) * 100)}%` }} />
@@ -437,6 +458,7 @@ export default function RentVsBuyPage() {
           <div className="rounded-xl border bg-card p-4">
             <h3 className="font-semibold mb-2">Scenarios table</h3>
             <div className="overflow-x-auto">
+              <p className="mb-2 text-xs text-muted-foreground">← Scroll →</p>
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-left border-b">
@@ -467,6 +489,7 @@ export default function RentVsBuyPage() {
           <div className="rounded-xl border bg-card p-4">
             <h3 className="font-semibold mb-2">Break-even year by home appreciation vs. investment return</h3>
             <div className="overflow-x-auto">
+              <p className="mb-2 text-xs text-muted-foreground">← Scroll →</p>
               <table className="w-full text-sm">
                 <thead>
                   <tr>

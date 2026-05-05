@@ -10,8 +10,11 @@ export interface Message {
   content: string;
 }
 
-function buildFinancialContext(store: ReturnType<typeof useFinanceStore.getState>): string {
-  const { transactions, budgets } = store;
+function buildFinancialContext(
+  financeStore: ReturnType<typeof useFinanceStore.getState>,
+  planningStore: ReturnType<typeof useFinWiseStore.getState>
+): string {
+  const { transactions, budgets } = financeStore;
 
   const now = new Date();
   const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -56,6 +59,20 @@ function buildFinancialContext(store: ReturnType<typeof useFinanceStore.getState
 
   lines.push(`\nTotal transactions on record: ${transactions.length}`);
 
+  const transportTotal =
+    planningStore.budgetInputs.carPayment +
+    planningStore.budgetInputs.carInsurance +
+    planningStore.budgetInputs.gas +
+    planningStore.budgetInputs.parking +
+    planningStore.budgetInputs.publicTransit +
+    planningStore.budgetInputs.otherTransport;
+  lines.push('\nLive planning snapshot:');
+  lines.push(`  Gross annual: ${formatCurrency(planningStore.paycheckResults.grossAnnual)}`);
+  lines.push(`  Net monthly: ${formatCurrency(planningStore.paycheckResults.netPayMonthly)}`);
+  lines.push(`  Monthly housing: ${formatCurrency(planningStore.budgetInputs.housing)}`);
+  lines.push(`  Monthly transportation: ${formatCurrency(transportTotal)}`);
+  lines.push(`  Debts tracked: ${planningStore.debts.length}`);
+
   return lines.join('\n');
 }
 
@@ -83,7 +100,7 @@ export function useAdvisor() {
   const financialContext = useCallback(() => {
     const txStore = useFinanceStore.getState();
     const planningStore = useFinWiseStore.getState();
-    const base = buildFinancialContext(txStore);
+    const base = buildFinancialContext(txStore, planningStore);
     const rvb = buildRentVsBuyContext(planningStore);
     return rvb ? `${base}\n\n${rvb}` : base;
   }, []);
@@ -107,6 +124,7 @@ export function useAdvisor() {
         body: JSON.stringify({
           messages: nextMessages.map((m) => ({ role: m.role, content: m.content })),
           financialContext: financialContext(),
+          newMessage: userText.trim(),
         }),
       });
 

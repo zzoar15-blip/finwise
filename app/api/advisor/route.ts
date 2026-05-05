@@ -31,15 +31,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Rate limit exceeded (20 messages/hour)' }, { status: 429 });
   }
 
-  const { messages, financialContext } = await req.json();
+  const { messages, financialContext, newMessage } = await req.json();
 
   if (!Array.isArray(messages) || messages.length === 0) {
     return NextResponse.json({ error: 'Invalid messages' }, { status: 400 });
   }
 
-  const systemPrompt = `You are a knowledgeable, friendly personal finance advisor. You give clear, actionable advice tailored to the user's financial situation. You cite relevant rules (e.g. IRS limits, tax brackets) when helpful. You are honest about uncertainty and never make guarantees about investment returns. Keep responses concise and practical.
+  const systemPrompt = `You are FinWise AI, a personal financial advisor.
+Here is the user's current financial data as of this message:
 
-${financialContext ? `## User's Current Financial Snapshot\n${financialContext}` : ''}
+${financialContext || 'No financial context provided.'}
+
+Always reference their specific numbers. Never give generic advice.
+Be concise and actionable. Show calculations when relevant.
 
 Today's date: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`;
 
@@ -47,7 +51,9 @@ Today's date: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month:
     model: 'claude-sonnet-4-6',
     max_tokens: 1024,
     system: systemPrompt,
-    messages,
+    messages: Array.isArray(messages)
+      ? messages
+      : [{ role: 'user', content: String(newMessage || 'Help with my finances') }],
   });
 
   const readable = new ReadableStream({

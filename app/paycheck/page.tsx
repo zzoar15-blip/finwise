@@ -26,6 +26,8 @@ import { SyncMeta } from '@/components/SyncMeta';
 import type { StorePaycheckInputs } from '@/lib/calculations';
 import { PaycheckPDF } from '@/lib/pdf/PaycheckPDF';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { HelpTooltip } from '@/components/ui/help-tooltip';
+import { validators } from '@/lib/validation';
 
 const PAY_PERIOD_LABELS: Record<PayPeriod, string> = {
   weekly: 'Weekly',
@@ -50,10 +52,10 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
   );
 }
 
-function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {
+function FieldRow({ label, children }: { label: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="grid grid-cols-2 items-center gap-3">
-      <Label className="text-sm text-gray-600">{label}</Label>
+      <Label className="flex items-center gap-1.5 text-sm text-gray-600">{label}</Label>
       <div>{children}</div>
     </div>
   );
@@ -176,10 +178,27 @@ export default function PaycheckPage() {
 
   // Local inputs state: per-period display values for $ amounts, direct for % and other
   const [localInputs, setLocalInputs] = useState<StorePaycheckInputs>(() => storeInputs);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function update(newInputs: StorePaycheckInputs) {
     setLocalInputs(newInputs);
+    const nextErrors: string[] = [];
+    const salaryError = validators.salary(newInputs.annualSalary);
+    if (salaryError) nextErrors.push(salaryError);
+    const k401Error = validators.k401(newInputs.k401TraditionalPct, newInputs.annualSalary);
+    if (k401Error) nextErrors.push(k401Error);
+    const rothError = validators.percentage(newInputs.k401RothPct);
+    if (rothError) nextErrors.push(`Roth 401(k): ${rothError}`);
+    if (newInputs.k401TraditionalPct + newInputs.k401RothPct > 100) {
+      nextErrors.push('401(k) + Roth 401(k) combined cannot exceed 100%.');
+    }
+    const hsaError = validators.hsa(newInputs.hsaAnnual, false);
+    if (hsaError) nextErrors.push(hsaError);
+    const fsaError = validators.fsa(newInputs.fsaAnnual);
+    if (fsaError) nextErrors.push(fsaError);
+    setValidationErrors(nextErrors);
+    if (nextErrors.length > 0) return;
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       setPaycheckInputs(newInputs);
@@ -319,6 +338,13 @@ export default function PaycheckPage() {
           Paycheck synced — Budget, Debt, and Investment tools will reflect these numbers automatically.
         </div>
       )}
+      {validationErrors.length > 0 && (
+        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {validationErrors.map((e) => (
+            <p key={e}>{e}</p>
+          ))}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_400px]">
         {/* ── LEFT PANEL: Inputs ─────────────────────────────────────── */}
@@ -433,13 +459,17 @@ export default function PaycheckPage() {
                   value={localInputs.k401TraditionalPct}
                   onChange={(v) => updateField('k401TraditionalPct', v)}
                 />
+                <HelpTooltip
+                  title="Traditional 401(k)"
+                  body="Contributions are pre-tax, reducing your taxable income now. You pay tax when you withdraw in retirement."
+                />
                 {selectedState && !selectedState.allows401k && (
                   <p className="text-xs text-amber-600">
                     * {selectedState.name} does not allow 401(k) deduction for state income tax.
                   </p>
                 )}
 
-                <FieldRow label={`HSA ($/period)`}>
+                <FieldRow label={<><span>HSA ($/period)</span><HelpTooltip title="HSA" body="Triple tax advantage: contributions are pre-tax, growth is tax-free, and withdrawals for medical expenses are tax-free." /></>}>
                   <Input
                     type="number"
                     min={0}
@@ -451,7 +481,7 @@ export default function PaycheckPage() {
                   />
                 </FieldRow>
 
-                <FieldRow label={`FSA ($/period)`}>
+                <FieldRow label={<><span>FSA ($/period)</span><HelpTooltip title="FSA" body="Use-it-or-lose-it pre-tax account for medical/dependent care expenses. Reduces taxable income." /></>}>
                   <Input
                     type="number"
                     min={0}
@@ -511,6 +541,10 @@ export default function PaycheckPage() {
                   label="Roth 401(k) (%)"
                   value={localInputs.k401RothPct}
                   onChange={(v) => updateField('k401RothPct', v)}
+                />
+                <HelpTooltip
+                  title="Roth 401(k)"
+                  body="Contributions are post-tax, so there is no immediate tax break, but qualified growth and withdrawals are tax-free in retirement."
                 />
 
                 <FieldRow label={`Other Post-Tax ($/period)`}>
@@ -613,10 +647,18 @@ export default function PaycheckPage() {
                     <Badge variant="secondary" className="gap-1 text-xs">
                       <Info className="h-3 w-3" />
                       Effective: {(pr.effectiveTaxRate * 100).toFixed(1)}%
+                      <HelpTooltip
+                        title="Effective tax rate"
+                        body="The percentage of your total gross income paid in taxes. Lower than your marginal rate because lower income brackets are taxed at lower rates."
+                      />
                     </Badge>
                     <Badge variant="secondary" className="gap-1 text-xs">
                       <Info className="h-3 w-3" />
                       Marginal: {(pr.marginalFederalRate * 100).toFixed(0)}%
+                      <HelpTooltip
+                        title="Marginal tax rate"
+                        body="The rate applied to your last dollar of income — the rate that matters for pre-tax contribution decisions."
+                      />
                     </Badge>
                     <Badge variant="secondary" className="gap-1 text-xs">
                       <Info className="h-3 w-3" />

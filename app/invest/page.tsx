@@ -33,7 +33,9 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-import { DollarSign, Calendar, Percent, Info } from 'lucide-react';
+import { DollarSign, Calendar, Percent, Info, TrendingUp } from 'lucide-react';
+import { EmptyChart } from '@/components/ui/empty-chart';
+import { HelpTooltip } from '@/components/ui/help-tooltip';
 
 type Tab = 'charts' | 'milestones' | 'targets';
 type FocusType = 'income' | 'growth';
@@ -148,6 +150,8 @@ export default function InvestPage() {
   const [annualAppreciation, setAnnualAppreciationState] = useState(investmentInputs.annualAppreciation);
   const [tab, setTab] = useState<Tab>('charts');
   const [focusType, setFocusType] = useState<FocusType>('income');
+  const [showTaxDrag, setShowTaxDrag] = useState(true);
+  const [holdInRoth, setHoldInRoth] = useState(false);
 
   const monthlyBuy = Math.max(0, syncedContributionMonthly + additionalMonthlyBuy);
   function setExtraMonthlyBuy(v: number) {
@@ -264,16 +268,20 @@ export default function InvestPage() {
       monthlyBuy,
       annualBonus,
       dividendYield,
-      taxRate,
+      taxRate: holdInRoth ? 0 : taxRate,
       qualifiedPercent,
       payFrequency,
       years,
       annualAppreciation,
     }),
-    [monthlyBuy, annualBonus, dividendYield, taxRate, qualifiedPercent, payFrequency, years, annualAppreciation]
+    [monthlyBuy, annualBonus, dividendYield, taxRate, qualifiedPercent, payFrequency, years, annualAppreciation, holdInRoth]
   );
 
   const result: InvestResult = useMemo(() => simulateInvestment(inputs), [inputs]);
+  const noTaxDragResult: InvestResult = useMemo(
+    () => simulateInvestment({ ...inputs, taxRate: 0 }),
+    [inputs]
+  );
 
   const totalInvested = monthlyBuy * years * 12 + annualBonus * years;
   const yearlyTicks = useMemo(() => getYearlyTicks(result.monthly), [result.monthly]);
@@ -446,6 +454,17 @@ export default function InvestPage() {
               onChange={setTaxRate}
               note={taxRateNote}
             />
+            <div className="grid grid-cols-1 gap-2 rounded-lg border p-2 text-sm">
+              <label className="flex items-center justify-between gap-2">
+                <span>Show tax drag comparison</span>
+                <input type="checkbox" checked={showTaxDrag} onChange={(e) => setShowTaxDrag(e.target.checked)} />
+              </label>
+              <label className="flex items-center justify-between gap-2">
+                <span>Hold in Roth IRA (tax-free)</span>
+                <input type="checkbox" checked={holdInRoth} onChange={(e) => setHoldInRoth(e.target.checked)} />
+              </label>
+              {holdInRoth && <p className="text-xs text-green-700">Tax-free growth enabled</p>}
+            </div>
             <SliderRow
               label="Qualified Dividends %"
               value={qualifiedPercent}
@@ -502,6 +521,10 @@ export default function InvestPage() {
                 <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
                   <Percent className="size-3.5" />
                   Effective Dividend Tax Rate
+                  <HelpTooltip
+                    title="Blended tax rate"
+                    body="Weighted average of qualified dividend rate and ordinary income rate applied to your dividend income based on the qualified percentage."
+                  />
                 </span>
                 <Badge variant="secondary">
                   {(result.effectiveDividendTaxRate * 100).toFixed(1)}%
@@ -513,6 +536,22 @@ export default function InvestPage() {
                   Total Invested
                 </span>
                 <Badge variant="secondary">{formatCurrency(totalInvested)}</Badge>
+              </div>
+              <div className="text-xs text-muted-foreground space-y-1">
+                <p className="flex items-center gap-1.5">
+                  <HelpTooltip
+                    title="DRIP"
+                    body="Dividend Reinvestment Plan — automatically reinvesting dividends to buy more shares and compound returns over time."
+                  />
+                  DRIP reinvestment is modeled in both taxable and tax-free paths.
+                </p>
+                <p className="flex items-center gap-1.5">
+                  <HelpTooltip
+                    title="Yield on cost"
+                    body="Annual dividend income divided by total invested amount. Shows your effective return on original investment."
+                  />
+                  Yield on cost can improve as dividends compound.
+                </p>
               </div>
             </div>
           </CardContent>
@@ -546,6 +585,14 @@ export default function InvestPage() {
                   <CardTitle>Portfolio Value Over Time</CardTitle>
                 </CardHeader>
                 <CardContent>
+                  {monthlyBuy <= 0 ? (
+                    <EmptyChart
+                      icon={TrendingUp}
+                      title="Configure your investment plan"
+                      description="Set a monthly buy amount to see your projected portfolio growth"
+                      height={280}
+                    />
+                  ) : (
                   <ResponsiveContainer width="100%" height={280}>
                     <LineChart data={result.monthly} margin={{ top: 4, right: 16, left: 8, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
@@ -566,10 +613,42 @@ export default function InvestPage() {
                         stroke="#3b82f6"
                         strokeWidth={2}
                         dot={false}
-                        name="Portfolio Value"
+                        name={holdInRoth ? 'Portfolio (Roth tax-free)' : 'Portfolio (with tax drag)'}
                       />
+                      {showTaxDrag && !holdInRoth && (
+                        <Line
+                          type="monotone"
+                          data={noTaxDragResult.monthly}
+                          dataKey="portfolioValue"
+                          stroke="#dc2626"
+                          strokeWidth={2}
+                          strokeDasharray="5 4"
+                          dot={false}
+                          name="Portfolio (no tax drag)"
+                        />
+                      )}
                     </LineChart>
                   </ResponsiveContainer>
+                  )}
+                  {showTaxDrag && !holdInRoth && (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Roth IRA vs taxable adds{' '}
+                      <span className="font-semibold">
+                        {formatCurrency(
+                          (noTaxDragResult.annual.find((a) => a.year === 5)?.portfolioValue ?? 0) -
+                          (result.annual.find((a) => a.year === 5)?.portfolioValue ?? 0)
+                        )}
+                      </span>{' '}
+                      at year 5 and{' '}
+                      <span className="font-semibold">
+                        {formatCurrency(
+                          (noTaxDragResult.annual.find((a) => a.year === 10)?.portfolioValue ?? 0) -
+                          (result.annual.find((a) => a.year === 10)?.portfolioValue ?? 0)
+                        )}
+                      </span>{' '}
+                      at year 10.
+                    </p>
+                  )}
                 </CardContent>
               </Card>
 
@@ -625,6 +704,7 @@ export default function InvestPage() {
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
+                  <p className="mb-2 text-xs text-muted-foreground">← Scroll →</p>
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-border">
@@ -692,6 +772,7 @@ export default function InvestPage() {
                       </Badge>
                     </div>
                     <div className="overflow-x-auto rounded-lg border border-border">
+                      <p className="px-3 pt-2 text-xs text-muted-foreground">← Scroll →</p>
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="border-b border-border bg-muted/30">
