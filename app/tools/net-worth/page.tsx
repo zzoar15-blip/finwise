@@ -55,7 +55,9 @@ export default function NetWorthPage() {
   }, [debts, liabilities, setLiabilities]);
 
   useEffect(() => {
-    const emergencyFundEstimate = budget.emergencyFundMonthly * monthsSaved;
+    const fromBalance = budget.emergencyFundBalance ?? 0;
+    const emergencyFundEstimate =
+      fromBalance > 0 ? fromBalance : budget.emergencyFundMonthly * monthsSaved;
     const existing = assets.find((a) => a.id === 'auto-emergency-fund');
     if (!existing) {
       setAssets([{ id: 'auto-emergency-fund', name: 'Emergency Fund (est.)', amount: emergencyFundEstimate, category: 'Cash' }, ...assets]);
@@ -64,7 +66,7 @@ export default function NetWorthPage() {
     if (existing.amount !== emergencyFundEstimate) {
       setAssets(assets.map((a) => (a.id === 'auto-emergency-fund' ? { ...a, amount: emergencyFundEstimate } : a)));
     }
-  }, [budget.emergencyFundMonthly, monthsSaved, assets, setAssets]);
+  }, [budget.emergencyFundBalance, budget.emergencyFundMonthly, monthsSaved, assets, setAssets]);
 
   const totals = useMemo(() => computeNetWorthTotals(assets, liabilities), [assets, liabilities]);
 

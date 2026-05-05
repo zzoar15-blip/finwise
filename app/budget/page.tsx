@@ -163,6 +163,20 @@ export default function BudgetPage() {
   const monthlyIncome = flow.monthlyIncome;
   const monthlySurplus = flow.monthlySurplus;
   const savingsRate = flow.savingsRate;
+  const emergencyFundBalance = bi.emergencyFundBalance ?? 0;
+  const emergencyCoverageMonths = totalExpenses > 0 ? emergencyFundBalance / totalExpenses : 0;
+  const efReserveTarget3 = totalExpenses * 3;
+  const efReserveTarget6 = totalExpenses * 6;
+  const efPctToward3Mo =
+    efReserveTarget3 > 0 ? Math.min(100, (emergencyFundBalance / efReserveTarget3) * 100) : 0;
+  const efPctToward6Mo =
+    efReserveTarget6 > 0 ? Math.min(100, (emergencyFundBalance / efReserveTarget6) * 100) : 0;
+  function emergencyReserveBarTone(pct: number) {
+    if (pct >= 100) return 'bg-green-600';
+    if (pct >= 66) return 'bg-blue-600';
+    if (pct >= 33) return 'bg-amber-500';
+    return 'bg-red-500';
+  }
   const sinkingFundDrivenHomeMonthly = useMemo(() => {
     if (sinkingFundInputs.goalType !== 'down-payment') return null;
     const monthly =
@@ -249,6 +263,7 @@ export default function BudgetPage() {
       ['Roth IRA', bi.rothIraMonthly, bi.rothIraMonthly * 12],
       ['Brokerage', bi.brokerageMonthly, bi.brokerageMonthly * 12],
       ['Emergency Fund', bi.emergencyFundMonthly, bi.emergencyFundMonthly * 12],
+      ['Emergency Fund — Current Balance', emergencyFundBalance, ''],
       ['Home Down Payment Fund', bi.homeDownPaymentMonthly, bi.homeDownPaymentMonthly * 12],
       ['Payroll savings (401k/HSA/FSA; in net pay)', payrollSavingsMonthly, payrollSavingsMonthly * 12],
       ['Savings from bank (surplus calc)', optionalSavings, optionalSavings * 12],
@@ -407,6 +422,42 @@ export default function BudgetPage() {
                 onChange={(v) => setBudgetInputs({ emergencyFundMonthly: v })}
                 badge={syncedEmergencyGoalMonthly > 0 ? 'Synced from Plan Goal' : undefined}
               />
+              <BudgetRow
+                label="Current balance"
+                value={bi.emergencyFundBalance}
+                onChange={(v) => setBudgetInputs({ emergencyFundBalance: v })}
+              />
+              <div className="rounded-md border border-[#cfe0fa] bg-[#f0f7ff] px-3 py-2.5 mb-2 space-y-2.5">
+                <p className="text-xs text-muted-foreground">
+                  Coverage:{' '}
+                  <span className="font-semibold tabular-nums text-foreground">
+                    {emergencyCoverageMonths.toFixed(1)}
+                  </span>{' '}
+                  months of expenses
+                </p>
+                <div>
+                  <p className="text-[11px] text-muted-foreground mb-1">
+                    Toward 3-month target ({formatCurrency(efReserveTarget3)})
+                  </p>
+                  <div className="h-2 w-full rounded-full bg-white/80 border border-[#e2e8f0] overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${emergencyReserveBarTone(efPctToward3Mo)}`}
+                      style={{ width: `${efPctToward3Mo}%` }}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <p className="text-[11px] text-muted-foreground mb-1">
+                    Toward 6-month target ({formatCurrency(efReserveTarget6)})
+                  </p>
+                  <div className="h-2 w-full rounded-full bg-white/80 border border-[#e2e8f0] overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${emergencyReserveBarTone(efPctToward6Mo)}`}
+                      style={{ width: `${efPctToward6Mo}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
               <BudgetRow
                 label="Home Down Payment Fund"
                 value={bi.homeDownPaymentMonthly}

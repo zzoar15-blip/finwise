@@ -42,7 +42,13 @@ import type { Debt } from '@/lib/calculations/debt';
 import { calcDebtAcceleration } from '@/lib/calculations/debtAcceleration';
 import { futureValueMonthlyContributions } from '@/lib/calculations/futureValueMonthly';
 import type { StoreBudgetInputs } from '@/lib/calculations';
-import { getEffectivePaycheckResults, getTotalTransportation } from '@/lib/calculations';
+import {
+  addMonthsToDate,
+  computeBudgetSurplus,
+  computeTotalExpenses,
+  getEffectivePaycheckResults,
+  getTotalTransportation,
+} from '@/lib/calculations';
 import { PDFDownloadButton } from '@/components/pdf/PDFDownloadButton';
 import { PlanPDF } from '@/lib/pdf/PlanPDF';
 import {
@@ -55,6 +61,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
+import { HelpTooltip } from '@/components/ui/help-tooltip';
 import { PageSkeleton } from '@/components/ui/page-skeleton';
 import {
   Dialog,
@@ -89,6 +96,10 @@ function formatMonthYear(ym: string): string {
 
 function formatMonthYearFromDate(d: Date): string {
   return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+}
+
+function formatShortMonthYearFromDate(d: Date): string {
+  return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
 }
 
 function findBiggestBudgetLine(b: StoreBudgetInputs): { name: string; amount: number } {
@@ -604,6 +615,9 @@ export default function PlanPage() {
   const debtSliderSeededRef = useRef(false);
   const [whatIfExpenseCutPct, setWhatIfExpenseCutPct] = useState(10);
   const [whatIfInvestBoost, setWhatIfInvestBoost] = useState(150);
+  const [whatIfEmergencyContrib, setWhatIfEmergencyContrib] = useState(0);
+  const [efSliderUserTouched, setEfSliderUserTouched] = useState(false);
+  const efSliderSeededRef = useRef(false);
 
   // 800ms loading splash
   useEffect(() => {
@@ -680,6 +694,11 @@ export default function PlanPage() {
     [paycheckInputs, paycheckResults],
   );
 
+  const efWhatIfBudgetSurplus = useMemo(
+    () => computeBudgetSurplus(effectivePaycheckResults, budgetInputs, finWiseDebts),
+    [effectivePaycheckResults, budgetInputs, finWiseDebts],
+  );
+
   const metrics = useMemo(
     () =>
       mergePlanMetricsWithUnifiedBudget(
@@ -746,6 +765,21 @@ export default function PlanPage() {
     }, 0);
     return () => window.clearTimeout(t);
   }, [metrics.monthlySurplus, unifiedBudgetHeroForSeed, debtSliderUserTouched]);
+
+  useEffect(() => {
+    if (efSliderUserTouched || efSliderSeededRef.current) return;
+    const surplus = efWhatIfBudgetSurplus;
+    const rawMax = Math.min(2000, Math.max(0, surplus));
+    const maxSnap = Math.floor(rawMax / 50) * 50;
+    const curMonthly = budgetInputs.emergencyFundMonthly ?? 0;
+    if (maxSnap <= 0 && curMonthly <= 0) return;
+    efSliderSeededRef.current = true;
+    const rawDefault =
+      curMonthly > 0 ? curMonthly : Math.min(500, Math.max(0, surplus * 0.3));
+    const snapped = Math.min(maxSnap, Math.round(rawDefault / 50) * 50);
+    const t = window.setTimeout(() => setWhatIfEmergencyContrib(Math.max(0, snapped)), 0);
+    return () => window.clearTimeout(t);
+  }, [efWhatIfBudgetSurplus, budgetInputs.emergencyFundMonthly, efSliderUserTouched]);
 
   useEffect(() => {
     if (process.env.NODE_ENV === 'development') {
@@ -870,8 +904,54 @@ export default function PlanPage() {
 
   const biggestBudgetExpense = findBiggestBudgetLine(budgetInputs);
 
+  const efMonthlyExpensesWhatIf = computeTotalExpenses(budgetInputs);
+  const efBalanceWhatIf = budgetInputs.emergencyFundBalance ?? 0;
+  const efTarget3WhatIf = efMonthlyExpensesWhatIf * 3;
+  const efTarget6WhatIf = efMonthlyExpensesWhatIf * 6;
+  const efSliderMaxRawWhatIf = Math.min(2000, Math.max(0, efWhatIfBudgetSurplus));
+  const efSliderMaxSnappedWhatIf = Math.floor(efSliderMaxRawWhatIf / 50) * 50;
+  const efContribWhatIf = Math.min(whatIfEmergencyContrib, efSliderMaxSnappedWhatIf);
+  const efCurrentMonthlyBudgetWhatIf = budgetInputs.emergencyFundMonthly ?? 0;
+  const efRemainingSurplusWhatIf =
+    efWhatIfBudgetSurplus + efCurrentMonthlyBudgetWhatIf - efContribWhatIf;
+
+  const gapTo3WhatIf = Math.max(0, efTarget3WhatIf - efBalanceWhatIf);
+  const gapTo6WhatIf = Math.max(0, efTarget6WhatIf - efBalanceWhatIf);
+  const monthsTo3WhatIf =
+    efContribWhatIf > 0 ? Math.ceil(gapTo3WhatIf / efContribWhatIf) : null;
+  const monthsTo6WhatIf =
+    efContribWhatIf > 0 ? Math.ceil(gapTo6WhatIf / efContribWhatIf) : null;
+  const date3WhatIf =
+    monthsTo3WhatIf != null ? addMonthsToDate(new Date(), monthsTo3WhatIf) : null;
+  const date6WhatIf =
+    monthsTo6WhatIf != null ? addMonthsToDate(new Date(), monthsTo6WhatIf) : null;
+
+  const efProgress3PctWhatIf =
+    efTarget3WhatIf > 0 ? Math.min(100, (efBalanceWhatIf / efTarget3WhatIf) * 100) : 0;
+
+  const efSurplusRemainClassWhatIf =
+    efRemainingSurplusWhatIf > 500
+      ? 'text-green-700'
+      : efRemainingSurplusWhatIf >= 200
+        ? 'text-amber-700'
+        : 'text-red-600';
+
+  const whatIfDebtAnnual = whatIfExtraPay * 12;
+  const whatIfExpenseAnnualPortion = whatIfExpenseCutDollars * 12;
+  const whatIfInvestAnnualPortion = whatIfInvestBoost * 12;
+  const whatIfEmergencyAnnualPortion =
+    efBalanceWhatIf >= efTarget6WhatIf ? 0 : efContribWhatIf * 12;
   const whatIfAnnualCombined =
-    whatIfExpenseCutDollars * 12 + whatIfInvestBoost * 12;
+    whatIfDebtAnnual +
+    whatIfExpenseAnnualPortion +
+    whatIfInvestAnnualPortion +
+    whatIfEmergencyAnnualPortion;
+
+  const efProgressBarClass = (pct: number) =>
+    pct >= 100 ? 'bg-green-600' : pct >= 66 ? 'bg-blue-600' : pct >= 33 ? 'bg-amber-500' : 'bg-red-500';
+
+  const efProgress6PctWhatIf =
+    efTarget6WhatIf > 0 ? Math.min(100, (efBalanceWhatIf / efTarget6WhatIf) * 100) : 0;
 
   const insightItems = aiInsightsCache?.items ?? [];
   const insightsFresh = Boolean(aiInsightsCache);
@@ -1817,7 +1897,7 @@ export default function PlanPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
-              <div className="grid gap-4 lg:grid-cols-3">
+              <div className="grid gap-4 lg:grid-cols-4">
                 <div className="rounded-lg border border-border p-3 flex flex-col gap-3">
                   <p className="text-sm font-semibold">Debt acceleration</p>
                   {whatIfDebtsForAccel.length === 0 ? (
@@ -1950,10 +2030,152 @@ export default function PlanPage() {
                     </p>
                   </div>
                 </div>
+
+                <div className="rounded-lg border border-border p-3 flex flex-col gap-3">
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-sm font-semibold">Emergency fund</p>
+                    <HelpTooltip
+                      title="Emergency fund"
+                      body="An emergency fund covers unexpected expenses without derailing your financial plan. 3 months of expenses is the minimum; 6 months is the goal for most people. Keep it in a high-yield savings account."
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground -mt-1">Monthly contribution</p>
+
+                  {efBalanceWhatIf >= efTarget6WhatIf ? (
+                    <div className="space-y-2 text-sm">
+                      <p className="font-semibold text-green-700 flex items-center gap-1.5">
+                        <CheckCircle2 className="size-4 shrink-0" />
+                        Fully funded — 6 months covered
+                      </p>
+                      <p className="text-muted-foreground">
+                        Consider redirecting to your investment portfolio.
+                      </p>
+                      <Link
+                        href="/invest"
+                        className="text-[#3b82f6] font-medium hover:underline inline-flex items-center gap-1 text-sm"
+                      >
+                        Go to investments
+                        <ChevronRight className="size-4" />
+                      </Link>
+                    </div>
+                  ) : efWhatIfBudgetSurplus <= 0 ? (
+                    <div className="space-y-2 text-sm text-muted-foreground">
+                      <p>
+                        Your current budget has no surplus to allocate. Review your budget to free up
+                        room.
+                      </p>
+                      <Link
+                        href="/budget"
+                        className="text-[#3b82f6] font-medium hover:underline inline-flex items-center gap-1"
+                      >
+                        Update budget
+                        <ChevronRight className="size-4" />
+                      </Link>
+                    </div>
+                  ) : (
+                    <>
+                      <input
+                        type="range"
+                        min={0}
+                        max={efSliderMaxSnappedWhatIf}
+                        step={50}
+                        value={efContribWhatIf}
+                        onChange={(e) => {
+                          setEfSliderUserTouched(true);
+                          setWhatIfEmergencyContrib(Number(e.target.value));
+                        }}
+                        className="w-full accent-[#3b82f6]"
+                        aria-label="Emergency fund monthly contribution"
+                      />
+                      <p className="text-lg font-bold tabular-nums" style={{ color: '#0f172a' }}>
+                        {formatCurrency(efContribWhatIf)}/mo
+                      </p>
+
+                      <div className="rounded-md border border-border/80 bg-muted/20 p-2 space-y-2">
+                        <p className="text-[11px] text-muted-foreground">
+                          Current: {formatCurrency(efBalanceWhatIf)} saved of{' '}
+                          {formatCurrency(efTarget3WhatIf)} target (3 mo)
+                        </p>
+                        <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all ${efProgressBarClass(efProgress3PctWhatIf)}`}
+                            style={{ width: `${efProgress3PctWhatIf}%` }}
+                          />
+                        </div>
+                        <p className="text-[11px] text-muted-foreground">Toward 6-month target</p>
+                        <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all ${efProgressBarClass(efProgress6PctWhatIf)}`}
+                            style={{ width: `${efProgress6PctWhatIf}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2 text-sm">
+                        <div>
+                          <p className="text-xs text-muted-foreground">
+                            3-month target ({formatCurrency(efTarget3WhatIf)})
+                          </p>
+                          {efBalanceWhatIf >= efTarget3WhatIf ? (
+                            <p className="font-medium text-green-700 flex items-center gap-1">
+                              <CheckCircle2 className="size-4" /> Already covered
+                            </p>
+                          ) : monthsTo3WhatIf != null && date3WhatIf ? (
+                            <>
+                              <p className="font-semibold tabular-nums">
+                                Reached by {formatShortMonthYearFromDate(date3WhatIf)}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {monthsTo3WhatIf} months away
+                              </p>
+                            </>
+                          ) : (
+                            <p className="text-muted-foreground text-xs">Add a monthly amount to estimate</p>
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">
+                            6-month target ({formatCurrency(efTarget6WhatIf)})
+                          </p>
+                          {efBalanceWhatIf >= efTarget6WhatIf ? (
+                            <p className="font-medium text-green-700 flex items-center gap-1">
+                              <CheckCircle2 className="size-4" /> Already covered
+                            </p>
+                          ) : monthsTo6WhatIf != null && date6WhatIf ? (
+                            <>
+                              <p className="font-semibold tabular-nums">
+                                Reached by {formatShortMonthYearFromDate(date6WhatIf)}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {monthsTo6WhatIf} months away
+                              </p>
+                            </>
+                          ) : (
+                            <p className="text-muted-foreground text-xs">Add a monthly amount to estimate</p>
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Surplus impact</p>
+                          <p className={`font-semibold tabular-nums ${efSurplusRemainClassWhatIf}`}>
+                            Remaining surplus: {formatCurrency(efRemainingSurplusWhatIf)}/mo
+                          </p>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
-              <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
-                Combined annual impact if applied together:{' '}
-                <span className="font-semibold">{formatCurrency(whatIfAnnualCombined)}</span>
+              <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 space-y-1">
+                <p>
+                  Combined annual impact:{' '}
+                  <span className="font-semibold">{formatCurrency(whatIfAnnualCombined)}</span>
+                </p>
+                <p className="text-xs text-blue-950/85 leading-relaxed">
+                  Debt paydown {formatCurrency(whatIfDebtAnnual)} + expense trim{' '}
+                  {formatCurrency(whatIfExpenseAnnualPortion)} + investments{' '}
+                  {formatCurrency(whatIfInvestAnnualPortion)} + emergency fund{' '}
+                  {formatCurrency(whatIfEmergencyAnnualPortion)}
+                </p>
               </div>
             </CardContent>
           </Card>

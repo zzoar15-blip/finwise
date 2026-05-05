@@ -1136,11 +1136,16 @@ export function mergePlanMetricsWithUnifiedBudget(
         })
       : null;
 
+  const emergencyCashBalance =
+    (budgetInputs.emergencyFundBalance ?? 0) > 0
+      ? budgetInputs.emergencyFundBalance
+      : inputs.currentEmergencyFund;
+
   const emergencyFundMonthsCovered =
-    budgetExpenses > 0 ? inputs.currentEmergencyFund / budgetExpenses : 0;
+    budgetExpenses > 0 ? emergencyCashBalance / budgetExpenses : 0;
 
   let emergencyFundDate: string | null = null;
-  const remainingEmergencyTarget = Math.max(0, inputs.emergencyFundTarget - inputs.currentEmergencyFund);
+  const remainingEmergencyTarget = Math.max(0, inputs.emergencyFundTarget - emergencyCashBalance);
   if (remainingEmergencyTarget > 0 && unifiedSurplus > 0) {
     const monthsNeeded = Math.ceil(remainingEmergencyTarget / unifiedSurplus);
     const target = addMonths(new Date(), monthsNeeded);
@@ -1198,7 +1203,7 @@ export function mergePlanMetricsWithUnifiedBudget(
     debtStrategy: debtOverrides.strategy ?? 'avalanche',
     monthlyExpenses: budgetExpenses,
     emergencyMonthsCovered: emergencyFundMonthsCovered,
-    emergencyBalance: inputs.currentEmergencyFund,
+    emergencyBalance: emergencyCashBalance,
     emergencyMonthly: budgetInputs.emergencyFundMonthly,
     totalMonthlySavingsHealth: totalMonthlySavingsHealthUnified,
     taxEfficiencyScore: unifiedTaxScore,

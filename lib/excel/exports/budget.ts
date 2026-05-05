@@ -158,6 +158,7 @@ function buildBudgetModelSheet(
     [labelCell('Roth IRA'), inputCell(bi.rothIraMonthly), formulaCell(bi.rothIraMonthly * 12)],
     [labelCell('Brokerage / Investments'), inputCell(bi.brokerageMonthly), formulaCell(bi.brokerageMonthly * 12)],
     [labelCell('Emergency Fund'), inputCell(bi.emergencyFundMonthly), formulaCell(bi.emergencyFundMonthly * 12)],
+    [labelCell('Emergency fund — current balance'), inputCell(bi.emergencyFundBalance ?? 0), blankCell()],
     [labelCell('Home Down Payment Fund'), inputCell(bi.homeDownPaymentMonthly), formulaCell(bi.homeDownPaymentMonthly * 12)],
     [cell('Subtotal — payroll savings (included in net pay above)', { font: { sz: 9, italic: true, color: { rgb: '6b7280' } } }), formulaCell(totalSavingsPayroll), formulaCell(totalSavingsPayroll * 12)],
     [labelCell('Total savings & investments (all channels)'), subtotalCell(totalSavings), subtotalCell(totalSavings * 12)],

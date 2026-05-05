@@ -335,6 +335,7 @@ function DashboardPageContent() {
       travel: inputs.expenses.travel,
       misc: inputs.expenses.misc,
       emergencyFundMonthly: emergencyGoalMonthly,
+      emergencyFundBalance: inputs.currentEmergencyFund,
       homeDownPaymentMonthly: homeGoalMonthly,
     });
     setDebts(

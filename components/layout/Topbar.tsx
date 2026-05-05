@@ -75,6 +75,7 @@ export function Topbar() {
       brokerageMonthly: 0,
       rothIraMonthly: 0,
       emergencyFundMonthly: 0,
+      emergencyFundBalance: 0,
       homeDownPaymentMonthly: 0,
     });
     setDebts([]);

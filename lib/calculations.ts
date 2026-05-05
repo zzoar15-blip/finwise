@@ -64,6 +64,8 @@ export interface StoreBudgetInputs {
   brokerageMonthly: number;
   rothIraMonthly: number;
   emergencyFundMonthly: number;
+  /** Current dollars saved in an emergency fund (cash / HYSA). */
+  emergencyFundBalance: number;
   homeDownPaymentMonthly: number;
 }
 
@@ -108,8 +110,15 @@ export const DEFAULT_BUDGET_INPUTS: StoreBudgetInputs = {
   investmentIncome: 0, housing: 0, utilities: 0, insurance: 0, groceries: 0, dining: 0,
   carPayment: 0, carInsurance: 0, gas: 0, parking: 0, publicTransit: 0, otherTransport: 0,
   subscriptions: 0, phone: 0, healthGym: 0, travel: 0, misc: 0,
-  brokerageMonthly: 0, rothIraMonthly: 0, emergencyFundMonthly: 0, homeDownPaymentMonthly: 0,
+  brokerageMonthly: 0, rothIraMonthly: 0, emergencyFundMonthly: 0, emergencyFundBalance: 0, homeDownPaymentMonthly: 0,
 };
+
+/** Move a calendar date forward by whole months (what-if target dates, projections). */
+export function addMonthsToDate(base: Date, months: number): Date {
+  const d = new Date(base);
+  d.setMonth(d.getMonth() + months);
+  return d;
+}
 
 export function getTotalTransportation(b: StoreBudgetInputs): number {
   return (
