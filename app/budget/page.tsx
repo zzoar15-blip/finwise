@@ -163,13 +163,18 @@ export default function BudgetPage() {
         : sinkingFundInputs.monthlyContribution;
     return Math.max(0, Math.round(monthly));
   }, [sinkingFundInputs.goalType, sinkingFundInputs.mode, sinkingFundInputs.monthlyContribution, sinkingFundResults.requiredMonthlyContribution]);
-  const syncedHomeGoalMonthly = useMemo(() => {
+  const homeGoalSuggestedMonthly = useMemo(() => {
     if (sinkingFundDrivenHomeMonthly !== null) return sinkingFundDrivenHomeMonthly;
     const target = plan?.inputs?.homeTarget ?? 0;
     const hasHomeGoal = plan?.inputs?.goals?.includes('save-home') ?? false;
     if (!hasHomeGoal || target <= 0) return 0;
     return Math.ceil(target / Math.max(1, plan?.inputs?.homeTimelineMonths || 36));
   }, [sinkingFundDrivenHomeMonthly, plan?.inputs?.goals, plan?.inputs?.homeTarget, plan?.inputs?.homeTimelineMonths]);
+  const homeGoalSuggestionSource = sinkingFundDrivenHomeMonthly !== null
+    ? 'Sinking Fund'
+    : homeGoalSuggestedMonthly > 0
+      ? 'Plan Goal'
+      : null;
   const syncedEmergencyGoalMonthly = useMemo(() => {
     const target = plan?.inputs?.emergencyFundTarget ?? 0;
     const hasEmergencyGoal = plan?.inputs?.goals?.includes('emergency-fund') ?? false;
@@ -177,11 +182,6 @@ export default function BudgetPage() {
     return Math.ceil(target / 12);
   }, [plan?.inputs?.goals, plan?.inputs?.emergencyFundTarget]);
 
-  useEffect(() => {
-    if (syncedHomeGoalMonthly <= 0) return;
-    if (budgetInputs.homeDownPaymentMonthly === syncedHomeGoalMonthly) return;
-    setBudgetInputs({ homeDownPaymentMonthly: syncedHomeGoalMonthly });
-  }, [syncedHomeGoalMonthly, budgetInputs.homeDownPaymentMonthly, setBudgetInputs]);
   useEffect(() => {
     if (syncedEmergencyGoalMonthly <= 0) return;
     if (budgetInputs.emergencyFundMonthly === syncedEmergencyGoalMonthly) return;
@@ -312,6 +312,26 @@ export default function BudgetPage() {
             </div>
           )}
 
+          {homeGoalSuggestedMonthly > 0 && budgetInputs.homeDownPaymentMonthly !== homeGoalSuggestedMonthly && (
+            <div className="flex items-start justify-between gap-3 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+              <div>
+                <p className="font-medium">Home down payment suggestion available</p>
+                <p className="text-blue-800 mt-0.5">
+                  {formatCurrency(homeGoalSuggestedMonthly)}/mo from {homeGoalSuggestionSource}.
+                  Apply it, or keep your custom value to compare financial impact.
+                </p>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-blue-300 bg-white text-blue-800 hover:bg-blue-100"
+                onClick={() => setBudgetInputs({ homeDownPaymentMonthly: homeGoalSuggestedMonthly })}
+              >
+                Apply
+              </Button>
+            </div>
+          )}
+
           <Card className="shadow-sm">
             <CardContent className="space-y-0.5 pt-4">
               {/* INCOME */}
@@ -381,10 +401,10 @@ export default function BudgetPage() {
                 value={bi.homeDownPaymentMonthly}
                 onChange={(v) => setBudgetInputs({ homeDownPaymentMonthly: v })}
                 badge={
-                  syncedHomeGoalMonthly > 0
+                  homeGoalSuggestedMonthly > 0
                     ? sinkingFundDrivenHomeMonthly !== null
-                      ? 'Synced from Sinking Fund'
-                      : 'Synced from Plan Goal'
+                      ? 'Suggested from Sinking Fund'
+                      : 'Suggested from Plan Goal'
                     : undefined
                 }
                 linkTo={sinkingFundDrivenHomeMonthly !== null ? '/tools/sinking-fund' : undefined}

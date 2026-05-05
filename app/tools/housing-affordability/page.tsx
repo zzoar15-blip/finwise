@@ -25,7 +25,11 @@ export default function HousingAffordabilityPage() {
   const [targetMonthlySavings, setTargetMonthlySavings] = useState(300);
   const [annualMortgageRate, setAnnualMortgageRate] = useState(0.0675);
   const [loanTermYears, setLoanTermYears] = useState(30);
-  const [downPaymentCash, setDownPaymentCash] = useState(plan?.inputs?.homeTarget || 80000);
+  const planHasHomeGoal = plan?.inputs?.goals?.includes('save-home') ?? false;
+  const seededDownPaymentCash = planHasHomeGoal && (plan?.inputs?.homeTarget ?? 0) > 0
+    ? (plan?.inputs?.homeTarget ?? 0)
+    : 80000;
+  const [downPaymentCash, setDownPaymentCash] = useState(seededDownPaymentCash);
   const [downPaymentPct, setDownPaymentPct] = useState(0.2);
   const [monthlyHoa, setMonthlyHoa] = useState(0);
   const [annualPropertyTaxRate, setAnnualPropertyTaxRate] = useState(() =>
@@ -116,7 +120,7 @@ export default function HousingAffordabilityPage() {
             step={0.05}
           />
           <Field
-            label={`Down payment cash${plan?.inputs?.homeTarget ? ' (seeded from plan goal)' : ''}`}
+            label={`Down payment cash${planHasHomeGoal && plan?.inputs?.homeTarget ? ' (seeded from plan goal)' : ''}`}
             value={downPaymentCash}
             onChange={setDownPaymentCash}
             step={5000}
