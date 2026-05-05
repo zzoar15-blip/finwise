@@ -20,6 +20,12 @@ import {
   type RentVsBuyInputs,
   type RentVsBuyResults,
 } from '@/lib/calculations/rentVsBuy';
+import {
+  computeSinkingFund,
+  DEFAULT_SINKING_FUND_INPUTS,
+  type SinkingFundInputs,
+  type SinkingFundResults,
+} from '@/lib/calculations/sinkingFund';
 
 interface FinWiseStore {
   paycheckInputs: StorePaycheckInputs;
@@ -31,6 +37,8 @@ interface FinWiseStore {
   planLastUpdated: string | null;
   rentVsBuyInputs: RentVsBuyInputs | null;
   rentVsBuyResults: RentVsBuyResults | null;
+  sinkingFundInputs: SinkingFundInputs;
+  sinkingFundResults: SinkingFundResults;
 
   setPaycheckInputs: (inputs: Partial<StorePaycheckInputs>) => void;
   setBudgetInputs: (inputs: Partial<StoreBudgetInputs>) => void;
@@ -38,6 +46,7 @@ interface FinWiseStore {
   setGoals: (goals: string[]) => void;
   setInvestmentInputs: (inputs: Partial<StoreInvestmentInputs>) => void;
   setRentVsBuyInputs: (inputs: Partial<RentVsBuyInputs>) => void;
+  setSinkingFundInputs: (inputs: Partial<SinkingFundInputs>) => void;
 }
 
 export const useFinWiseStore = create<FinWiseStore>()(
@@ -52,6 +61,8 @@ export const useFinWiseStore = create<FinWiseStore>()(
       planLastUpdated: null,
       rentVsBuyInputs: null,
       rentVsBuyResults: null,
+      sinkingFundInputs: DEFAULT_SINKING_FUND_INPUTS,
+      sinkingFundResults: computeSinkingFund(DEFAULT_SINKING_FUND_INPUTS),
 
       setPaycheckInputs: (inputs) =>
         set((state) => {
@@ -109,6 +120,16 @@ export const useFinWiseStore = create<FinWiseStore>()(
           return {
             rentVsBuyInputs: merged,
             rentVsBuyResults: computeRentVsBuy(merged),
+            planLastUpdated: new Date().toISOString(),
+          };
+        }),
+
+      setSinkingFundInputs: (inputs) =>
+        set((state) => {
+          const merged = { ...state.sinkingFundInputs, ...inputs };
+          return {
+            sinkingFundInputs: merged,
+            sinkingFundResults: computeSinkingFund(merged),
             planLastUpdated: new Date().toISOString(),
           };
         }),

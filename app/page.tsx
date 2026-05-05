@@ -13,6 +13,7 @@ import {
   ArrowRight,
   Plus,
   Home,
+  PiggyBank,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -141,6 +142,12 @@ const QUICK_LINKS = [
     icon: Home,
     title: 'Rent vs. Buy',
     description: 'Compare the true financial cost of buying vs renting over any time horizon. Includes break-even analysis, opportunity cost, and sensitivity modeling.',
+  },
+  {
+    href: '/tools/sinking-fund',
+    icon: PiggyBank,
+    title: 'Sinking Fund',
+    description: 'Plan monthly saving targets for goals like vacations, weddings, or a home down payment.',
   },
 ];
 
@@ -446,7 +453,7 @@ function DashboardPageContent() {
 
         <div>
           <h2 className="mb-4 text-lg font-semibold text-gray-800">Tools</h2>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
             {QUICK_LINKS.map(({ href, icon: Icon, title, description }) => (
               <Link key={href} href={href} className="group block">
                 <div className="flex h-full flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-all group-hover:-translate-y-0.5 group-hover:border-[#3b82f6] group-hover:shadow-md">

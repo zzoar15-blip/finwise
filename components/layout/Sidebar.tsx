@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, Calculator, PieChart, CreditCard,
   TrendingUp, BarChart3, Sparkles, FileText, Settings,
-  LineChart, Home,
+  LineChart, Home, PiggyBank,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -21,6 +21,7 @@ const TOOLS_NAV = [
   { href: '/invest', label: 'Investment Simulator', icon: TrendingUp },
   { href: '/forecast', label: 'Scenario Forecaster', icon: BarChart3 },
   { href: '/tools/rent-vs-buy', label: 'Rent vs. Buy', icon: Home },
+  { href: '/tools/sinking-fund', label: 'Sinking Fund', icon: PiggyBank },
 ];
 
 function NavItem({
