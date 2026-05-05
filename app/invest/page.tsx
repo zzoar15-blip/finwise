@@ -485,7 +485,7 @@ export default function InvestPage() {
                       : 'border-border bg-background text-foreground hover:bg-muted'
                   }`}
                 >
-                  Monthly (JEPI/SPHY style)
+                  Monthly
                 </button>
                 <button
                   onClick={() => setPayFrequency('quarterly')}
@@ -495,7 +495,7 @@ export default function InvestPage() {
                       : 'border-border bg-background text-foreground hover:bg-muted'
                   }`}
                 >
-                  Quarterly (OWL style)
+                  Quarterly
                 </button>
               </div>
             </div>
