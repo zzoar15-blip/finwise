@@ -459,21 +459,44 @@ export default function PlanPage() {
   const effectiveInputs = useMemo((): PlanInputs => {
     const base: PlanInputs = plan?.inputs ?? EMPTY_INPUTS;
 
-    const paycheckOverride = paycheckProfile ? {
-      annualSalary: paycheckProfile.annualSalary,
-      payPeriod: paycheckProfile.payPeriod,
-      filingStatus: paycheckProfile.filingStatus,
-      state: paycheckProfile.state,
-      nycResident: paycheckProfile.nycResident,
-      traditional401kPct: paycheckProfile.traditional401kPct,
-      roth401kPct: paycheckProfile.roth401kPct,
-      hsaPerPeriod: paycheckProfile.hsaPerPeriod,
-      fsaPerPeriod: paycheckProfile.fsaPerPeriod,
-      healthInsurancePerPeriod: paycheckProfile.healthInsurancePerPeriod,
-      dentalPerPeriod: paycheckProfile.dentalPerPeriod,
-      commuterBenefitPerPeriod: paycheckProfile.commuterBenefitPerPeriod,
-      otherPreTaxPerPeriod: paycheckProfile.otherPostTaxPerPeriod,
-    } : {};
+    const paycheckOverride = paycheckResults.isComplete
+      ? (() => {
+          const periodMap = { weekly: 52, biweekly: 26, semimonthly: 24, monthly: 12 } as const;
+          const periods = periodMap[paycheckInputs.payPeriod] ?? 26;
+          return {
+            annualSalary: paycheckInputs.annualSalary,
+            payPeriod: paycheckInputs.payPeriod,
+            filingStatus: paycheckInputs.filingStatus,
+            state: paycheckInputs.state,
+            nycResident: paycheckInputs.nycResident,
+            traditional401kPct: paycheckInputs.k401TraditionalPct,
+            roth401kPct: paycheckInputs.k401RothPct,
+            hsaPerPeriod: paycheckInputs.hsaAnnual / periods,
+            fsaPerPeriod: paycheckInputs.fsaAnnual / periods,
+            healthInsurancePerPeriod: paycheckInputs.healthInsuranceAnnual / periods,
+            dentalPerPeriod: paycheckInputs.dentalAnnual / periods,
+            commuterBenefitPerPeriod: paycheckInputs.commuterAnnual / periods,
+            otherPreTaxPerPeriod: paycheckInputs.otherPreTaxAnnual / periods,
+          };
+        })()
+      : paycheckProfile
+        ? {
+            annualSalary: paycheckProfile.annualSalary,
+            payPeriod: paycheckProfile.payPeriod,
+            filingStatus: paycheckProfile.filingStatus,
+            state: paycheckProfile.state,
+            nycResident: paycheckProfile.nycResident,
+            traditional401kPct: paycheckProfile.traditional401kPct,
+            roth401kPct: paycheckProfile.roth401kPct,
+            hsaPerPeriod: paycheckProfile.hsaPerPeriod,
+            fsaPerPeriod: paycheckProfile.fsaPerPeriod,
+            healthInsurancePerPeriod: paycheckProfile.healthInsurancePerPeriod,
+            dentalPerPeriod: paycheckProfile.dentalPerPeriod,
+            commuterBenefitPerPeriod: paycheckProfile.commuterBenefitPerPeriod,
+            // Legacy profile only persisted post-tax misc; keep fallback for backward compatibility.
+            otherPreTaxPerPeriod: paycheckProfile.otherPostTaxPerPeriod,
+          }
+        : {};
 
     const debtOverride = debtProfile ? {
       debts: debtProfile.debts.map(d => ({
@@ -483,7 +506,7 @@ export default function PlanPage() {
     } : {};
 
     return { ...base, ...paycheckOverride, ...debtOverride };
-  }, [plan, paycheckProfile, debtProfile]);
+  }, [plan, paycheckResults.isComplete, paycheckInputs, paycheckProfile, debtProfile]);
 
   const baseMetrics = useMemo(
     () =>
