@@ -25,6 +25,8 @@ import {
   CartesianGrid,
 } from 'recharts';
 import { TrendingUp, TrendingDown, DollarSign, PiggyBank, Home, CreditCard } from 'lucide-react';
+import { ExportButton } from '@/components/ExportButton';
+import { downloadCsv, downloadXlsxFromAoa } from '@/lib/export';
 
 interface BudgetData {
   salary: number;
@@ -408,9 +410,44 @@ export default function BudgetPage() {
     return positive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400';
   }
 
+  const BUDGET_ROWS: Array<{ label: string; key: keyof BudgetData }> = [
+    { label: 'Monthly Salary', key: 'salary' },
+    { label: 'Investment Income', key: 'investmentIncome' },
+    { label: 'Housing', key: 'housing' },
+    { label: 'Debt Payments', key: 'debtPayments' },
+    { label: '401(k)', key: 'k401' },
+    { label: 'Roth IRA', key: 'rothIRA' },
+    { label: 'Brokerage', key: 'brokerage' },
+    { label: 'Groceries', key: 'groceries' },
+    { label: 'Dining', key: 'dining' },
+    { label: 'Transport', key: 'transport' },
+    { label: 'Subscriptions', key: 'subscriptions' },
+    { label: 'Phone', key: 'phone' },
+    { label: 'Health', key: 'health' },
+    { label: 'Travel', key: 'travel' },
+    { label: 'Misc', key: 'misc' },
+  ];
+
+  function exportRows(): (string | number)[][] {
+    return [
+      ['Category', 'Now ($/mo)', 'Future ($/mo)'],
+      ...BUDGET_ROWS.filter((r) => r.key !== 'brokerageNote').map((r) => [
+        r.label,
+        nowData[r.key] as number,
+        futureData[r.key] as number,
+      ]),
+    ];
+  }
+
   return (
     <div className="space-y-6 max-w-7xl">
-      <h1 className="text-2xl font-bold">Budget Planner</h1>
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="text-2xl font-bold">Budget Planner</h1>
+        <ExportButton
+          onExportXlsx={() => downloadXlsxFromAoa('Budget', exportRows(), [24, 14, 14], 'finwise-budget')}
+          onExportCsv={() => downloadCsv(exportRows(), 'finwise-budget')}
+        />
+      </div>
 
       {/* Two-column grid */}
       <div className="flex gap-4 flex-col lg:flex-row">

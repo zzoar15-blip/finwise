@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { calculatePaycheck, PAY_PERIODS } from '@/lib/calculations/paycheck';
 import type { PaycheckInputs, PayPeriod, FilingStatus } from '@/lib/calculations/paycheck';
+import { STATE_CONFIGS } from '@/lib/stateTax';
 import { formatCurrency } from '@/lib/format';
 
 const PAY_PERIOD_LABELS: Record<PayPeriod, string> = {
@@ -35,6 +36,8 @@ const DEFAULT_INPUTS: PaycheckInputs = {
   annualSalary: 85000,
   payPeriod: 'biweekly',
   filingStatus: 'single',
+  state: 'CA',
+  nycResident: false,
   traditional401kPct: 6,
   hsaPerPeriod: 0,
   fsaPerPeriod: 0,
@@ -193,6 +196,8 @@ export default function PaycheckPage() {
   const periods = PAY_PERIODS[inputs.payPeriod];
   const annualNet = result.netPay * periods;
 
+  const selectedState = STATE_CONFIGS.find((s) => s.abbr === inputs.state);
+
   // Benefit savings table — only non-zero benefits
   const benefitRows: Array<{ label: string; annual: number; savings: number }> = [
     {
@@ -233,7 +238,7 @@ export default function PaycheckPage() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Paycheck Calculator</h1>
         <p className="mt-1 text-sm text-gray-500">
-          Estimate your Massachusetts take-home pay for 2025.
+          Estimate your take-home pay after federal and state taxes for 2025.
         </p>
       </div>
 
@@ -294,6 +299,46 @@ export default function PaycheckPage() {
                     </SelectContent>
                   </Select>
                 </FieldRow>
+
+                <FieldRow label="State">
+                  <Select
+                    value={inputs.state}
+                    onValueChange={(v) => {
+                      if (!v) return;
+                      update('state', v);
+                      if (v !== 'NY') update('nycResident', false);
+                    }}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue>
+                        {selectedState ? `${selectedState.abbr} – ${selectedState.name}` : inputs.state}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent className="max-h-64">
+                      {STATE_CONFIGS.map((s) => (
+                        <SelectItem key={s.abbr} value={s.abbr}>
+                          {s.abbr} – {s.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FieldRow>
+
+                {inputs.state === 'NY' && (
+                  <FieldRow label="NYC Resident?">
+                    <label className="flex cursor-pointer items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={inputs.nycResident}
+                        onChange={(e) => update('nycResident', e.target.checked)}
+                        className="h-4 w-4 rounded accent-[#1a56a8]"
+                      />
+                      <span className="text-sm text-gray-700">
+                        Add NYC local tax (~3.5%)
+                      </span>
+                    </label>
+                  </FieldRow>
+                )}
               </div>
             </div>
 
@@ -304,10 +349,15 @@ export default function PaycheckPage() {
               <SectionHeading>Pre-Tax Deductions</SectionHeading>
               <div className="space-y-5">
                 <SliderField
-                  label="Traditional 401(k) (%)"
+                  label={`Traditional 401(k) (%)${selectedState && !selectedState.allows401k ? ' *' : ''}`}
                   value={inputs.traditional401kPct}
                   onChange={(v) => update('traditional401kPct', v)}
                 />
+                {selectedState && !selectedState.allows401k && (
+                  <p className="text-xs text-amber-600">
+                    * {selectedState.name} does not allow 401(k) deduction for state income tax.
+                  </p>
+                )}
 
                 <FieldRow label="HSA ($/period)">
                   <Input {...numericInput('hsaPerPeriod')} step={10} className="w-full" />
@@ -373,39 +423,43 @@ export default function PaycheckPage() {
               </div>
 
               {/* Pre-tax deductions */}
-              <LineItem
-                label="Traditional 401(k)"
-                value={result.traditional401k}
-                indent
-                negative
-                muted
-              />
+              <LineItem label="Traditional 401(k)" value={result.traditional401k} indent negative muted />
               <LineItem label="HSA" value={result.hsa} indent negative muted />
               <LineItem label="FSA" value={result.fsa} indent negative muted />
               <LineItem label="Health Insurance" value={result.healthInsurance} indent negative muted />
               <LineItem label="Dental" value={result.dental} indent negative muted />
-              <LineItem
-                label="Commuter Benefit"
-                value={result.commuterBenefit}
-                indent
-                negative
-                muted
-              />
+              <LineItem label="Commuter Benefit" value={result.commuterBenefit} indent negative muted />
 
               {/* Taxable wages */}
-              <LineItem
-                label="= Taxable Wages"
-                value={result.federalTaxableWages}
-                borderTop
-                highlight
-              />
+              <LineItem label="= Taxable Wages" value={result.federalTaxableWages} borderTop highlight />
 
-              {/* Taxes */}
+              {/* Federal taxes */}
               <LineItem label="Federal Income Tax" value={result.federalIncomeTax} red />
               <LineItem label="Social Security (6.2%)" value={result.socialSecurity} red />
               <LineItem label="Medicare" value={result.medicare} red />
-              <LineItem label="MA State Tax (5%)" value={result.maStateTax} red />
-              <LineItem label="MA PFML (0.46%)" value={result.maPfml} red />
+
+              {/* State tax */}
+              {result.stateTax > 0 && (
+                <LineItem
+                  label={`${selectedState?.name ?? inputs.state} Income Tax`}
+                  value={result.stateTax}
+                  red
+                />
+              )}
+
+              {/* Local tax (e.g. NYC) */}
+              {result.localTax > 0 && (
+                <LineItem
+                  label={selectedState?.localTaxName ?? 'Local Tax'}
+                  value={result.localTax}
+                  red
+                />
+              )}
+
+              {/* Additional payroll taxes (PFML, SDI, etc.) */}
+              {result.additionalPayrollTaxes.map((t) => (
+                <LineItem key={t.name} label={t.name} value={t.amount} red />
+              ))}
 
               {/* After-tax pay */}
               <LineItem
@@ -420,12 +474,7 @@ export default function PaycheckPage() {
               <LineItem label="Other Post-Tax" value={result.otherPostTax} indent negative muted />
 
               {/* Net pay */}
-              <LineItem
-                label="NET PAY"
-                value={result.netPay}
-                doubleBorderTop
-                large
-              />
+              <LineItem label="NET PAY" value={result.netPay} doubleBorderTop large />
 
               {/* Rate badges */}
               <div className="mt-4 flex flex-wrap gap-2">
@@ -437,6 +486,12 @@ export default function PaycheckPage() {
                   <Info className="h-3 w-3" />
                   Marginal Rate: {(result.marginalFederalRate * 100).toFixed(0)}%
                 </Badge>
+                {result.stateEffectiveRate > 0 && (
+                  <Badge variant="secondary" className="gap-1 text-xs">
+                    <Info className="h-3 w-3" />
+                    State Effective: {(result.stateEffectiveRate * 100).toFixed(1)}%
+                  </Badge>
+                )}
               </div>
 
               {/* Annual net */}
@@ -467,43 +522,27 @@ export default function PaycheckPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-gray-100 bg-gray-50">
-                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">
-                        Benefit
-                      </th>
-                      <th className="px-4 py-2 text-right text-xs font-semibold text-gray-500">
-                        Annual Amt
-                      </th>
-                      <th className="px-4 py-2 text-right text-xs font-semibold text-gray-500">
-                        Tax Savings
-                      </th>
-                      <th className="px-4 py-2 text-right text-xs font-semibold text-gray-500">
-                        Rate
-                      </th>
+                      <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">Benefit</th>
+                      <th className="px-4 py-2 text-right text-xs font-semibold text-gray-500">Annual Amt</th>
+                      <th className="px-4 py-2 text-right text-xs font-semibold text-gray-500">Tax Savings</th>
+                      <th className="px-4 py-2 text-right text-xs font-semibold text-gray-500">Rate</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
                     {benefitRows.map((row) => (
                       <tr key={row.label} className="hover:bg-gray-50/50">
                         <td className="px-4 py-2.5 font-medium text-gray-700">{row.label}</td>
-                        <td className="px-4 py-2.5 text-right text-gray-600">
-                          {formatCurrency(row.annual)}
-                        </td>
-                        <td className="px-4 py-2.5 text-right font-semibold text-green-600">
-                          {formatCurrency(row.savings)}
-                        </td>
+                        <td className="px-4 py-2.5 text-right text-gray-600">{formatCurrency(row.annual)}</td>
+                        <td className="px-4 py-2.5 text-right font-semibold text-green-600">{formatCurrency(row.savings)}</td>
                         <td className="px-4 py-2.5 text-right text-gray-400">
-                          {row.annual > 0
-                            ? `${((row.savings / row.annual) * 100).toFixed(1)}%`
-                            : '—'}
+                          {row.annual > 0 ? `${((row.savings / row.annual) * 100).toFixed(1)}%` : '—'}
                         </td>
                       </tr>
                     ))}
                   </tbody>
                   <tfoot>
                     <tr className="border-t border-gray-200 bg-green-50/50">
-                      <td className="px-4 py-2.5 font-semibold text-gray-700" colSpan={2}>
-                        Total Annual Savings
-                      </td>
+                      <td className="px-4 py-2.5 font-semibold text-gray-700" colSpan={2}>Total Annual Savings</td>
                       <td className="px-4 py-2.5 text-right font-bold text-green-600">
                         {formatCurrency(benefitRows.reduce((s, r) => s + r.savings, 0))}
                       </td>

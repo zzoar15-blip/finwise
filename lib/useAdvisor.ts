@@ -1,0 +1,140 @@
+'use client';
+
+import { useState, useCallback, useRef } from 'react';
+import { useFinanceStore } from '@/lib/store';
+import { formatCurrency } from '@/lib/format';
+
+export interface Message {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+function buildFinancialContext(store: ReturnType<typeof useFinanceStore.getState>): string {
+  const { transactions, budgets } = store;
+
+  const now = new Date();
+  const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+  const monthTx = transactions.filter((t) => t.date.startsWith(ym));
+  const income = monthTx.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+  const expenses = monthTx.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+
+  // Category breakdown
+  const byCategory: Record<string, number> = {};
+  for (const t of monthTx.filter((t) => t.type === 'expense')) {
+    byCategory[t.category] = (byCategory[t.category] ?? 0) + t.amount;
+  }
+  const catLines = Object.entries(byCategory)
+    .sort((a, b) => b[1] - a[1])
+    .map(([cat, amt]) => `  - ${cat}: ${formatCurrency(amt)}`)
+    .join('\n');
+
+  // Budget usage
+  const budgetLines = budgets
+    .map((b) => {
+      const spent = byCategory[b.category] ?? 0;
+      const pct = b.monthlyLimit > 0 ? Math.round((spent / b.monthlyLimit) * 100) : 0;
+      return `  - ${b.category}: ${formatCurrency(spent)} / ${formatCurrency(b.monthlyLimit)} (${pct}%)`;
+    })
+    .join('\n');
+
+  const lines: string[] = [
+    `Current month (${ym}):`,
+    `  Income: ${formatCurrency(income)}`,
+    `  Expenses: ${formatCurrency(expenses)}`,
+    `  Net: ${formatCurrency(income - expenses)}`,
+  ];
+
+  if (catLines) {
+    lines.push(`\nSpending by category:\n${catLines}`);
+  }
+
+  if (budgetLines) {
+    lines.push(`\nBudget tracking:\n${budgetLines}`);
+  }
+
+  lines.push(`\nTotal transactions on record: ${transactions.length}`);
+
+  return lines.join('\n');
+}
+
+export function useAdvisor() {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [streaming, setStreaming] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  const financialContext = useCallback(() => {
+    const store = useFinanceStore.getState();
+    return buildFinancialContext(store);
+  }, []);
+
+  const send = useCallback(async (userText: string) => {
+    if (!userText.trim() || streaming) return;
+
+    const userMsg: Message = { role: 'user', content: userText.trim() };
+    const nextMessages = [...messages, userMsg];
+    setMessages(nextMessages);
+    setStreaming(true);
+    setError(null);
+
+    abortRef.current = new AbortController();
+
+    try {
+      const res = await fetch('/api/advisor', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: abortRef.current.signal,
+        body: JSON.stringify({
+          messages: nextMessages.map((m) => ({ role: m.role, content: m.content })),
+          financialContext: financialContext(),
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? `HTTP ${res.status}`);
+      }
+
+      const assistantMsg: Message = { role: 'assistant', content: '' };
+      setMessages((prev) => [...prev, assistantMsg]);
+
+      const reader = res.body!.getReader();
+      const decoder = new TextDecoder();
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        setMessages((prev) => {
+          const copy = [...prev];
+          copy[copy.length - 1] = {
+            ...copy[copy.length - 1],
+            content: copy[copy.length - 1].content + chunk,
+          };
+          return copy;
+        });
+      }
+    } catch (err) {
+      if ((err as Error).name === 'AbortError') return;
+      setError((err as Error).message);
+      setMessages((prev) => prev.slice(0, -1)); // remove empty assistant bubble
+    } finally {
+      setStreaming(false);
+    }
+  }, [messages, streaming, financialContext]);
+
+  const stop = useCallback(() => {
+    abortRef.current?.abort();
+    setStreaming(false);
+  }, []);
+
+  const clear = useCallback(() => {
+    abortRef.current?.abort();
+    setMessages([]);
+    setStreaming(false);
+    setError(null);
+  }, []);
+
+  return { messages, streaming, error, send, stop, clear };
+}

@@ -3,6 +3,8 @@
 import { useState, useMemo } from 'react';
 import { simulateDebtPayoff, buildSensitivityTable } from '@/lib/calculations/debt';
 import type { Debt, DebtResult, SensitivityRow } from '@/lib/calculations/debt';
+import { ExportButton } from '@/components/ExportButton';
+import { downloadCsv, downloadXlsxFromAoa } from '@/lib/export';
 import { formatCurrency } from '@/lib/format';
 import {
   Card,
@@ -117,9 +119,32 @@ export default function DebtPage() {
 
   const hasDebts = debts.length > 0 && debts.some((d) => d.balance > 0);
 
+  function buildExportRows(): (string | number)[][] {
+    const headers = ['Month', 'Date', ...debts.map((d) => d.name), 'Total Balance ($)', 'Cumulative Interest ($)'];
+    const dataRows = result.snapshots.map((s) => [
+      s.month,
+      s.date,
+      ...debts.map((d) => Math.round((s.balances[d.id] ?? 0) * 100) / 100),
+      Math.round(s.totalBalance * 100) / 100,
+      Math.round(s.cumulativeInterest * 100) / 100,
+    ]);
+    return [headers, ...dataRows];
+  }
+
   return (
     <div className="space-y-6 max-w-5xl">
-      <h1 className="text-2xl font-bold">Debt Payoff Simulator</h1>
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="text-2xl font-bold">Debt Payoff Simulator</h1>
+        {hasDebts && (
+          <ExportButton
+            onExportXlsx={() => {
+              const rows = buildExportRows();
+              downloadXlsxFromAoa('Payment Schedule', rows, rows[0].map(() => 14), `finwise-debt-${strategy}`);
+            }}
+            onExportCsv={() => downloadCsv(buildExportRows(), `finwise-debt-${strategy}`)}
+          />
+        )}
+      </div>
 
       {/* Debts Table */}
       <Card>

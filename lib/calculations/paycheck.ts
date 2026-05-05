@@ -1,3 +1,5 @@
+import { computeStateTax, STATE_BY_ABBR } from '@/lib/stateTax';
+
 export type PayPeriod = 'weekly' | 'biweekly' | 'semimonthly' | 'monthly';
 export type FilingStatus = 'single' | 'married' | 'hoh';
 
@@ -5,6 +7,8 @@ export interface PaycheckInputs {
   annualSalary: number;
   payPeriod: PayPeriod;
   filingStatus: FilingStatus;
+  state: string; // state abbreviation, e.g. 'MA'
+  nycResident: boolean;
   // Pre-tax deductions (per pay period)
   traditional401kPct: number; // %
   hsaPerPeriod: number; // $
@@ -15,6 +19,11 @@ export interface PaycheckInputs {
   // Post-tax
   roth401kPct: number; // %
   otherPostTaxPerPeriod: number; // $
+}
+
+export interface AdditionalPayrollTax {
+  name: string;
+  amount: number; // per period
 }
 
 export interface PaycheckResult {
@@ -31,8 +40,9 @@ export interface PaycheckResult {
   federalIncomeTax: number;
   socialSecurity: number;
   medicare: number;
-  maStateTax: number;
-  maPfml: number;
+  stateTax: number;
+  localTax: number;
+  additionalPayrollTaxes: AdditionalPayrollTax[];
   totalTaxes: number;
   roth401k: number;
   otherPostTax: number;
@@ -40,6 +50,7 @@ export interface PaycheckResult {
   netPay: number;
   effectiveFederalRate: number;
   marginalFederalRate: number;
+  stateEffectiveRate: number;
   benefitSavings: {
     traditional401k: number;
     hsa: number;
@@ -57,7 +68,7 @@ export const PAY_PERIODS: Record<PayPeriod, number> = {
   monthly: 12,
 };
 
-// 2025 Federal tax brackets — cumulative upper limits
+// 2025 Federal tax brackets
 const BRACKETS: Record<FilingStatus, Array<[number, number]>> = {
   single: [
     [11925, 0.10], [48475, 0.12], [103350, 0.22],
@@ -77,10 +88,6 @@ const STANDARD_DEDUCTIONS: Record<FilingStatus, number> = {
   single: 15000, married: 30000, hoh: 22500,
 };
 
-const MA_EXEMPTIONS: Record<FilingStatus, number> = {
-  single: 4400, married: 8800, hoh: 6800,
-};
-
 const SS_WAGE_BASE = 176100;
 
 function federalTax(income: number, status: FilingStatus): number {
@@ -97,10 +104,8 @@ function federalTax(income: number, status: FilingStatus): number {
 
 function marginalRate(income: number, status: FilingStatus): number {
   if (income <= 0) return 0.10;
-  let prev = 0;
   for (const [upper, rate] of BRACKETS[status]) {
     if (income <= upper) return rate;
-    prev = upper;
   }
   return 0.37;
 }
@@ -111,15 +116,17 @@ export function calculatePaycheck(inp: PaycheckInputs): PaycheckResult {
 
   // Pre-tax deductions per period
   const trad401k = gross * (inp.traditional401kPct / 100);
-  // Section 125 (reduces FICA + federal + MA)
   const sec125 = inp.hsaPerPeriod + inp.fsaPerPeriod +
     inp.healthInsurancePerPeriod + inp.dentalPerPeriod +
     inp.commuterBenefitPerPeriod;
   const totalPreTax = trad401k + sec125;
 
+  const annualTrad401k = trad401k * periods;
+  const annualSec125 = sec125 * periods;
+
   // Federal taxable income (annual)
   const annualFedTaxable = Math.max(0,
-    inp.annualSalary - trad401k * periods - sec125 * periods - STANDARD_DEDUCTIONS[inp.filingStatus]
+    inp.annualSalary - annualTrad401k - annualSec125 - STANDARD_DEDUCTIONS[inp.filingStatus]
   );
   const annualFedTax = federalTax(annualFedTaxable, inp.filingStatus);
   const fedTaxPerPeriod = annualFedTax / periods;
@@ -135,16 +142,26 @@ export function calculatePaycheck(inp: PaycheckInputs): PaycheckResult {
   const medicareSurtax = Math.max(0, annualFica - 200000) * 0.009 / periods;
   const medicarePerPeriod = medicareBase + medicareSurtax;
 
-  // Massachusetts income tax
-  const annualMaTaxable = Math.max(0,
-    inp.annualSalary - trad401k * periods - sec125 * periods - MA_EXEMPTIONS[inp.filingStatus]
+  // State taxes using 50-state engine
+  const stateConfig = STATE_BY_ABBR[inp.state] ?? STATE_BY_ABBR['CA'];
+  const stateResult = computeStateTax(
+    stateConfig,
+    inp.annualSalary,
+    annualTrad401k,
+    annualSec125,
+    inp.filingStatus,
+    inp.state === 'NY' && inp.nycResident,
   );
-  const maPerPeriod = (annualMaTaxable * 0.05) / periods;
+  const stateTaxPerPeriod = stateResult.incomeTax / periods;
+  const localTaxPerPeriod = stateResult.localTax / periods;
+  const additionalPayrollTaxes: AdditionalPayrollTax[] = stateResult.additionalTaxes.map((t) => ({
+    name: t.name,
+    amount: t.amount / periods,
+  }));
 
-  // MA PFML: 0.46% on wages up to SS wage base
-  const maPfmlPerPeriod = (Math.min(annualFica, SS_WAGE_BASE) * 0.0046) / periods;
-
-  const totalTaxes = fedTaxPerPeriod + ssPerPeriod + medicarePerPeriod + maPerPeriod + maPfmlPerPeriod;
+  const additionalTotal = additionalPayrollTaxes.reduce((s, t) => s + t.amount, 0);
+  const totalTaxes = fedTaxPerPeriod + ssPerPeriod + medicarePerPeriod +
+    stateTaxPerPeriod + localTaxPerPeriod + additionalTotal;
 
   // Post-tax
   const roth401k = gross * (inp.roth401kPct / 100);
@@ -152,10 +169,15 @@ export function calculatePaycheck(inp: PaycheckInputs): PaycheckResult {
 
   const netPay = gross - totalPreTax - totalTaxes - totalPostTax;
 
-  // Annual benefit tax savings (federal + state + FICA where applicable)
-  const ficaRate = 0.062 + 0.0145; // SS + Medicare
-  const incomeRate = marginal + 0.05; // federal marginal + MA flat
-  const section125Rate = incomeRate + ficaRate; // Section 125 saves income AND FICA
+  // Benefit tax savings
+  const ficaRate = 0.062 + 0.0145;
+  const stateRate = inp.annualSalary > 0 ? stateResult.incomeTax / inp.annualSalary : 0;
+  const incomeRate = marginal + stateRate;
+  const section125Rate = incomeRate + ficaRate;
+
+  const stateEffectiveRate = inp.annualSalary > 0
+    ? (stateResult.incomeTax + stateResult.localTax) / inp.annualSalary
+    : 0;
 
   return {
     grossPay: gross,
@@ -171,8 +193,9 @@ export function calculatePaycheck(inp: PaycheckInputs): PaycheckResult {
     federalIncomeTax: fedTaxPerPeriod,
     socialSecurity: ssPerPeriod,
     medicare: medicarePerPeriod,
-    maStateTax: maPerPeriod,
-    maPfml: maPfmlPerPeriod,
+    stateTax: stateTaxPerPeriod,
+    localTax: localTaxPerPeriod,
+    additionalPayrollTaxes,
     totalTaxes,
     roth401k,
     otherPostTax: inp.otherPostTaxPerPeriod,
@@ -180,8 +203,9 @@ export function calculatePaycheck(inp: PaycheckInputs): PaycheckResult {
     netPay,
     effectiveFederalRate: effectiveRate,
     marginalFederalRate: marginal,
+    stateEffectiveRate,
     benefitSavings: {
-      traditional401k: trad401k * periods * incomeRate,
+      traditional401k: annualTrad401k * incomeRate,
       hsa: inp.hsaPerPeriod * periods * section125Rate,
       fsa: inp.fsaPerPeriod * periods * section125Rate,
       healthInsurance: inp.healthInsurancePerPeriod * periods * section125Rate,

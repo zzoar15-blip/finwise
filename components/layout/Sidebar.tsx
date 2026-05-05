@@ -4,12 +4,13 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, Calculator, PieChart, CreditCard,
-  TrendingUp, BarChart3, Wallet,
+  TrendingUp, BarChart3, Wallet, Sparkles,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export const NAV = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/advisor', label: 'AI Advisor', icon: Sparkles },
   { href: '/paycheck', label: 'Paycheck', icon: Calculator },
   { href: '/budget', label: 'Budget', icon: PieChart },
   { href: '/debt', label: 'Debt Payoff', icon: CreditCard },

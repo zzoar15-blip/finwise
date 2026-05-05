@@ -3,6 +3,8 @@
 import { useState, useMemo } from 'react';
 import { simulateInvestment } from '@/lib/calculations/invest';
 import type { InvestInputs, InvestResult } from '@/lib/calculations/invest';
+import { ExportButton } from '@/components/ExportButton';
+import { downloadCsv, downloadXlsxFromAoa } from '@/lib/export';
 import { formatCurrency } from '@/lib/format';
 import {
   Card,
@@ -132,17 +134,36 @@ export default function InvestPage() {
     { key: 'targets', label: 'Income Targets' },
   ];
 
+  function buildExportRows(): (string | number)[][] {
+    return [
+      ['Year', 'Portfolio Value ($)', 'Gross Annual Income ($)', 'After-Tax Income ($)', 'Total Invested ($)'],
+      ...result.annual.map((pt) => [
+        pt.year,
+        Math.round(pt.portfolioValue * 100) / 100,
+        Math.round(pt.grossAnnualIncome * 100) / 100,
+        Math.round(pt.afterTaxAnnualIncome * 100) / 100,
+        Math.round(pt.totalInvested * 100) / 100,
+      ]),
+    ];
+  }
+
   return (
     <div className="max-w-7xl space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <TrendingUp className="size-6 text-[#1a56a8]" />
-        <div>
-          <h1 className="text-2xl font-bold">Investment Income Simulator</h1>
-          <p className="text-sm text-muted-foreground">
-            Model dividend income growth over time with custom buy schedules
-          </p>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <TrendingUp className="size-6 text-[#1a56a8]" />
+          <div>
+            <h1 className="text-2xl font-bold">Investment Income Simulator</h1>
+            <p className="text-sm text-muted-foreground">
+              Model dividend income growth over time with custom buy schedules
+            </p>
+          </div>
         </div>
+        <ExportButton
+          onExportXlsx={() => downloadXlsxFromAoa('Projection', buildExportRows(), [8, 22, 24, 22, 20], 'finwise-invest')}
+          onExportCsv={() => downloadCsv(buildExportRows(), 'finwise-invest')}
+        />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[380px_1fr]">

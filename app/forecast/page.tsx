@@ -3,6 +3,8 @@
 import { useState, useMemo } from 'react';
 import { forecastScenario, findBreakeven } from '@/lib/calculations/forecast';
 import type { Scenario, ScenarioResult } from '@/lib/calculations/forecast';
+import { ExportButton } from '@/components/ExportButton';
+import { downloadCsv, downloadXlsxFromAoa } from '@/lib/export';
 import { formatCurrency } from '@/lib/format';
 import {
   Card,
@@ -191,6 +193,15 @@ export default function ForecastPage() {
     );
   };
 
+  function buildExportRows(): (string | number)[][] {
+    const headers = ['Year', ...results.map((r) => `${r.scenario.name} Net Worth ($)`)];
+    const rows = Array.from({ length: 10 }, (_, i) => [
+      i + 1,
+      ...results.map((r) => Math.round((r.points[i]?.netWorth ?? 0) * 100) / 100),
+    ]);
+    return [headers, ...rows];
+  }
+
   return (
     <div className="max-w-7xl space-y-6">
       {/* Header */}
@@ -204,12 +215,21 @@ export default function ForecastPage() {
             </p>
           </div>
         </div>
-        {scenarios.length < 3 && (
-          <Button onClick={addScenario} variant="outline" size="sm">
-            <Plus className="size-4" />
-            Add Scenario
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          <ExportButton
+            onExportXlsx={() => {
+              const rows = buildExportRows();
+              downloadXlsxFromAoa('Forecast', rows, rows[0].map((_, i) => i === 0 ? 8 : 24), 'finwise-forecast');
+            }}
+            onExportCsv={() => downloadCsv(buildExportRows(), 'finwise-forecast')}
+          />
+          {scenarios.length < 3 && (
+            <Button onClick={addScenario} variant="outline" size="sm">
+              <Plus className="size-4" />
+              Add Scenario
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Scenario cards */}
