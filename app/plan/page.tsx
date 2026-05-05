@@ -38,7 +38,7 @@ import {
   Lightbulb,
 } from 'lucide-react';
 import { usePlanStore } from '@/lib/planStore';
-import { computePlanMetrics } from '@/lib/planCalculations';
+import { computePlanMetrics, mergePlanMetricsWithUnifiedBudget } from '@/lib/planCalculations';
 import { simulateInvestment } from '@/lib/calculations/invest';
 import type { PlanMetrics, WaterfallEntry, TaxSuggestion, PriorityCard } from '@/lib/planCalculations';
 import type { AIInsight, PlanInputs, PlanExpenses } from '@/types/plan';
@@ -400,6 +400,10 @@ export default function PlanPage() {
   const setAIInsightsCache = usePlanStore((s) => s.setAIInsightsCache);
   const goals = useFinWiseStore((s) => s.goals);
   const rentVsBuyResults = useFinWiseStore((s) => s.rentVsBuyResults);
+  const paycheckResults = useFinWiseStore((s) => s.paycheckResults);
+  const paycheckInputs = useFinWiseStore((s) => s.paycheckInputs);
+  const budgetInputs = useFinWiseStore((s) => s.budgetInputs);
+  const finWiseDebts = useFinWiseStore((s) => s.debts);
 
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
@@ -442,9 +446,29 @@ export default function PlanPage() {
     return { ...base, ...paycheckOverride, ...debtOverride };
   }, [plan, paycheckProfile, debtProfile]);
 
-  const metrics: PlanMetrics = useMemo(
+  const baseMetrics = useMemo(
     () => computePlanMetrics(effectiveInputs),
     [effectiveInputs],
+  );
+
+  const metrics = useMemo(
+    () =>
+      mergePlanMetricsWithUnifiedBudget(
+        baseMetrics,
+        paycheckResults,
+        paycheckInputs,
+        budgetInputs,
+        finWiseDebts,
+        effectiveInputs,
+      ),
+    [
+      baseMetrics,
+      paycheckResults,
+      paycheckInputs,
+      budgetInputs,
+      finWiseDebts,
+      effectiveInputs,
+    ],
   );
 
   // Invest metrics: prefer investProfile simulation, else use computed
@@ -467,7 +491,14 @@ export default function PlanPage() {
 
   const hasPaycheckData = effectiveInputs.annualSalary > 0;
   const hasExpenseData = Object.values(effectiveInputs.expenses).some(v => v > 0);
-  const hasDebtData = effectiveInputs.debts.some(d => d.balance > 0);
+  const unifiedBudgetHero = paycheckResults.isComplete;
+  /** Income / surplus cards: show synced numbers when paycheck store is filled, even if wizard expenses are blank. */
+  const heroIncomeVisible = hasPaycheckData || unifiedBudgetHero;
+  const heroCashflowVisible =
+    unifiedBudgetHero || (hasPaycheckData && hasExpenseData);
+  const hasDebtData = unifiedBudgetHero
+    ? finWiseDebts.some((d) => d.balance > 0)
+    : effectiveInputs.debts.some((d) => d.balance > 0);
   const hasAnyData = hasPaycheckData || hasDebtData;
   const hasHomeGoal = goals.includes('Save for a home');
 
@@ -646,14 +677,19 @@ export default function PlanPage() {
           {/* Hero metrics */}
           <div className="mt-5 flex flex-col gap-3 sm:flex-row">
             <MetricCard
-              label="Monthly Take-Home"
-              value={hasPaycheckData ? formatCurrency(monthlyTakeHome) : '—'}
+              label={unifiedBudgetHero ? 'Monthly income' : 'Monthly Take-Home'}
+              value={heroIncomeVisible ? formatCurrency(monthlyTakeHome) : '—'}
               valueClass="text-green-600"
               icon={<DollarSign className="size-5 text-green-600" />}
+              sub={
+                unifiedBudgetHero
+                  ? 'Net pay + investment income · matches Budget Planner'
+                  : undefined
+              }
             />
             <MetricCard
               label="Monthly Surplus"
-              value={hasPaycheckData && hasExpenseData ? formatCurrency(monthlySurplus) : '—'}
+              value={heroCashflowVisible ? formatCurrency(monthlySurplus) : '—'}
               valueClass={monthlySurplus >= 0 ? 'text-[#3b82f6]' : 'text-red-500'}
               icon={
                 monthlySurplus >= 0 ? (
@@ -662,31 +698,42 @@ export default function PlanPage() {
                   <TrendingDown className="size-5 text-red-500" />
                 )
               }
-              sub={hasPaycheckData && hasExpenseData && monthlySurplus < 0 ? 'Spending exceeds income' : undefined}
+              sub={
+                !heroCashflowVisible ? undefined
+                : monthlySurplus < 0 ? 'Spending exceeds income'
+                : unifiedBudgetHero ?
+                  'After expenses, bank savings & debt minimums'
+                : undefined
+              }
             />
             <MetricCard
               label="Savings Rate"
-              value={hasPaycheckData && hasExpenseData ? `${savingsRate.toFixed(1)}%` : '—'}
+              value={heroCashflowVisible ? `${savingsRate.toFixed(1)}%` : '—'}
               valueClass={savingsRateColor(savingsRate)}
               icon={<Shield className="size-5 text-muted-foreground" />}
               sub={
-                hasPaycheckData && hasExpenseData
-                  ? savingsRate >= 20 ? 'Excellent' : savingsRate >= 10 ? 'Good — aim for 20%' : 'Below target'
-                  : undefined
+                !heroCashflowVisible ? undefined
+                : unifiedBudgetHero ?
+                  (savingsRate >= 25 ? 'Strong'
+                  : savingsRate >= 15 ? 'Good — many aim for ~20%+ of gross'
+                  : 'Consider increasing payroll or bank savings')
+                : savingsRate >= 20 ? 'Excellent'
+                : savingsRate >= 10 ? 'Good — aim for 20%'
+                : 'Below target'
               }
             />
             <MetricCard
               label="Debt-Free Date"
               value={
-                !hasDebtData
-                  ? (hasPaycheckData ? 'No debts' : '—')
-                  : hasDebts && debtFreeDate
+                !hasDebts
+                  ? (heroIncomeVisible ? 'No debts' : '—')
+                  : debtFreeDate
                   ? formatMonthYear(debtFreeDate)
                   : '—'
               }
-              valueClass={!hasDebtData && hasPaycheckData ? 'text-green-600' : ''}
+              valueClass={!hasDebts && heroIncomeVisible ? 'text-green-600' : ''}
               icon={<Calendar className="size-5 text-muted-foreground" />}
-              sub={hasDebtData && debtResult ? `${debtResult.monthsToPayoff} months away` : undefined}
+              sub={hasDebts && debtResult ? `${debtResult.monthsToPayoff} months away` : undefined}
             />
           </div>
         </Section>
@@ -700,10 +747,14 @@ export default function PlanPage() {
               <CardTitle className="text-lg font-bold" style={{ color: '#0f172a' }}>
                 Where You Stand
               </CardTitle>
-              <CardDescription>Monthly money flow — from paycheck to surplus</CardDescription>
+              <CardDescription>
+                {unifiedBudgetHero ?
+                  'Payroll withholdings are already in net pay. Outflows mirror Budget Planner (living expenses + bank transfers + debt minimums).'
+                : 'Monthly money flow — from paycheck to surplus'}
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              {!hasPaycheckData ? (
+              {!heroIncomeVisible ? (
                 <EmptySection
                   title="No paycheck data"
                   desc="Add your salary and deductions to see your monthly money flow."
@@ -936,7 +987,7 @@ export default function PlanPage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-5">
-              {!hasPaycheckData ? (
+              {!heroIncomeVisible ? (
                 <EmptySection
                   title="Set up your paycheck first"
                   desc="Your investment capacity is calculated from your monthly surplus."
@@ -1055,7 +1106,7 @@ export default function PlanPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
-              {!hasPaycheckData ? (
+              {!heroIncomeVisible ? (
                 <EmptySection
                   title="No paycheck data"
                   desc="Add your salary and pre-tax benefits to see your tax efficiency score."
@@ -1134,7 +1185,7 @@ export default function PlanPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
-              {!hasPaycheckData ? (
+              {!heroIncomeVisible ? (
                 <EmptySection
                   title="Set up your paycheck to see your projection"
                   desc="We'll model your debt payoff, savings growth, and passive income month by month."
@@ -1283,7 +1334,7 @@ export default function PlanPage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
-              {!hasPaycheckData ? (
+              {!heroIncomeVisible ? (
                 <EmptySection
                   title="Add your paycheck data to unlock AI insights"
                   desc="Claude will analyze your complete financial picture and surface personalized recommendations."

@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Calculator,
   PieChart,
@@ -19,7 +19,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard';
 import { usePlanStore } from '@/lib/planStore';
-import { useFinanceStore } from '@/lib/store';
+import { useFinanceStore, useFinWiseStore } from '@/lib/store';
+import { computeBudgetSurplus, computeSavingsRate } from '@/lib/calculations';
 import { computePlanMetrics } from '@/lib/planCalculations';
 import { formatCurrency, formatDate } from '@/lib/format';
 import { CATEGORY_ICONS } from '@/lib/constants';
@@ -41,6 +42,64 @@ function savingsRateColor(rate: number): string {
   if (rate >= 20) return 'text-green-600';
   if (rate >= 10) return 'text-amber-600';
   return 'text-red-600';
+}
+
+function InstitutionalDisclosurePanel({
+  onDismiss,
+  onAccept,
+}: {
+  onDismiss: () => void;
+  onAccept: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 p-4 sm:p-8">
+      <div className="mx-auto max-h-[85vh] w-full max-w-4xl overflow-auto rounded-xl bg-white shadow-xl">
+        <div className="sticky top-0 border-b bg-white px-6 py-4">
+          <h2 className="text-xl font-bold text-gray-900">The &quot;Institutional Grade&quot; Disclosure</h2>
+          <p className="mt-1 text-sm font-semibold text-gray-700">DISCLOSURES AND TERMS OF USE</p>
+        </div>
+        <div className="space-y-4 px-6 py-5 text-sm leading-relaxed text-gray-700">
+          <p>
+            <span className="font-semibold">Educational Purpose Only:</span> This wealth comparison model (the
+            &quot;Tool&quot;) is provided by FinWise for informational and illustrative purposes only. The output is
+            generated based on user-provided assumptions and is not intended to serve as, and should not be relied upon
+            as, investment, tax, legal, or financial advice.
+          </p>
+          <p>
+            <span className="font-semibold">Model Assumptions &amp; Projections:</span> All calculations are hypothetical
+            and based on mathematical models. Projections regarding home appreciation, investment returns, and tax implications
+            are based on historical averages and current statutory rates which are subject to change. Past performance is not
+            indicative of future results. Actual market conditions and financial outcomes may differ significantly from the
+            estimates provided by this Tool.
+          </p>
+          <p>
+            <span className="font-semibold">No Fiduciary Relationship:</span> Use of this Tool does not create a fiduciary,
+            advisory, or professional relationship. FinWise is not a registered investment advisor, broker-dealer, or tax
+            professional.
+          </p>
+          <p>
+            <span className="font-semibold">Risk Disclosure:</span> All financial decisions involve risk, including the
+            possible loss of principal. Real estate and equity markets are volatile; home ownership involves significant
+            non-recoverable costs (maintenance, taxes, interest, and transaction fees) that may outweigh potential gains.
+          </p>
+          <p>
+            <span className="font-semibold">Tax &amp; Legal Consultation:</span> Tax benefits, including mortgage interest
+            deductions, are subject to individual eligibility and complex IRS regulations. Users are strongly encouraged to
+            consult with a qualified tax professional or financial advisor before making any significant financial
+            commitments.
+          </p>
+        </div>
+        <div className="flex items-center justify-end gap-2 border-t bg-gray-50 px-6 py-4">
+          <Button variant="outline" onClick={onDismiss}>
+            Not now
+          </Button>
+          <Button onClick={onAccept} className="bg-[#3b82f6] hover:bg-[#2563eb]">
+            I Understand &amp; Agree
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ── Static data ────────────────────────────────────────────────────────────
@@ -102,12 +161,17 @@ const FEATURE_CARDS = [
   },
 ];
 
-// ── Page ───────────────────────────────────────────────────────────────────
-
-export default function DashboardPage() {
+function DashboardPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const wizardOpen = searchParams.get('wizard') === 'true';
+
   const { plan, settings, setPlan, updateSettings } = usePlanStore();
   const transactions = useFinanceStore((s) => s.transactions);
+  const paycheckResults = useFinWiseStore((s) => s.paycheckResults);
+  const paycheckInputs = useFinWiseStore((s) => s.paycheckInputs);
+  const budgetInputs = useFinWiseStore((s) => s.budgetInputs);
+  const debts = useFinWiseStore((s) => s.debts);
 
   const [showWizard, setShowWizard] = useState(false);
   const [showDisclosure, setShowDisclosure] = useState(false);
@@ -118,6 +182,29 @@ export default function DashboardPage() {
   );
 
   const recentTransactions = useMemo(() => transactions.slice(0, 5), [transactions]);
+
+  const unifiedSurplus = useMemo(() => {
+    if (!paycheckResults.isComplete) return null;
+    return computeBudgetSurplus(paycheckResults, budgetInputs, debts);
+  }, [paycheckResults, budgetInputs, debts]);
+
+  const unifiedSavingsRate = useMemo(() => {
+    if (!paycheckResults.isComplete) return null;
+    return computeSavingsRate(paycheckResults, paycheckInputs, budgetInputs);
+  }, [paycheckResults, paycheckInputs, budgetInputs]);
+
+  useEffect(() => {
+    if (!wizardOpen) return;
+    if (settings.acceptedInstitutionalDisclosure) setShowWizard(true);
+    else setShowDisclosure(true);
+    router.replace('/', { scroll: false });
+  }, [wizardOpen, settings.acceptedInstitutionalDisclosure, router]);
+
+  const handleAcceptDisclosure = useCallback(() => {
+    updateSettings({ acceptedInstitutionalDisclosure: true });
+    setShowDisclosure(false);
+    setShowWizard(true);
+  }, [updateSettings]);
 
   function handleUpdatePlan(inputs: PlanInputs) {
     setPlan(inputs);
@@ -132,75 +219,30 @@ export default function DashboardPage() {
     setShowDisclosure(true);
   }
 
-  function handleAcceptDisclosure() {
-    updateSettings({ acceptedInstitutionalDisclosure: true });
-    setShowDisclosure(false);
-    setShowWizard(true);
+  function openPlanWizardOrDisclosure() {
+    if (settings.acceptedInstitutionalDisclosure) setShowWizard(true);
+    else setShowDisclosure(true);
   }
+
+  const disclosureModal = showDisclosure ? (
+    <InstitutionalDisclosurePanel
+      onDismiss={() => setShowDisclosure(false)}
+      onAccept={handleAcceptDisclosure}
+    />
+  ) : null;
 
   // ── State A: no plan ─────────────────────────────────────────────────────
   if (!plan) {
     return (
       <>
+        {disclosureModal}
         {showWizard && (
           <div className="fixed inset-0 z-50 overflow-auto bg-white">
             <OnboardingWizard onComplete={handleUpdatePlan} />
           </div>
         )}
 
-        {showDisclosure && (
-          <div className="fixed inset-0 z-50 bg-black/50 p-4 sm:p-8">
-            <div className="mx-auto max-h-[85vh] w-full max-w-4xl overflow-auto rounded-xl bg-white shadow-xl">
-              <div className="sticky top-0 border-b bg-white px-6 py-4">
-                <h2 className="text-xl font-bold text-gray-900">The &quot;Institutional Grade&quot; Disclosure</h2>
-                <p className="mt-1 text-sm font-semibold text-gray-700">DISCLOSURES AND TERMS OF USE</p>
-              </div>
-              <div className="space-y-4 px-6 py-5 text-sm leading-relaxed text-gray-700">
-                <p>
-                  <span className="font-semibold">Educational Purpose Only:</span> This wealth comparison model (the
-                  &quot;Tool&quot;) is provided by FinWise for informational and illustrative purposes only. The output is
-                  generated based on user-provided assumptions and is not intended to serve as, and should not be
-                  relied upon as, investment, tax, legal, or financial advice.
-                </p>
-                <p>
-                  <span className="font-semibold">Model Assumptions &amp; Projections:</span> All calculations are
-                  hypothetical and based on mathematical models. Projections regarding home appreciation, investment
-                  returns, and tax implications are based on historical averages and current statutory rates which are
-                  subject to change. Past performance is not indicative of future results. Actual market conditions and
-                  financial outcomes may differ significantly from the estimates provided by this Tool.
-                </p>
-                <p>
-                  <span className="font-semibold">No Fiduciary Relationship:</span> Use of this Tool does not create a
-                  fiduciary, advisory, or professional relationship. FinWise is not a registered investment advisor,
-                  broker-dealer, or tax professional.
-                </p>
-                <p>
-                  <span className="font-semibold">Risk Disclosure:</span> All financial decisions involve risk,
-                  including the possible loss of principal. Real estate and equity markets are volatile; home ownership
-                  involves significant non-recoverable costs (maintenance, taxes, interest, and transaction fees) that
-                  may outweigh potential gains.
-                </p>
-                <p>
-                  <span className="font-semibold">Tax &amp; Legal Consultation:</span> Tax benefits, including mortgage
-                  interest deductions, are subject to individual eligibility and complex IRS regulations. Users are
-                  strongly encouraged to consult with a qualified tax professional or financial advisor before making
-                  any significant financial commitments.
-                </p>
-              </div>
-              <div className="flex items-center justify-end gap-2 border-t bg-gray-50 px-6 py-4">
-                <Button variant="outline" onClick={() => setShowDisclosure(false)}>
-                  Not now
-                </Button>
-                <Button onClick={handleAcceptDisclosure} className="bg-[#3b82f6] hover:bg-[#2563eb]">
-                  I Understand &amp; Agree
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
-
         <div className="flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center px-4 py-16">
-          {/* Hero */}
           <div className="flex flex-col items-center text-center">
             <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#3b82f6] shadow-lg">
               <Wallet className="h-8 w-8 text-white" />
@@ -224,7 +266,6 @@ export default function DashboardPage() {
             </Button>
           </div>
 
-          {/* Feature cards */}
           <div className="mt-16 grid w-full max-w-3xl grid-cols-1 gap-4 sm:grid-cols-3">
             {FEATURE_CARDS.map((f) => (
               <div
@@ -246,13 +287,17 @@ export default function DashboardPage() {
 
   // ── State B: plan exists ──────────────────────────────────────────────────
   const name = settings.displayName || plan.inputs.name;
-  const surplus = metrics?.monthlySurplus ?? 0;
-  const savingsRate = metrics?.savingsRate ?? 0;
-  const takeHome = metrics?.monthlyTakeHome ?? 0;
+  const surplus = unifiedSurplus ?? metrics?.monthlySurplus ?? 0;
+  const savingsRate = unifiedSavingsRate ?? metrics?.savingsRate ?? 0;
+  const takeHome =
+    paycheckResults.isComplete ?
+      paycheckResults.netPayMonthly
+    : metrics?.monthlyTakeHome ?? 0;
   const debtFreeDate = metrics?.debtFreeDate;
 
   return (
     <>
+      {disclosureModal}
       {showWizard && (
         <div className="fixed inset-0 z-50 overflow-auto bg-white">
           <OnboardingWizard
@@ -263,7 +308,6 @@ export default function DashboardPage() {
       )}
 
       <div className="max-w-6xl space-y-8">
-        {/* Header row */}
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
@@ -281,15 +325,13 @@ export default function DashboardPage() {
               View Full Plan
               <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
             </Link>
-            <Button variant="outline" onClick={() => setShowWizard(true)}>
+            <Button variant="outline" onClick={openPlanWizardOrDisclosure}>
               Update Plan
             </Button>
           </div>
         </div>
 
-        {/* Hero metric cards */}
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          {/* Monthly Take-Home */}
           <Card className="shadow-sm">
             <CardHeader className="pb-1">
               <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wide">
@@ -298,10 +340,12 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <p className="text-2xl font-bold text-gray-900">{formatCurrency(takeHome)}</p>
+              {paycheckResults.isComplete && (
+                <p className="text-[10px] text-muted-foreground mt-1">Net pay from Paycheck Calculator</p>
+              )}
             </CardContent>
           </Card>
 
-          {/* Monthly Surplus */}
           <Card className="shadow-sm">
             <CardHeader className="pb-1">
               <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wide">
@@ -316,10 +360,12 @@ export default function DashboardPage() {
               >
                 {formatCurrency(surplus)}
               </p>
+              {unifiedSurplus != null && (
+                <p className="text-[10px] text-muted-foreground mt-1">Aligned with Budget Planner cash flow</p>
+              )}
             </CardContent>
           </Card>
 
-          {/* Savings Rate */}
           <Card className="shadow-sm">
             <CardHeader className="pb-1">
               <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wide">
@@ -330,10 +376,12 @@ export default function DashboardPage() {
               <p className={`text-2xl font-bold ${savingsRateColor(savingsRate)}`}>
                 {savingsRate.toFixed(1)}%
               </p>
+              {unifiedSavingsRate != null && (
+                <p className="text-[10px] text-muted-foreground mt-1">% of gross (payroll + bank savings)</p>
+              )}
             </CardContent>
           </Card>
 
-          {/* Debt-Free Date */}
           <Card className="shadow-sm">
             <CardHeader className="pb-1">
               <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wide">
@@ -350,7 +398,6 @@ export default function DashboardPage() {
           </Card>
         </div>
 
-        {/* Quick links grid */}
         <div>
           <h2 className="mb-4 text-lg font-semibold text-gray-800">Tools</h2>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
@@ -370,7 +417,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Recent Transactions */}
         <Card className="shadow-sm">
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -428,5 +474,13 @@ export default function DashboardPage() {
         </Card>
       </div>
     </>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={null}>
+      <DashboardPageContent />
+    </Suspense>
   );
 }

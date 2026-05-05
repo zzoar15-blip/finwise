@@ -140,20 +140,26 @@ export default function BudgetPage() {
   const totalDebtMinimums = debts.reduce((s, d) => s + d.minPayment, 0);
   const totalExpenses = bi.housing + bi.utilities + bi.insurance + bi.groceries + bi.dining +
     bi.transportation + bi.subscriptions + bi.phone + bi.healthGym + bi.travel + bi.misc;
-  const payrollSavings = (pr.k401TraditionalAnnual + pr.k401RothAnnual) / 12 +
+  const payrollSavingsMonthly = (pr.k401TraditionalAnnual + pr.k401RothAnnual) / 12 +
     pi.hsaAnnual / 12 + pi.fsaAnnual / 12;
   const optionalSavings = bi.rothIraMonthly + bi.brokerageMonthly + bi.emergencyFundMonthly;
-  const totalSavings = payrollSavings + optionalSavings;
   const monthlyIncome = pr.netPayMonthly + bi.investmentIncome;
-  const totalOutflows = totalExpenses + totalSavings + totalDebtMinimums;
-  const monthlySurplus = monthlyIncome - totalOutflows;
-  const savingsRate = monthlyIncome > 0 ? (totalSavings / monthlyIncome) * 100 : 0;
+  /** Outflows from take-home (payroll savings already embedded in net pay). */
+  const cashOutflows = totalExpenses + optionalSavings + totalDebtMinimums;
+  const monthlySurplus = monthlyIncome - cashOutflows;
+  const savingsRate =
+    pr.grossAnnual > 0
+      ? (((pr.k401TraditionalAnnual + pr.k401RothAnnual + pi.hsaAnnual + pi.fsaAnnual) +
+          optionalSavings * 12) /
+          pr.grossAnnual) *
+        100
+      : 0;
 
-  // Chart data
+  // Chart data — optional savings + debt + living; housing called out in pie
   const pieData = [
     { name: 'Housing', value: bi.housing, color: CHART_COLORS.Housing },
     { name: 'Debt', value: totalDebtMinimums, color: CHART_COLORS.Debt },
-    { name: 'Savings', value: totalSavings, color: CHART_COLORS.Savings },
+    { name: 'Savings (from bank)', value: optionalSavings, color: CHART_COLORS.Savings },
     { name: 'Living', value: totalExpenses - bi.housing, color: CHART_COLORS.Living },
   ].filter(d => d.value > 0);
 
@@ -162,7 +168,7 @@ export default function BudgetPage() {
     { category: 'Groceries', Amount: bi.groceries },
     { category: 'Dining', Amount: bi.dining },
     { category: 'Transport', Amount: bi.transportation },
-    { category: 'Savings', Amount: totalSavings },
+    { category: 'Savings (bank)', Amount: optionalSavings },
     { category: 'Debt', Amount: totalDebtMinimums },
   ].filter(d => d.Amount > 0);
 
@@ -195,12 +201,14 @@ export default function BudgetPage() {
       ['Roth IRA', bi.rothIraMonthly, bi.rothIraMonthly * 12],
       ['Brokerage', bi.brokerageMonthly, bi.brokerageMonthly * 12],
       ['Emergency Fund', bi.emergencyFundMonthly, bi.emergencyFundMonthly * 12],
-      ['Total Savings', totalSavings, totalSavings * 12],
+      ['Payroll savings (401k/HSA/FSA; in net pay)', payrollSavingsMonthly, payrollSavingsMonthly * 12],
+      ['Savings from bank (surplus calc)', optionalSavings, optionalSavings * 12],
+      ['Total savings (all channels)', payrollSavingsMonthly + optionalSavings, (payrollSavingsMonthly + optionalSavings) * 12],
       [''],
       ['Debt Payments', totalDebtMinimums, totalDebtMinimums * 12],
       [''],
       ['Monthly Surplus / (Deficit)', monthlySurplus, monthlySurplus * 12],
-      ['Savings Rate', `${savingsRate.toFixed(1)}%`, ''],
+      ['Savings rate (% of gross)', `${savingsRate.toFixed(1)}%`, ''],
     ];
   }
 
@@ -377,8 +385,12 @@ export default function BudgetPage() {
                   <span className="font-medium tabular-nums">{formatCurrency(totalDebtMinimums)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Total Savings</span>
-                  <span className="font-medium tabular-nums">{formatCurrency(totalSavings)}</span>
+                  <span className="text-muted-foreground">Payroll savings (in net pay)</span>
+                  <span className="font-medium tabular-nums text-muted-foreground">{formatCurrency(payrollSavingsMonthly)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Savings from bank</span>
+                  <span className="font-medium tabular-nums">{formatCurrency(optionalSavings)}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between text-sm font-semibold">
@@ -388,7 +400,7 @@ export default function BudgetPage() {
                   </span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-muted-foreground">Savings Rate</span>
+                  <span className="text-muted-foreground">Savings rate (% of gross)</span>
                   <span className={`inline-flex h-5 items-center rounded-full px-2 text-xs font-semibold ${savingsRateColor(savingsRate)}`}>
                     {savingsRate.toFixed(1)}%
                   </span>
@@ -403,6 +415,9 @@ export default function BudgetPage() {
           <Card>
             <CardHeader>
               <CardTitle>Spending Breakdown</CardTitle>
+              <p className="text-xs text-muted-foreground pt-1">
+                Based on take-home: 401(k)/HSA/FSA are already reflected in net pay and are not double-counted in surplus.
+              </p>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={220}>
@@ -461,7 +476,7 @@ export default function BudgetPage() {
                 {[
                   { label: 'Annual Income', value: monthlyIncome * 12 },
                   { label: 'Annual Expenses', value: totalExpenses * 12 },
-                  { label: 'Annual Savings', value: totalSavings * 12 },
+                  { label: 'Annual savings (payroll + bank)', value: (payrollSavingsMonthly + optionalSavings) * 12 },
                   { label: 'Annual Debt Payments', value: totalDebtMinimums * 12 },
                   { label: 'Annual Surplus', value: monthlySurplus * 12, isSurplus: true },
                 ].map(row => (

@@ -71,10 +71,14 @@ function buildBudgetModelSheet(
     pi.hsaAnnual / 12 + pi.fsaAnnual / 12;
   const totalSavingsOptional = bi.rothIraMonthly + bi.brokerageMonthly + bi.emergencyFundMonthly;
   const totalSavings = totalSavingsPayroll + totalSavingsOptional;
-  const totalOutflows = totalExpenses + totalSavings + totalDebtMinimums;
   const monthlyIncome = pr.netPayMonthly + bi.investmentIncome;
-  const monthlySurplus = monthlyIncome - totalOutflows;
-  const savingsRate = monthlyIncome > 0 ? totalSavings / monthlyIncome : 0;
+  const cashOutflows = totalExpenses + totalSavingsOptional + totalDebtMinimums;
+  const monthlySurplus = monthlyIncome - cashOutflows;
+  const grossAnnual = Math.max(pr.grossAnnual, 1);
+  const savingsRate =
+    (pr.k401TraditionalAnnual + pr.k401RothAnnual + pi.hsaAnnual + pi.fsaAnnual +
+      totalSavingsOptional * 12) /
+    grossAnnual;
 
   const rows: XLSX.CellObject[][] = [
     ...workbookHeader('Budget Model'),
@@ -145,7 +149,8 @@ function buildBudgetModelSheet(
     [labelCell('Roth IRA'), inputCell(bi.rothIraMonthly), formulaCell(bi.rothIraMonthly * 12)],
     [labelCell('Brokerage / Investments'), inputCell(bi.brokerageMonthly), formulaCell(bi.brokerageMonthly * 12)],
     [labelCell('Emergency Fund'), inputCell(bi.emergencyFundMonthly), formulaCell(bi.emergencyFundMonthly * 12)],
-    [labelCell('Total Savings & Investments'), subtotalCell(totalSavings), subtotalCell(totalSavings * 12)],
+    [cell('Subtotal — payroll savings (included in net pay above)', { font: { sz: 9, italic: true, color: { rgb: '6b7280' } } }), formulaCell(totalSavingsPayroll), formulaCell(totalSavingsPayroll * 12)],
+    [labelCell('Total savings & investments (all channels)'), subtotalCell(totalSavings), subtotalCell(totalSavings * 12)],
     [blankCell()],
     [sectionHeaderCell('DEBT PAYMENTS'), blankCell(), blankCell()],
     ...debts.map(d => [labelCell(d.name), inputCell(d.minPayment), formulaCell(d.minPayment * 12)]),
@@ -153,9 +158,9 @@ function buildBudgetModelSheet(
     [blankCell()],
     // SUMMARY
     [sectionHeaderCell('SUMMARY'), blankCell(), blankCell()],
-    [totalLabelCell('Total Monthly Outflows'), totalCell(totalOutflows), totalCell(totalOutflows * 12)],
+    [totalLabelCell('Cash outflows (expenses + bank savings + debt)'), totalCell(cashOutflows), totalCell(cashOutflows * 12)],
     [totalLabelCell('Monthly Surplus / (Deficit)'), cell(monthlySurplus, { ...XLS.total, font: { ...XLS.total.font, color: { rgb: monthlySurplus >= 0 ? '86efac' : 'fca5a5' } } }, XLS.fmt.currencyNeg), cell(monthlySurplus * 12, { ...XLS.total, font: { ...XLS.total.font, color: { rgb: monthlySurplus >= 0 ? '86efac' : 'fca5a5' } } }, XLS.fmt.currencyNeg)],
-    [totalLabelCell('Savings Rate'), totalCell(savingsRate, XLS.fmt.percent), blankCell()],
+    [totalLabelCell('Savings rate (% of gross)'), totalCell(savingsRate, XLS.fmt.percent), blankCell()],
     [blankCell()],
     [workbookFooter()[0]],
   ];
@@ -181,10 +186,10 @@ function buildMonthlyProjectionSheet(
   const totalDebtMinimums = debts.reduce((s, d) => s + d.minPayment, 0);
   const totalExpenses = bi.housing + bi.utilities + bi.insurance + bi.groceries + bi.dining +
     bi.transportation + bi.subscriptions + bi.phone + bi.healthGym + bi.travel + bi.misc;
-  const totalSavings = (pr.k401TraditionalAnnual + pr.k401RothAnnual) / 12 +
-    pi.hsaAnnual / 12 + pi.fsaAnnual / 12 +
-    bi.rothIraMonthly + bi.brokerageMonthly + bi.emergencyFundMonthly;
-  const monthlySurplus = (pr.netPayMonthly + bi.investmentIncome) - totalExpenses - totalSavings - totalDebtMinimums;
+  const optionalMonthly = bi.rothIraMonthly + bi.brokerageMonthly + bi.emergencyFundMonthly;
+  const monthlyIncome = pr.netPayMonthly + bi.investmentIncome;
+  const monthlySurplus = monthlyIncome - totalExpenses - optionalMonthly - totalDebtMinimums;
+  const savingsFromBank = optionalMonthly;
 
   const today = new Date();
   const rows: XLSX.CellObject[][] = [
@@ -192,10 +197,10 @@ function buildMonthlyProjectionSheet(
     [
       columnHeaderCell('Month'),
       columnHeaderCell('Date'),
-      columnHeaderCell('Take-Home'),
+      columnHeaderCell('Income (net + inv.)'),
       columnHeaderCell('Living Expenses'),
       columnHeaderCell('Debt Pmts'),
-      columnHeaderCell('Savings'),
+      columnHeaderCell('Bank savings'),
       columnHeaderCell('Total Out'),
       columnHeaderCell('Surplus'),
       columnHeaderCell('Cum Surplus'),
@@ -209,16 +214,16 @@ function buildMonthlyProjectionSheet(
     const d = new Date(today.getFullYear(), today.getMonth() + m, 1);
     const dateStr = d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
     cumSurplus += monthlySurplus;
-    cumSavings += totalSavings;
+    cumSavings += savingsFromBank;
     const alt = m % 2 === 1;
     rows.push([
       formulaCell(m + 1, XLS.fmt.integer, alt),
       cell(dateStr, alt ? XLS.altRow : XLS.formula),
-      formulaCell(pr.netPayMonthly, XLS.fmt.currency, alt),
+      formulaCell(monthlyIncome, XLS.fmt.currency, alt),
       formulaCell(totalExpenses, XLS.fmt.currency, alt),
       formulaCell(totalDebtMinimums, XLS.fmt.currency, alt),
-      formulaCell(totalSavings, XLS.fmt.currency, alt),
-      formulaCell(totalExpenses + totalDebtMinimums + totalSavings, XLS.fmt.currency, alt),
+      formulaCell(savingsFromBank, XLS.fmt.currency, alt),
+      formulaCell(totalExpenses + totalDebtMinimums + savingsFromBank, XLS.fmt.currency, alt),
       cell(monthlySurplus, { ...(alt ? XLS.altRow : XLS.formula), font: { sz: 10, color: { rgb: monthlySurplus >= 0 ? '166534' : 'dc2626' } } }, XLS.fmt.currency),
       cell(cumSurplus, { ...(alt ? XLS.altRow : XLS.formula), font: { sz: 10, color: { rgb: cumSurplus >= 0 ? '166534' : 'dc2626' } } }, XLS.fmt.currency),
       formulaCell(cumSavings, XLS.fmt.currency, alt),

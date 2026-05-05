@@ -71,10 +71,10 @@ export default function DebtPage() {
   const paycheckResults = useFinWiseStore((s) => s.paycheckResults);
   const budgetInputs = useFinWiseStore((s) => s.budgetInputs);
 
-  const surplus = computeBudgetSurplus(paycheckResults, budgetInputs);
+  const [debts, setDebts] = useState<Debt[]>(storeDebts.length > 0 ? storeDebts : []);
+  const surplus = computeBudgetSurplus(paycheckResults, budgetInputs, debts);
   const surplusRounded = Math.max(0, Math.min(2000, Math.round(surplus / 100) * 100));
 
-  const [debts, setDebts] = useState<Debt[]>(storeDebts.length > 0 ? storeDebts : []);
   const [monthlyOverpayment, setMonthlyOverpayment] = useState(surplusRounded);
   const [annualBonus, setAnnualBonus] = useState(0);
   const [bonusMonth, setBonusMonth] = useState(2);

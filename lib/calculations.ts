@@ -150,23 +150,47 @@ export function computeTotalExpenses(budget: StoreBudgetInputs): number {
     budget.healthGym + budget.travel + budget.misc;
 }
 
+/** Voluntary savings/transfers from net pay (checking), not payroll withholdings. */
+export function computeOptionalMonthlySavings(budget: StoreBudgetInputs): number {
+  return budget.brokerageMonthly + budget.rothIraMonthly + budget.emergencyFundMonthly;
+}
+
 export function computeTotalSavings(paycheckResults: StorePaycheckResults, paycheckInputs: StorePaycheckInputs, budget: StoreBudgetInputs): number {
   return paycheckResults.k401TraditionalAnnual / 12 + paycheckResults.k401RothAnnual / 12 +
     paycheckInputs.hsaAnnual / 12 + paycheckInputs.fsaAnnual / 12 +
     budget.brokerageMonthly + budget.rothIraMonthly + budget.emergencyFundMonthly;
 }
 
-export function computeBudgetSurplus(results: StorePaycheckResults, budget: StoreBudgetInputs): number {
+/**
+ * Cash surplus after net pay hits your account: take-home + investment income minus
+ * living expenses, optional savings (IRA/brokerage/EF transfers), and debt minimums.
+ * Payroll 401(k)/HSA/FSA are not subtracted again — they already reduced net pay.
+ */
+export function computeBudgetSurplus(
+  results: StorePaycheckResults,
+  budget: StoreBudgetInputs,
+  debts: Array<{ minPayment: number }> = [],
+): number {
+  if (!results.isComplete) return 0;
   const income = results.netPayMonthly + budget.investmentIncome;
   const expenses = computeTotalExpenses(budget);
-  return income - expenses;
+  const debtMins = debts.reduce((s, d) => s + d.minPayment, 0);
+  return income - expenses - computeOptionalMonthlySavings(budget) - debtMins;
 }
 
-export function computeSavingsRate(results: StorePaycheckResults, budget: StoreBudgetInputs): number {
-  const income = results.netPayMonthly + budget.investmentIncome;
-  if (income <= 0) return 0;
-  const savings = budget.brokerageMonthly + budget.rothIraMonthly + budget.emergencyFundMonthly;
-  return (savings / income) * 100;
+/** Total annual dollars going to savings channels (payroll + voluntary) as % of gross pay. */
+export function computeSavingsRate(
+  results: StorePaycheckResults,
+  paycheckInputs: StorePaycheckInputs,
+  budget: StoreBudgetInputs,
+): number {
+  const grossAnnual = Math.max(results.grossAnnual, 1);
+  const payrollAnnual =
+    results.k401TraditionalAnnual + results.k401RothAnnual +
+    paycheckInputs.hsaAnnual + paycheckInputs.fsaAnnual;
+  const optionalAnnual =
+    (budget.brokerageMonthly + budget.rothIraMonthly + budget.emergencyFundMonthly) * 12;
+  return ((payrollAnnual + optionalAnnual) / grossAnnual) * 100;
 }
 
 export function buildFinancialContext(
@@ -179,9 +203,9 @@ export function buildFinancialContext(
 ): string {
   const fmt = (n: number) => `$${Math.round(n).toLocaleString()}`;
   const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
-  const surplus = computeBudgetSurplus(paycheckResults, budgetInputs);
+  const surplus = computeBudgetSurplus(paycheckResults, budgetInputs, debts);
   const expenses = computeTotalExpenses(budgetInputs);
-  const savingsRate = computeSavingsRate(paycheckResults, budgetInputs);
+  const savingsRate = computeSavingsRate(paycheckResults, paycheckInputs, budgetInputs);
   const totalDebt = debts.reduce((s, d) => s + d.balance, 0);
   const lines: string[] = [];
   if (paycheckResults.isComplete) {

@@ -112,9 +112,8 @@ export default function InvestPage() {
   const budgetInputs = useFinWiseStore((s) => s.budgetInputs);
   const debts = useFinWiseStore((s) => s.debts);
 
-  const surplus = computeBudgetSurplus(paycheckResults, budgetInputs);
-  const totalDebtMinimums = debts.reduce((s, d) => s + d.minPayment, 0);
-  const availableForInvesting = Math.max(0, surplus - totalDebtMinimums);
+  const surplus = computeBudgetSurplus(paycheckResults, budgetInputs, debts);
+  const availableForInvesting = Math.max(0, surplus);
 
   // Default tax rate from paycheck if complete
   const defaultTaxRate = paycheckResults.isComplete

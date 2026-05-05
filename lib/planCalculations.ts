@@ -4,6 +4,17 @@ import { simulateDebtPayoff } from '@/lib/calculations/debt';
 import type { Debt, DebtResult } from '@/lib/calculations/debt';
 import { simulateInvestment } from '@/lib/calculations/invest';
 import type { InvestResult } from '@/lib/calculations/invest';
+import type {
+  StoreBudgetInputs,
+  StorePaycheckInputs,
+  StorePaycheckResults,
+} from '@/lib/calculations';
+import {
+  computeBudgetSurplus,
+  computeOptionalMonthlySavings,
+  computeSavingsRate,
+  computeTotalExpenses,
+} from '@/lib/calculations';
 import type { PlanInputs, PlanDebt, Goal } from '@/types/plan';
 
 export interface WaterfallEntry {
@@ -46,7 +57,8 @@ export interface PlanMetrics {
   monthlyBonus: number;
   totalMonthlyExpenses: number;
   monthlySurplus: number;
-  savingsRate: number; // % of take-home
+  /** Wizard-only: surplus / take-home. With Budget Planner sync: payroll + bank savings as % of gross. */
+  savingsRate: number;
 
   // Tax
   paycheckResult: PaycheckResult;
@@ -481,6 +493,177 @@ export function computePlanMetrics(inputs: PlanInputs): PlanMetrics {
     investResult,
     taxEfficiencyScore,
     taxSuggestions,
+    waterfallData,
+    priorities,
+    projection,
+    emergencyFundMonthsCovered,
+    emergencyFundDate,
+  };
+}
+
+/**
+ * When the Paycheck Calculator store is complete, align hero surplus, savings rate,
+ * waterfall, projections, priorities, and invest baseline with Budget / Debt tools
+ * (net pay — expenses — bank savings — debt minimums; no double-counting payroll).
+ */
+export function mergePlanMetricsWithUnifiedBudget(
+  base: PlanMetrics,
+  paycheckResults: StorePaycheckResults,
+  paycheckInputs: StorePaycheckInputs,
+  budgetInputs: StoreBudgetInputs,
+  debts: Array<{ id?: string; name?: string; balance?: number; apr?: number; minPayment: number }>,
+  inputs: PlanInputs,
+): PlanMetrics {
+  if (!paycheckResults.isComplete) {
+    return base;
+  }
+
+  const monthlyIncome = paycheckResults.netPayMonthly + budgetInputs.investmentIncome;
+  const unifiedSurplus = computeBudgetSurplus(paycheckResults, budgetInputs, debts);
+  const unifiedSavingsRate = computeSavingsRate(
+    paycheckResults,
+    paycheckInputs,
+    budgetInputs,
+  );
+
+  const budgetExpenses = computeTotalExpenses(budgetInputs);
+  const optional = computeOptionalMonthlySavings(budgetInputs);
+  const debtMins = debts.reduce((s, d) => s + (d.minPayment ?? 0), 0);
+  const unifiedDebts: Debt[] = debts
+    .filter((d) => (d.balance ?? 0) > 0)
+    .map((d, i) => ({
+      id: d.id ?? `store-debt-${i}`,
+      name: d.name ?? `Debt ${i + 1}`,
+      balance: d.balance ?? 0,
+      apr: d.apr ?? 0,
+      minPayment: d.minPayment,
+    }));
+  const hasDebts = unifiedDebts.length > 0;
+  const totalDebtBalance = unifiedDebts.reduce((s, d) => s + d.balance, 0);
+  const debtResult = hasDebts
+    ? simulateDebtPayoff(unifiedDebts, 0, 0, 2, 'avalanche')
+    : null;
+  const debtFreeDate = debtResult?.debtFreeDate ?? null;
+
+  const monthlyInvestCapacity = Math.max(0, unifiedSurplus);
+
+  const investResult =
+    monthlyInvestCapacity > 0
+      ? simulateInvestment({
+          monthlyBuy: monthlyInvestCapacity,
+          annualBonus: 0,
+          dividendYield: 7,
+          taxRate: Math.round(Math.min(paycheckResults.marginalCombinedRate, 0.5) * 100),
+          qualifiedPercent: 70,
+          payFrequency: 'monthly',
+          years: 5,
+          annualAppreciation: 3,
+        })
+      : null;
+
+  const emergencyFundMonthsCovered =
+    budgetExpenses > 0 ? unifiedSurplus / budgetExpenses : 0;
+
+  let emergencyFundDate: string | null = null;
+  if (inputs.emergencyFundTarget > 0 && unifiedSurplus > 0) {
+    const monthsNeeded = Math.ceil(inputs.emergencyFundTarget / unifiedSurplus);
+    const target = addMonths(new Date(), monthsNeeded);
+    emergencyFundDate = target.toLocaleDateString('en-US', {
+      month: 'long',
+      year: 'numeric',
+    });
+  }
+
+  const partialMetrics: Partial<PlanMetrics> = {
+    monthlySurplus: unifiedSurplus,
+    debtResult,
+    debtFreeDate,
+    monthlyInvestCapacity,
+    investResult,
+    taxEfficiencyScore: base.taxEfficiencyScore,
+    taxSuggestions: base.taxSuggestions,
+    emergencyFundMonthsCovered,
+  };
+  const priorities = buildPriorities(inputs, partialMetrics);
+
+  const projection = build12MonthProjection(
+    inputs,
+    unifiedSurplus,
+    debtResult,
+    investResult,
+    budgetExpenses,
+  );
+
+  const grossMonthly = paycheckResults.grossAnnual / 12;
+  const preTaxMonthly = paycheckResults.totalPreTaxDeductions / 12;
+  const taxesMonthly = paycheckResults.totalTaxesAnnual / 12;
+  const netPay = paycheckResults.netPayMonthly;
+
+  const waterfallData: WaterfallEntry[] = [
+    { name: 'Gross Salary', value: grossMonthly, running: grossMonthly, type: 'income' },
+    {
+      name: 'Pre-Tax Deductions',
+      value: -preTaxMonthly,
+      running: grossMonthly - preTaxMonthly,
+      type: 'deduction',
+    },
+    {
+      name: 'Taxes',
+      value: -taxesMonthly,
+      running: netPay,
+      type: 'tax',
+    },
+    { name: 'Net Pay', value: 0, running: netPay, type: 'result' },
+  ];
+
+  let flow = netPay;
+  if (budgetInputs.investmentIncome > 0) {
+    flow += budgetInputs.investmentIncome;
+    waterfallData.push({
+      name: 'Investment income',
+      value: budgetInputs.investmentIncome,
+      running: flow,
+      type: 'income',
+    });
+  }
+
+  flow -= budgetExpenses;
+  waterfallData.push({
+    name: 'Living expenses',
+    value: -budgetExpenses,
+    running: flow,
+    type: 'expense',
+  });
+
+  const bankAndDebt = optional + debtMins;
+  flow -= bankAndDebt;
+  waterfallData.push({
+    name: 'Bank savings & debt minimums',
+    value: -bankAndDebt,
+    running: flow,
+    type: 'expense',
+  });
+
+  waterfallData.push({
+    name: 'Monthly surplus',
+    value: 0,
+    running: unifiedSurplus,
+    type: 'result',
+  });
+
+  return {
+    ...base,
+    monthlyTakeHome: monthlyIncome,
+    totalMonthlyExpenses: budgetExpenses,
+    monthlySurplus: unifiedSurplus,
+    savingsRate: unifiedSavingsRate,
+    hasDebts,
+    debtResult,
+    debtFreeDate,
+    totalDebtBalance,
+    monthlyDebtMinimums: debtMins,
+    monthlyInvestCapacity,
+    investResult,
     waterfallData,
     priorities,
     projection,
