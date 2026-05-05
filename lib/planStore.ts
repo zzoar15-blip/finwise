@@ -2,7 +2,7 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { PlanStore, PlanInputs, PlanAIInsights, AppSettings } from '@/types/plan';
+import type { PlanStore, PlanInputs, PlanAIInsights, AppSettings, PaycheckProfile, DebtProfile, InvestProfile, AIInsightsCache } from '@/types/plan';
 
 const DEFAULT_SETTINGS: AppSettings = {
   displayName: '',
@@ -14,6 +14,11 @@ export const usePlanStore = create<PlanStore>()(
     (set) => ({
       plan: null,
       settings: DEFAULT_SETTINGS,
+      paycheckProfile: null,
+      debtProfile: null,
+      investProfile: null,
+      planLastUpdated: null,
+      aiInsightsCache: null,
 
       setPlan: (inputs: PlanInputs) =>
         set({
@@ -47,6 +52,18 @@ export const usePlanStore = create<PlanStore>()(
 
       updateSettings: (partial: Partial<AppSettings>) =>
         set((s) => ({ settings: { ...s.settings, ...partial } })),
+
+      setPaycheckProfile: (profile: PaycheckProfile) =>
+        set({ paycheckProfile: profile, planLastUpdated: new Date().toISOString() }),
+
+      setDebtProfile: (profile: DebtProfile) =>
+        set({ debtProfile: profile, planLastUpdated: new Date().toISOString() }),
+
+      setInvestProfile: (profile: InvestProfile) =>
+        set({ investProfile: profile, planLastUpdated: new Date().toISOString() }),
+
+      setAIInsightsCache: (cache: AIInsightsCache) =>
+        set({ aiInsightsCache: cache }),
     }),
     { name: 'finwise-plan-store' }
   )

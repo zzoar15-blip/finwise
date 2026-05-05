@@ -5,6 +5,7 @@ import { Sparkles, Send, Square, Trash2, AlertCircle, User, Bot } from 'lucide-r
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAdvisor } from '@/lib/useAdvisor';
+import { useFinWiseStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
 
 const SUGGESTED_PROMPTS = [
@@ -16,9 +17,19 @@ const SUGGESTED_PROMPTS = [
   "How do I start investing with limited extra income?",
 ];
 
+const RENT_VS_BUY_PROMPTS = [
+  'Should I buy a home given my financial situation?',
+  'What if I waited 2 years and saved a bigger down payment?',
+  'How does buying a home affect my investment income plan?',
+  "What's the impact of a 15-year vs 30-year mortgage?",
+];
+
 export default function AdvisorPage() {
   const { messages, streaming, error, send, stop, clear } = useAdvisor();
+  const hasRentVsBuy = useFinWiseStore((s) => Boolean(s.rentVsBuyResults));
   const [input, setInput] = useState('');
+  const prompts = hasRentVsBuy ? [...RENT_VS_BUY_PROMPTS, ...SUGGESTED_PROMPTS] : SUGGESTED_PROMPTS;
+
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -54,7 +65,7 @@ export default function AdvisorPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold text-gray-900">
-            <Sparkles className="h-6 w-6 text-[#1a56a8]" />
+            <Sparkles className="h-6 w-6 text-[#3b82f6]" />
             AI Financial Advisor
           </h1>
           <p className="mt-0.5 text-sm text-gray-500">
@@ -77,7 +88,7 @@ export default function AdvisorPage() {
             {messages.length === 0 && (
               <div className="flex flex-col items-center gap-6 py-8 text-center">
                 <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50">
-                  <Sparkles className="h-8 w-8 text-[#1a56a8]" />
+                  <Sparkles className="h-8 w-8 text-[#3b82f6]" />
                 </div>
                 <div>
                   <p className="text-base font-semibold text-gray-800">
@@ -88,11 +99,11 @@ export default function AdvisorPage() {
                   </p>
                 </div>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 w-full max-w-xl">
-                  {SUGGESTED_PROMPTS.map((prompt) => (
+                  {prompts.map((prompt) => (
                     <button
                       key={prompt}
                       onClick={() => send(prompt)}
-                      className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-left text-sm text-gray-700 shadow-sm transition-all hover:border-[#1a56a8] hover:shadow-md"
+                      className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-left text-sm text-gray-700 shadow-sm transition-all hover:border-[#3b82f6] hover:shadow-md"
                     >
                       {prompt}
                     </button>
@@ -113,7 +124,7 @@ export default function AdvisorPage() {
                 <div
                   className={cn(
                     'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white',
-                    msg.role === 'user' ? 'bg-[#1a56a8]' : 'bg-gray-700'
+                    msg.role === 'user' ? 'bg-[#3b82f6]' : 'bg-gray-700'
                   )}
                 >
                   {msg.role === 'user'
@@ -127,7 +138,7 @@ export default function AdvisorPage() {
                   className={cn(
                     'max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap',
                     msg.role === 'user'
-                      ? 'bg-[#1a56a8] text-white rounded-tr-sm'
+                      ? 'bg-[#3b82f6] text-white rounded-tr-sm'
                       : 'bg-gray-100 text-gray-800 rounded-tl-sm'
                   )}
                 >
@@ -164,7 +175,7 @@ export default function AdvisorPage() {
                 disabled={streaming}
                 className={cn(
                   'flex-1 resize-none rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm text-gray-800 placeholder:text-gray-400 outline-none transition-colors',
-                  'focus:border-[#1a56a8] focus:ring-1 focus:ring-[#1a56a8]',
+                  'focus:border-[#3b82f6] focus:ring-1 focus:ring-[#3b82f6]',
                   'disabled:opacity-50',
                   'min-h-[42px] max-h-[160px]'
                 )}
@@ -183,7 +194,7 @@ export default function AdvisorPage() {
                   size="sm"
                   onClick={handleSend}
                   disabled={!input.trim()}
-                  className="h-[42px] w-[42px] shrink-0 p-0 bg-[#1a56a8] hover:bg-[#1545a0]"
+                  className="h-[42px] w-[42px] shrink-0 p-0 bg-[#3b82f6] hover:bg-[#2563eb]"
                 >
                   <Send className="h-4 w-4" />
                 </Button>

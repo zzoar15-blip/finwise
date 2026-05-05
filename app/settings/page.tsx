@@ -193,7 +193,7 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#1a56a8]">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#3b82f6]">
               <Wallet className="h-6 w-6 text-white" />
             </div>
             <div>

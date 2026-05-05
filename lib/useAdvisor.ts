@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef } from 'react';
 import { useFinanceStore } from '@/lib/store';
+import { useFinWiseStore } from '@/lib/store';
 import { formatCurrency } from '@/lib/format';
 
 export interface Message {
@@ -58,6 +59,21 @@ function buildFinancialContext(store: ReturnType<typeof useFinanceStore.getState
   return lines.join('\n');
 }
 
+function buildRentVsBuyContext(store: ReturnType<typeof useFinWiseStore.getState>): string {
+  const { rentVsBuyInputs, rentVsBuyResults } = store;
+  if (!rentVsBuyInputs || !rentVsBuyResults) return '';
+  return [
+    'RENT VS BUY ANALYSIS:',
+    `Purchase price: ${formatCurrency(rentVsBuyInputs.purchasePrice)}`,
+    `Monthly rent: ${formatCurrency(rentVsBuyInputs.monthlyRent)}`,
+    `Planned stay: ${rentVsBuyInputs.plannedStayYears} years`,
+    `Break-even: ${rentVsBuyResults.breakEvenYear ? `${rentVsBuyResults.breakEvenYear.toFixed(1)} years` : 'Never'}`,
+    `At planned stay: ${rentVsBuyResults.plannedStayResult.winner} wins by ${formatCurrency(rentVsBuyResults.plannedStayResult.difference)}`,
+    `Price-to-rent ratio: ${rentVsBuyResults.priceToRentRatio.toFixed(1)} (${rentVsBuyResults.priceToRentInterpretation})`,
+    `True monthly cost buying: ${formatCurrency(rentVsBuyResults.trueMonthlyCostBuying)} vs renting: ${formatCurrency(rentVsBuyResults.trueMonthlyCostRenting)}`,
+  ].join('\n');
+}
+
 export function useAdvisor() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [streaming, setStreaming] = useState(false);
@@ -65,8 +81,11 @@ export function useAdvisor() {
   const abortRef = useRef<AbortController | null>(null);
 
   const financialContext = useCallback(() => {
-    const store = useFinanceStore.getState();
-    return buildFinancialContext(store);
+    const txStore = useFinanceStore.getState();
+    const planningStore = useFinWiseStore.getState();
+    const base = buildFinancialContext(txStore);
+    const rvb = buildRentVsBuyContext(planningStore);
+    return rvb ? `${base}\n\n${rvb}` : base;
   }, []);
 
   const send = useCallback(async (userText: string) => {

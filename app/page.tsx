@@ -12,6 +12,7 @@ import {
   Wallet,
   ArrowRight,
   Plus,
+  Home,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -75,6 +76,12 @@ const QUICK_LINKS = [
     title: 'Forecaster',
     description: 'See a 12-month cashflow projection.',
   },
+  {
+    href: '/tools/rent-vs-buy',
+    icon: Home,
+    title: 'Rent vs. Buy',
+    description: 'Compare the true financial cost of buying vs renting over any time horizon. Includes break-even analysis, opportunity cost, and sensitivity modeling.',
+  },
 ];
 
 const FEATURE_CARDS = [
@@ -129,7 +136,7 @@ export default function DashboardPage() {
         <div className="flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center px-4 py-16">
           {/* Hero */}
           <div className="flex flex-col items-center text-center">
-            <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#1a56a8] shadow-lg">
+            <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#3b82f6] shadow-lg">
               <Wallet className="h-8 w-8 text-white" />
             </div>
             <h1 className="text-4xl font-bold tracking-tight text-gray-900 sm:text-5xl">
@@ -203,7 +210,7 @@ export default function DashboardPage() {
           <div className="flex gap-2">
             <Link
               href="/plan"
-              className="inline-flex items-center rounded-md bg-[#1a56a8] px-4 py-2 text-sm font-medium text-white hover:bg-[#1545a0] transition-colors"
+              className="inline-flex items-center rounded-md bg-[#3b82f6] px-4 py-2 text-sm font-medium text-white hover:bg-[#2563eb] transition-colors"
             >
               View Full Plan
               <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
@@ -283,8 +290,8 @@ export default function DashboardPage() {
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
             {QUICK_LINKS.map(({ href, icon: Icon, title, description }) => (
               <Link key={href} href={href} className="group block">
-                <div className="flex h-full flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-all group-hover:border-[#1a56a8] group-hover:shadow-md">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-[#1a56a8]">
+                <div className="flex h-full flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-all group-hover:border-[#3b82f6] group-hover:shadow-md">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-[#3b82f6]">
                     <Icon className="h-5 w-5" />
                   </div>
                   <div>

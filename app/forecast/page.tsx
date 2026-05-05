@@ -28,13 +28,13 @@ import {
 } from 'recharts';
 import { Plus, Trash2, TrendingUp } from 'lucide-react';
 
-const SCENARIO_COLORS = ['#1a56a8', '#22c55e', '#f97316'] as const;
+const SCENARIO_COLORS = ['#3b82f6', '#22c55e', '#f97316'] as const;
 
 const DEFAULT_SCENARIOS: Scenario[] = [
   {
     id: '1',
     name: 'Conservative',
-    color: '#1a56a8',
+    color: '#3b82f6',
     startingSalary: 80000,
     annualRaise: 2,
     savingsRate: 15,
@@ -61,7 +61,7 @@ function yAxisFormatter(v: number): string {
 
 // Light tint backgrounds for summary table cells
 const CELL_BG: Record<string, string> = {
-  '#1a56a8': 'rgba(26, 86, 168, 0.08)',
+  '#3b82f6': 'rgba(26, 86, 168, 0.08)',
   '#22c55e': 'rgba(34, 197, 94, 0.08)',
   '#f97316': 'rgba(249, 115, 22, 0.08)',
 };
@@ -207,7 +207,7 @@ export default function ForecastPage() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
-          <TrendingUp className="size-6 text-[#1a56a8]" />
+          <TrendingUp className="size-6 text-[#3b82f6]" />
           <div>
             <h1 className="text-2xl font-bold">Scenario Forecaster</h1>
             <p className="text-sm text-muted-foreground">
@@ -256,7 +256,7 @@ export default function ForecastPage() {
                     type="text"
                     value={scenario.name}
                     onChange={(e) => updateScenario(scenario.id, { name: e.target.value })}
-                    className="flex-1 bg-transparent text-sm font-semibold outline-none focus:border-b focus:border-[#1a56a8]"
+                    className="flex-1 bg-transparent text-sm font-semibold outline-none focus:border-b focus:border-[#3b82f6]"
                   />
                   <button
                     onClick={() => removeScenario(scenario.id)}

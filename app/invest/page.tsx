@@ -1,11 +1,14 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import Link from 'next/link';
 import { simulateInvestment } from '@/lib/calculations/invest';
 import type { InvestInputs, InvestResult } from '@/lib/calculations/invest';
 import { ExportButton } from '@/components/ExportButton';
-import { downloadCsv, downloadXlsxFromAoa } from '@/lib/export';
+import { downloadCsv } from '@/lib/export';
 import { formatCurrency } from '@/lib/format';
+import { useFinWiseStore } from '@/lib/store';
+import { computeBudgetSurplus } from '@/lib/calculations';
 import {
   Card,
   CardContent,
@@ -33,7 +36,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-import { TrendingUp, DollarSign, Calendar, Percent } from 'lucide-react';
+import { TrendingUp, DollarSign, Calendar, Percent, ChevronLeft, Info } from 'lucide-react';
 
 type Tab = 'charts' | 'milestones' | 'targets';
 
@@ -45,6 +48,7 @@ function SliderRow({
   max,
   step,
   onChange,
+  note,
 }: {
   label: string;
   value: number;
@@ -53,6 +57,7 @@ function SliderRow({
   max: number;
   step: number;
   onChange: (v: number) => void;
+  note?: string;
 }) {
   return (
     <div className="space-y-1.5">
@@ -62,18 +67,23 @@ function SliderRow({
       </div>
       <input
         type="range"
-        className="w-full accent-[#1a56a8]"
+        className="w-full accent-[#3b82f6]"
         min={min}
         max={max}
         step={step}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
       />
+      {note && (
+        <p className="text-xs text-blue-500 flex items-center gap-1">
+          <Info className="size-3" />
+          {note}
+        </p>
+      )}
     </div>
   );
 }
 
-// Only keep one label per year for the chart x-axis
 function getYearlyTicks(monthly: InvestResult['monthly']): string[] {
   const seen = new Set<string>();
   const ticks: string[] = [];
@@ -94,15 +104,41 @@ function yAxisTickFormatter(v: number) {
 }
 
 export default function InvestPage() {
-  const [monthlyBuy, setMonthlyBuy] = useState(1000);
-  const [annualBonus, setAnnualBonus] = useState(5000);
-  const [dividendYield, setDividendYield] = useState(7);
-  const [taxRate, setTaxRate] = useState(22);
-  const [qualifiedPercent, setQualifiedPercent] = useState(70);
-  const [payFrequency, setPayFrequency] = useState<'monthly' | 'quarterly'>('monthly');
-  const [years, setYears] = useState(5);
-  const [annualAppreciation, setAnnualAppreciation] = useState(3);
+  const investmentInputs = useFinWiseStore((s) => s.investmentInputs);
+  const setInvestmentInputs = useFinWiseStore((s) => s.setInvestmentInputs);
+  const paycheckResults = useFinWiseStore((s) => s.paycheckResults);
+  const budgetInputs = useFinWiseStore((s) => s.budgetInputs);
+  const debts = useFinWiseStore((s) => s.debts);
+
+  const surplus = computeBudgetSurplus(paycheckResults, budgetInputs);
+  const totalDebtMinimums = debts.reduce((s, d) => s + d.minPayment, 0);
+  const availableForInvesting = Math.max(0, surplus - totalDebtMinimums);
+
+  // Default tax rate from paycheck if complete
+  const defaultTaxRate = paycheckResults.isComplete
+    ? Math.round(paycheckResults.marginalCombinedRate * 100)
+    : investmentInputs.taxRate;
+
+  const [monthlyBuy, setMonthlyBuyState] = useState(
+    investmentInputs.monthlyBuy > 0 ? investmentInputs.monthlyBuy : Math.round(availableForInvesting / 50) * 50
+  );
+  const [annualBonus, setAnnualBonusState] = useState(investmentInputs.annualBonus);
+  const [dividendYield, setDividendYieldState] = useState(investmentInputs.dividendYield);
+  const [taxRate, setTaxRateState] = useState(defaultTaxRate);
+  const [qualifiedPercent, setQualifiedPercentState] = useState(investmentInputs.qualifiedPercent);
+  const [payFrequency, setPayFrequencyState] = useState<'monthly' | 'quarterly'>(investmentInputs.payFrequency);
+  const [years, setYearsState] = useState(investmentInputs.years);
+  const [annualAppreciation, setAnnualAppreciationState] = useState(investmentInputs.annualAppreciation);
   const [tab, setTab] = useState<Tab>('charts');
+
+  function setMonthlyBuy(v: number) { setMonthlyBuyState(v); setInvestmentInputs({ monthlyBuy: v }); }
+  function setAnnualBonus(v: number) { setAnnualBonusState(v); setInvestmentInputs({ annualBonus: v }); }
+  function setDividendYield(v: number) { setDividendYieldState(v); setInvestmentInputs({ dividendYield: v }); }
+  function setTaxRate(v: number) { setTaxRateState(v); setInvestmentInputs({ taxRate: v }); }
+  function setQualifiedPercent(v: number) { setQualifiedPercentState(v); setInvestmentInputs({ qualifiedPercent: v }); }
+  function setPayFrequency(v: 'monthly' | 'quarterly') { setPayFrequencyState(v); setInvestmentInputs({ payFrequency: v }); }
+  function setYears(v: number) { setYearsState(v); setInvestmentInputs({ years: v }); }
+  function setAnnualAppreciation(v: number) { setAnnualAppreciationState(v); setInvestmentInputs({ annualAppreciation: v }); }
 
   const inputs: InvestInputs = useMemo(
     () => ({
@@ -147,23 +183,38 @@ export default function InvestPage() {
     ];
   }
 
+  const taxRateNote = paycheckResults.isComplete
+    ? `From your paycheck data (marginal combined: ${(paycheckResults.marginalCombinedRate * 100).toFixed(1)}%)`
+    : undefined;
+
   return (
     <div className="max-w-7xl space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <TrendingUp className="size-6 text-[#1a56a8]" />
-          <div>
-            <h1 className="text-2xl font-bold">Investment Income Simulator</h1>
-            <p className="text-sm text-muted-foreground">
-              Model dividend income growth over time with custom buy schedules
-            </p>
+      <div className="space-y-3">
+        <Link href="/plan" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+          <ChevronLeft className="size-3" /> My Plan
+        </Link>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <TrendingUp className="size-6 text-[#3b82f6]" />
+            <div>
+              <h1 className="text-2xl font-bold">Investment Income Simulator</h1>
+              <p className="text-sm text-muted-foreground">
+                Model dividend income growth over time with custom buy schedules
+              </p>
+              <Link href="/tools/rent-vs-buy" className="text-sm text-blue-600 hover:underline">
+                What if you invested your down payment? →
+              </Link>
+            </div>
           </div>
+          <ExportButton
+            onExportXlsx={async () => {
+              const { exportInvestmentWorkbook } = await import('@/lib/excel/exports/investment');
+              exportInvestmentWorkbook(investmentInputs, paycheckResults);
+            }}
+            onExportCsv={() => downloadCsv(buildExportRows(), 'finwise-invest')}
+          />
         </div>
-        <ExportButton
-          onExportXlsx={() => downloadXlsxFromAoa('Projection', buildExportRows(), [8, 22, 24, 22, 20], 'finwise-invest')}
-          onExportCsv={() => downloadCsv(buildExportRows(), 'finwise-invest')}
-        />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[380px_1fr]">
@@ -181,6 +232,9 @@ export default function InvestPage() {
               max={5000}
               step={50}
               onChange={setMonthlyBuy}
+              note={availableForInvesting > 0 && paycheckResults.isComplete
+                ? `Budget surplus after debts: ${formatCurrency(availableForInvesting)}/mo`
+                : undefined}
             />
             <SliderRow
               label="Annual Bonus (February)"
@@ -214,9 +268,10 @@ export default function InvestPage() {
               value={taxRate}
               display={`${taxRate}%`}
               min={10}
-              max={37}
+              max={50}
               step={1}
               onChange={setTaxRate}
+              note={taxRateNote}
             />
             <SliderRow
               label="Qualified Dividends %"
@@ -236,7 +291,7 @@ export default function InvestPage() {
                   onClick={() => setPayFrequency('monthly')}
                   className={`flex-1 rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors ${
                     payFrequency === 'monthly'
-                      ? 'border-[#1a56a8] bg-[#1a56a8] text-white'
+                      ? 'border-[#3b82f6] bg-[#3b82f6] text-white'
                       : 'border-border bg-background text-foreground hover:bg-muted'
                   }`}
                 >
@@ -246,7 +301,7 @@ export default function InvestPage() {
                   onClick={() => setPayFrequency('quarterly')}
                   className={`flex-1 rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors ${
                     payFrequency === 'quarterly'
-                      ? 'border-[#1a56a8] bg-[#1a56a8] text-white'
+                      ? 'border-[#3b82f6] bg-[#3b82f6] text-white'
                       : 'border-border bg-background text-foreground hover:bg-muted'
                   }`}
                 >
@@ -335,7 +390,7 @@ export default function InvestPage() {
                       <Line
                         type="monotone"
                         dataKey="portfolioValue"
-                        stroke="#1a56a8"
+                        stroke="#3b82f6"
                         strokeWidth={2}
                         dot={false}
                         name="Portfolio Value"
@@ -393,7 +448,7 @@ export default function InvestPage() {
           {tab === 'milestones' && (
             <Card>
               <CardHeader>
-                <CardTitle>Milestones — February (Bonus) & December (Year-End)</CardTitle>
+                <CardTitle>Milestones — February (Bonus) &amp; December (Year-End)</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
@@ -455,7 +510,7 @@ export default function InvestPage() {
                 {result.portfolioTargets.map((target) => (
                   <div key={target.monthlyTarget} className="space-y-2">
                     <div className="flex items-center gap-2">
-                      <Calendar className="size-4 text-[#1a56a8]" />
+                      <Calendar className="size-4 text-[#3b82f6]" />
                       <h3 className="font-semibold">
                         {formatCurrency(target.monthlyTarget)}/month target
                       </h3>
@@ -481,7 +536,7 @@ export default function InvestPage() {
                         <tbody>
                           {target.byYield.map((row) => (
                             <tr key={row.yield} className="border-b border-border/50 last:border-0">
-                              <td className="py-2 pl-3 pr-4 font-medium text-[#1a56a8]">
+                              <td className="py-2 pl-3 pr-4 font-medium text-[#3b82f6]">
                                 {row.yield}%
                               </td>
                               <td className="py-2 pr-4 text-right tabular-nums text-muted-foreground">

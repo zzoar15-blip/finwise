@@ -326,7 +326,7 @@ function StepIncome({
         <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
           <input
             type="checkbox"
-            className="h-4 w-4 rounded border-gray-300 text-[#1a56a8] accent-[#1a56a8]"
+            className="h-4 w-4 rounded border-gray-300 text-[#3b82f6] accent-[#3b82f6]"
             checked={inputs.nycResident}
             onChange={(e) => onChange({ nycResident: e.target.checked })}
           />
@@ -459,7 +459,7 @@ function PaycheckPreview({ inputs }: { inputs: PlanInputs }) {
 
       <div className="flex items-center justify-between">
         <span className="font-semibold text-gray-900">Net pay</span>
-        <span className="text-xl font-bold text-[#1a56a8]">{formatCurrency(result.netPay)}</span>
+        <span className="text-xl font-bold text-[#3b82f6]">{formatCurrency(result.netPay)}</span>
       </div>
       <div className="mt-1 flex items-center justify-between">
         <span className="text-xs text-gray-500">Annual net (excl. bonus)</span>
@@ -508,7 +508,7 @@ function StepBenefits({
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center justify-between">
           <Label className="text-sm font-medium text-gray-700">{label}</Label>
-          <span className="rounded bg-blue-50 px-2 py-0.5 text-sm font-semibold text-[#1a56a8]">
+          <span className="rounded bg-blue-50 px-2 py-0.5 text-sm font-semibold text-[#3b82f6]">
             {value}%
           </span>
         </div>
@@ -519,7 +519,7 @@ function StepBenefits({
           step={0.5}
           value={value}
           onChange={(e) => onChange({ [field]: parseFloat(e.target.value) })}
-          className="h-2 w-full cursor-pointer appearance-none rounded-full bg-gray-200 accent-[#1a56a8]"
+          className="h-2 w-full cursor-pointer appearance-none rounded-full bg-gray-200 accent-[#3b82f6]"
         />
         {hint && <p className="text-xs text-gray-500">{hint}</p>}
       </div>
@@ -881,7 +881,7 @@ function StepDebts({
                 key={key}
                 type="button"
                 onClick={() => applyPreset(key)}
-                className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm transition hover:border-[#1a56a8] hover:text-[#1a56a8]"
+                className="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm transition hover:border-[#3b82f6] hover:text-[#3b82f6]"
               >
                 {preset.label}
               </button>
@@ -969,7 +969,7 @@ function StepDebts({
             <Button
               size="sm"
               onClick={addDebt}
-              className="bg-[#1a56a8] text-white hover:bg-[#1547a0]"
+              className="bg-[#3b82f6] text-white hover:bg-[#1547a0]"
             >
               Add debt
             </Button>
@@ -1078,7 +1078,7 @@ function StepGoals({
                 onClick={() => toggleGoal(card.id)}
                 className={`relative w-full rounded-xl border-2 p-4 text-left transition-all ${
                   selected
-                    ? 'border-[#1a56a8] bg-blue-50 shadow-md'
+                    ? 'border-[#3b82f6] bg-blue-50 shadow-md'
                     : `border-transparent ${card.color} hover:border-gray-300`
                 }`}
               >
@@ -1096,7 +1096,7 @@ function StepGoals({
                   <div
                     className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all ${
                       selected
-                        ? 'border-[#1a56a8] bg-[#1a56a8] text-white'
+                        ? 'border-[#3b82f6] bg-[#3b82f6] text-white'
                         : 'border-gray-300 bg-white'
                     }`}
                   >
@@ -1190,7 +1190,7 @@ function GeneratingOverlay() {
         {/* Spinner */}
         <div className="relative h-14 w-14">
           <div className="absolute inset-0 rounded-full border-4 border-blue-100" />
-          <div className="absolute inset-0 animate-spin rounded-full border-4 border-transparent border-t-[#1a56a8]" />
+          <div className="absolute inset-0 animate-spin rounded-full border-4 border-transparent border-t-[#3b82f6]" />
         </div>
         <div className="text-center">
           <p className="text-base font-semibold text-gray-800">Generating your plan...</p>
@@ -1258,7 +1258,7 @@ export function OnboardingWizard({ initialValues, onComplete }: OnboardingWizard
         {/* Header */}
         <div className="mb-6 text-center">
           <h1 className="text-2xl font-bold text-gray-900">
-            <span className="text-[#1a56a8]">Fin</span>Wise
+            <span className="text-[#3b82f6]">Fin</span>Wise
           </h1>
           <p className="mt-1 text-sm text-gray-500">Your personalized financial plan</p>
         </div>
@@ -1272,9 +1272,9 @@ export function OnboardingWizard({ initialValues, onComplete }: OnboardingWizard
                 <div
                   className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold transition-colors ${
                     i < step
-                      ? 'bg-[#1a56a8] text-white'
+                      ? 'bg-[#3b82f6] text-white'
                       : i === step
-                        ? 'bg-[#1a56a8] text-white ring-4 ring-blue-100'
+                        ? 'bg-[#3b82f6] text-white ring-4 ring-blue-100'
                         : 'bg-gray-200 text-gray-500'
                   }`}
                 >
@@ -1294,7 +1294,7 @@ export function OnboardingWizard({ initialValues, onComplete }: OnboardingWizard
                 </div>
                 <span
                   className={`mt-1 hidden text-[11px] font-medium sm:block ${
-                    i === step ? 'text-[#1a56a8]' : i < step ? 'text-gray-600' : 'text-gray-400'
+                    i === step ? 'text-[#3b82f6]' : i < step ? 'text-gray-600' : 'text-gray-400'
                   }`}
                 >
                   {label}
@@ -1306,7 +1306,7 @@ export function OnboardingWizard({ initialValues, onComplete }: OnboardingWizard
           {/* Progress bar track */}
           <div className="relative h-1.5 overflow-hidden rounded-full bg-gray-200">
             <div
-              className="h-full rounded-full bg-[#1a56a8] transition-all duration-500 ease-out"
+              className="h-full rounded-full bg-[#3b82f6] transition-all duration-500 ease-out"
               style={{ width: `${progressPct}%` }}
             />
           </div>
@@ -1370,7 +1370,7 @@ export function OnboardingWizard({ initialValues, onComplete }: OnboardingWizard
                 <div
                   key={i}
                   className={`h-1.5 rounded-full transition-all duration-300 ${
-                    i === step ? 'w-6 bg-[#1a56a8]' : i < step ? 'w-1.5 bg-blue-300' : 'w-1.5 bg-gray-200'
+                    i === step ? 'w-6 bg-[#3b82f6]' : i < step ? 'w-1.5 bg-blue-300' : 'w-1.5 bg-gray-200'
                   }`}
                 />
               ))}
@@ -1379,7 +1379,7 @@ export function OnboardingWizard({ initialValues, onComplete }: OnboardingWizard
             {step < TOTAL_STEPS - 1 ? (
               <Button
                 onClick={goNext}
-                className="min-w-[80px] bg-[#1a56a8] text-white hover:bg-[#1547a0]"
+                className="min-w-[80px] bg-[#3b82f6] text-white hover:bg-[#1547a0]"
               >
                 Next →
               </Button>
@@ -1387,7 +1387,7 @@ export function OnboardingWizard({ initialValues, onComplete }: OnboardingWizard
               <Button
                 onClick={handleComplete}
                 disabled={generating}
-                className="bg-[#1a56a8] text-white hover:bg-[#1547a0]"
+                className="bg-[#3b82f6] text-white hover:bg-[#1547a0]"
               >
                 Generate My Plan
               </Button>

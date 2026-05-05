@@ -1,7 +1,13 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
-import { DollarSign, Info } from 'lucide-react';
+import React, { useState, useRef, useMemo } from 'react';
+import { DollarSign, Info, ChevronLeft } from 'lucide-react';
+import Link from 'next/link';
+import { useFinWiseStore } from '@/lib/store';
+import { PAY_PERIODS } from '@/lib/calculations/paycheck';
+import type { PayPeriod, FilingStatus } from '@/lib/calculations/paycheck';
+import { STATE_CONFIGS } from '@/lib/stateTax';
+import { formatCurrency } from '@/lib/format';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,10 +20,9 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { calculatePaycheck, PAY_PERIODS } from '@/lib/calculations/paycheck';
-import type { PaycheckInputs, PayPeriod, FilingStatus } from '@/lib/calculations/paycheck';
-import { STATE_CONFIGS } from '@/lib/stateTax';
-import { formatCurrency } from '@/lib/format';
+import { ExportButton } from '@/components/ExportButton';
+import { downloadCsv } from '@/lib/export';
+import type { StorePaycheckInputs } from '@/lib/calculations';
 
 const PAY_PERIOD_LABELS: Record<PayPeriod, string> = {
   weekly: 'Weekly',
@@ -30,22 +35,6 @@ const FILING_STATUS_LABELS: Record<FilingStatus, string> = {
   single: 'Single',
   married: 'Married Filing Jointly',
   hoh: 'Head of Household',
-};
-
-const DEFAULT_INPUTS: PaycheckInputs = {
-  annualSalary: 85000,
-  payPeriod: 'biweekly',
-  filingStatus: 'single',
-  state: 'CA',
-  nycResident: false,
-  traditional401kPct: 6,
-  hsaPerPeriod: 0,
-  fsaPerPeriod: 0,
-  healthInsurancePerPeriod: 0,
-  dentalPerPeriod: 0,
-  commuterBenefitPerPeriod: 0,
-  roth401kPct: 0,
-  otherPostTaxPerPeriod: 0,
 };
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -89,7 +78,7 @@ function SliderField({ label, value, onChange, min = 0, max = 30 }: SliderFieldP
         step={0.5}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full accent-[#1a56a8] cursor-pointer"
+        className="w-full accent-[#3b82f6] cursor-pointer"
       />
       <div className="flex justify-between text-xs text-gray-400">
         <span>{min}%</span>
@@ -146,7 +135,7 @@ function LineItem({
           large ? 'text-base font-bold' : 'text-sm',
           muted ? 'text-gray-400' : '',
           highlight ? 'font-semibold text-gray-700' : '',
-          large && !muted ? 'text-[#1a56a8]' : '',
+          large && !muted ? 'text-[#3b82f6]' : '',
           !large && !muted && !highlight ? 'text-gray-600' : '',
         ]
           .filter(Boolean)
@@ -158,7 +147,7 @@ function LineItem({
         className={[
           large ? 'text-lg font-bold' : 'text-sm font-medium',
           red ? 'text-red-600' : '',
-          large ? 'text-[#1a56a8]' : '',
+          large ? 'text-[#3b82f6]' : '',
           muted && !red ? 'text-gray-400' : '',
           negative && !red ? 'text-gray-500' : '',
           !red && !large && !muted && !negative ? 'text-gray-800' : '',
@@ -175,72 +164,127 @@ function LineItem({
 // ── Main Page ────────────────────────────────────────────────────────────────
 
 export default function PaycheckPage() {
-  const [inputs, setInputs] = useState<PaycheckInputs>(DEFAULT_INPUTS);
+  const storeInputs = useFinWiseStore((s) => s.paycheckInputs);
+  const paycheckResults = useFinWiseStore((s) => s.paycheckResults);
+  const setPaycheckInputs = useFinWiseStore((s) => s.setPaycheckInputs);
+  const budgetInputs = useFinWiseStore((s) => s.budgetInputs);
+  const debts = useFinWiseStore((s) => s.debts);
 
-  function update<K extends keyof PaycheckInputs>(key: K, value: PaycheckInputs[K]) {
-    setInputs((prev) => ({ ...prev, [key]: value }));
+  // Local inputs state: per-period display values for $ amounts, direct for % and other
+  const [localInputs, setLocalInputs] = useState<StorePaycheckInputs>(() => storeInputs);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function update(newInputs: StorePaycheckInputs) {
+    setLocalInputs(newInputs);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setPaycheckInputs(newInputs);
+    }, 300);
   }
 
-  function numericInput(key: keyof PaycheckInputs) {
-    return {
-      type: 'number' as const,
-      min: 0,
-      value: inputs[key] as number,
-      onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
-        update(key, Number(e.target.value) as PaycheckInputs[typeof key]),
-    };
+  function updateField<K extends keyof StorePaycheckInputs>(key: K, value: StorePaycheckInputs[K]) {
+    update({ ...localInputs, [key]: value });
   }
 
-  const result = useMemo(() => calculatePaycheck(inputs), [inputs]);
+  // When payPeriod changes, recalculate periods and keep annual amounts the same
+  function handlePayPeriodChange(newPeriod: PayPeriod) {
+    update({ ...localInputs, payPeriod: newPeriod });
+  }
 
-  const periods = PAY_PERIODS[inputs.payPeriod];
-  const annualNet = result.netPay * periods;
+  const currentPeriods = PAY_PERIODS[localInputs.payPeriod] || 26;
 
-  const selectedState = STATE_CONFIGS.find((s) => s.abbr === inputs.state);
+  // Per-period display helpers
+  function perPeriodDisplay(annualValue: number) {
+    return Math.round((annualValue / currentPeriods) * 100) / 100;
+  }
 
-  // Benefit savings table — only non-zero benefits
-  const benefitRows: Array<{ label: string; annual: number; savings: number }> = [
-    {
-      label: 'Traditional 401(k)',
-      annual: result.traditional401k * periods,
-      savings: result.benefitSavings.traditional401k,
-    },
-    {
-      label: 'HSA',
-      annual: result.hsa * periods,
-      savings: result.benefitSavings.hsa,
-    },
-    {
-      label: 'FSA',
-      annual: result.fsa * periods,
-      savings: result.benefitSavings.fsa,
-    },
-    {
-      label: 'Health Insurance',
-      annual: result.healthInsurance * periods,
-      savings: result.benefitSavings.healthInsurance,
-    },
-    {
-      label: 'Dental',
-      annual: result.dental * periods,
-      savings: result.benefitSavings.dental,
-    },
-    {
-      label: 'Commuter Benefit',
-      annual: result.commuterBenefit * periods,
-      savings: result.benefitSavings.commuterBenefit,
-    },
-  ].filter((r) => r.annual > 0);
+  function handlePerPeriodInput(key: keyof StorePaycheckInputs, perPeriodValue: number) {
+    const annualValue = perPeriodValue * currentPeriods;
+    update({ ...localInputs, [key]: annualValue });
+  }
+
+  const selectedState = STATE_CONFIGS.find((s) => s.abbr === localInputs.state);
+
+  // Benefit savings from results
+  const pr = paycheckResults;
+
+  // Benefit rows for the savings table
+  const benefitRows = useMemo(() => {
+    if (!pr.isComplete) return [];
+    const rows = [
+      { label: 'Traditional 401(k)', annual: pr.k401TraditionalAnnual, savings: 0 },
+      { label: 'HSA', annual: localInputs.hsaAnnual, savings: 0 },
+      { label: 'FSA', annual: localInputs.fsaAnnual, savings: 0 },
+    ].filter(r => r.annual > 0);
+
+    // Estimate savings using marginal rate for 401k / combined for others
+    return rows.map(r => ({
+      ...r,
+      savings: r.label === 'Traditional 401(k)'
+        ? r.annual * pr.marginalFederalRate
+        : r.annual * (pr.marginalCombinedRate),
+    })).filter(r => r.savings > 0);
+  }, [pr, localInputs.hsaAnnual, localInputs.fsaAnnual]);
+
+  function buildCsvRows(): (string | number)[][] {
+    if (!pr.isComplete) return [['No paycheck data calculated yet']];
+    return [
+      ['Paycheck Breakdown', `Per Period (${PAY_PERIOD_LABELS[localInputs.payPeriod]})`, 'Annual'],
+      ['Gross Pay', pr.grossPerPaycheck, pr.grossAnnual],
+      ['Traditional 401(k)', -(pr.k401TraditionalAnnual / currentPeriods), -pr.k401TraditionalAnnual],
+      ['Roth 401(k)', -(pr.k401RothAnnual / currentPeriods), -pr.k401RothAnnual],
+      ['HSA', -(localInputs.hsaAnnual / currentPeriods), -localInputs.hsaAnnual],
+      ['FSA', -(localInputs.fsaAnnual / currentPeriods), -localInputs.fsaAnnual],
+      ['Health Insurance', -(localInputs.healthInsuranceAnnual / currentPeriods), -localInputs.healthInsuranceAnnual],
+      ['Dental/Vision', -(localInputs.dentalAnnual / currentPeriods), -localInputs.dentalAnnual],
+      ['Commuter Benefit', -(localInputs.commuterAnnual / currentPeriods), -localInputs.commuterAnnual],
+      ['Federal Tax', -(pr.federalTaxAnnual / currentPeriods), -pr.federalTaxAnnual],
+      ['Social Security', -(pr.ssAnnual / currentPeriods), -pr.ssAnnual],
+      ['Medicare', -(pr.medicareAnnual / currentPeriods), -pr.medicareAnnual],
+      ['State Tax', -(pr.stateTaxAnnual / currentPeriods), -pr.stateTaxAnnual],
+      ['State Payroll Tax', -(pr.statePfmlAnnual / currentPeriods), -pr.statePfmlAnnual],
+      ['Net Pay', pr.netPayPerPaycheck, pr.netPayAnnual],
+      [''],
+      ['Effective Tax Rate', `${(pr.effectiveTaxRate * 100).toFixed(1)}%`],
+      ['Marginal Federal Rate', `${(pr.marginalFederalRate * 100).toFixed(0)}%`],
+      ['Marginal Combined Rate', `${(pr.marginalCombinedRate * 100).toFixed(1)}%`],
+      ['Annual Tax Savings', pr.annualTaxSavingsFromBenefits],
+    ];
+  }
 
   return (
     <div className="max-w-6xl space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Paycheck Calculator</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Estimate your take-home pay after federal and state taxes for 2025.
-        </p>
+      <div className="space-y-1">
+        <Link href="/plan" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+          <ChevronLeft className="size-3" /> My Plan
+        </Link>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Paycheck Calculator</h1>
+            <p className="mt-1 text-sm text-gray-500">
+              Estimate your take-home pay after federal and state taxes for 2025. Changes auto-save.
+            </p>
+          </div>
+          <ExportButton
+            label="Export"
+            onExportXlsx={async () => {
+              if (!pr.isComplete) return;
+              const { exportBudgetWorkbook } = await import('@/lib/excel/exports/budget');
+              exportBudgetWorkbook(localInputs, pr, budgetInputs, debts);
+            }}
+            onExportCsv={() => downloadCsv(buildCsvRows(), 'finwise-paycheck')}
+          />
+        </div>
       </div>
+
+      {/* Auto-save banner */}
+      {pr.isComplete && (
+        <div className="flex items-center gap-2 rounded-md border border-green-200 bg-green-50 px-4 py-2.5 text-sm text-green-800">
+          <Info className="h-4 w-4 shrink-0 text-green-600" />
+          Paycheck synced — Budget, Debt, and Investment tools will reflect these numbers automatically.
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_400px]">
         {/* ── LEFT PANEL: Inputs ─────────────────────────────────────── */}
@@ -258,19 +302,20 @@ export default function PaycheckPage() {
                     type="number"
                     min={0}
                     step={1000}
-                    value={inputs.annualSalary}
-                    onChange={(e) => update('annualSalary', Number(e.target.value))}
+                    value={localInputs.annualSalary || ''}
+                    placeholder="0"
+                    onChange={(e) => updateField('annualSalary', Number(e.target.value))}
                     className="w-full"
                   />
                 </FieldRow>
 
                 <FieldRow label="Pay Period">
                   <Select
-                    value={inputs.payPeriod}
-                    onValueChange={(v) => v && update('payPeriod', v as PayPeriod)}
+                    value={localInputs.payPeriod}
+                    onValueChange={(v) => v && handlePayPeriodChange(v as PayPeriod)}
                   >
                     <SelectTrigger className="w-full">
-                      <SelectValue>{PAY_PERIOD_LABELS[inputs.payPeriod]}</SelectValue>
+                      <SelectValue>{PAY_PERIOD_LABELS[localInputs.payPeriod]}</SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       {(Object.keys(PAY_PERIOD_LABELS) as PayPeriod[]).map((p) => (
@@ -284,11 +329,11 @@ export default function PaycheckPage() {
 
                 <FieldRow label="Filing Status">
                   <Select
-                    value={inputs.filingStatus}
-                    onValueChange={(v) => v && update('filingStatus', v as FilingStatus)}
+                    value={localInputs.filingStatus}
+                    onValueChange={(v) => v && updateField('filingStatus', v as FilingStatus)}
                   >
                     <SelectTrigger className="w-full">
-                      <SelectValue>{FILING_STATUS_LABELS[inputs.filingStatus]}</SelectValue>
+                      <SelectValue>{FILING_STATUS_LABELS[localInputs.filingStatus]}</SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       {(Object.keys(FILING_STATUS_LABELS) as FilingStatus[]).map((s) => (
@@ -302,16 +347,17 @@ export default function PaycheckPage() {
 
                 <FieldRow label="State">
                   <Select
-                    value={inputs.state}
+                    value={localInputs.state}
                     onValueChange={(v) => {
                       if (!v) return;
-                      update('state', v);
-                      if (v !== 'NY') update('nycResident', false);
+                      const newInputs = { ...localInputs, state: v };
+                      if (v !== 'NY') newInputs.nycResident = false;
+                      update(newInputs);
                     }}
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue>
-                        {selectedState ? `${selectedState.abbr} – ${selectedState.name}` : inputs.state}
+                        {selectedState ? `${selectedState.abbr} – ${selectedState.name}` : localInputs.state}
                       </SelectValue>
                     </SelectTrigger>
                     <SelectContent className="max-h-64">
@@ -324,14 +370,14 @@ export default function PaycheckPage() {
                   </Select>
                 </FieldRow>
 
-                {inputs.state === 'NY' && (
+                {localInputs.state === 'NY' && (
                   <FieldRow label="NYC Resident?">
                     <label className="flex cursor-pointer items-center gap-2">
                       <input
                         type="checkbox"
-                        checked={inputs.nycResident}
-                        onChange={(e) => update('nycResident', e.target.checked)}
-                        className="h-4 w-4 rounded accent-[#1a56a8]"
+                        checked={localInputs.nycResident}
+                        onChange={(e) => updateField('nycResident', e.target.checked)}
+                        className="h-4 w-4 rounded accent-[#3b82f6]"
                       />
                       <span className="text-sm text-gray-700">
                         Add NYC local tax (~3.5%)
@@ -350,8 +396,8 @@ export default function PaycheckPage() {
               <div className="space-y-5">
                 <SliderField
                   label={`Traditional 401(k) (%)${selectedState && !selectedState.allows401k ? ' *' : ''}`}
-                  value={inputs.traditional401kPct}
-                  onChange={(v) => update('traditional401kPct', v)}
+                  value={localInputs.k401TraditionalPct}
+                  onChange={(v) => updateField('k401TraditionalPct', v)}
                 />
                 {selectedState && !selectedState.allows401k && (
                   <p className="text-xs text-amber-600">
@@ -359,24 +405,64 @@ export default function PaycheckPage() {
                   </p>
                 )}
 
-                <FieldRow label="HSA ($/period)">
-                  <Input {...numericInput('hsaPerPeriod')} step={10} className="w-full" />
+                <FieldRow label={`HSA ($/period)`}>
+                  <Input
+                    type="number"
+                    min={0}
+                    step={10}
+                    value={perPeriodDisplay(localInputs.hsaAnnual) || ''}
+                    placeholder="0"
+                    onChange={(e) => handlePerPeriodInput('hsaAnnual', Number(e.target.value))}
+                    className="w-full"
+                  />
                 </FieldRow>
 
-                <FieldRow label="FSA ($/period)">
-                  <Input {...numericInput('fsaPerPeriod')} step={10} className="w-full" />
+                <FieldRow label={`FSA ($/period)`}>
+                  <Input
+                    type="number"
+                    min={0}
+                    step={10}
+                    value={perPeriodDisplay(localInputs.fsaAnnual) || ''}
+                    placeholder="0"
+                    onChange={(e) => handlePerPeriodInput('fsaAnnual', Number(e.target.value))}
+                    className="w-full"
+                  />
                 </FieldRow>
 
-                <FieldRow label="Health Insurance ($/period)">
-                  <Input {...numericInput('healthInsurancePerPeriod')} step={10} className="w-full" />
+                <FieldRow label={`Health Insurance ($/period)`}>
+                  <Input
+                    type="number"
+                    min={0}
+                    step={10}
+                    value={perPeriodDisplay(localInputs.healthInsuranceAnnual) || ''}
+                    placeholder="0"
+                    onChange={(e) => handlePerPeriodInput('healthInsuranceAnnual', Number(e.target.value))}
+                    className="w-full"
+                  />
                 </FieldRow>
 
-                <FieldRow label="Dental ($/period)">
-                  <Input {...numericInput('dentalPerPeriod')} step={5} className="w-full" />
+                <FieldRow label={`Dental/Vision ($/period)`}>
+                  <Input
+                    type="number"
+                    min={0}
+                    step={5}
+                    value={perPeriodDisplay(localInputs.dentalAnnual) || ''}
+                    placeholder="0"
+                    onChange={(e) => handlePerPeriodInput('dentalAnnual', Number(e.target.value))}
+                    className="w-full"
+                  />
                 </FieldRow>
 
-                <FieldRow label="Commuter Benefit ($/period)">
-                  <Input {...numericInput('commuterBenefitPerPeriod')} step={10} className="w-full" />
+                <FieldRow label={`Commuter Benefit ($/period)`}>
+                  <Input
+                    type="number"
+                    min={0}
+                    step={10}
+                    value={perPeriodDisplay(localInputs.commuterAnnual) || ''}
+                    placeholder="0"
+                    onChange={(e) => handlePerPeriodInput('commuterAnnual', Number(e.target.value))}
+                    className="w-full"
+                  />
                 </FieldRow>
               </div>
             </div>
@@ -389,12 +475,20 @@ export default function PaycheckPage() {
               <div className="space-y-5">
                 <SliderField
                   label="Roth 401(k) (%)"
-                  value={inputs.roth401kPct}
-                  onChange={(v) => update('roth401kPct', v)}
+                  value={localInputs.k401RothPct}
+                  onChange={(v) => updateField('k401RothPct', v)}
                 />
 
-                <FieldRow label="Other Post-Tax ($/period)">
-                  <Input {...numericInput('otherPostTaxPerPeriod')} step={10} className="w-full" />
+                <FieldRow label={`Other Post-Tax ($/period)`}>
+                  <Input
+                    type="number"
+                    min={0}
+                    step={10}
+                    value={perPeriodDisplay(localInputs.otherPostTaxAnnual) || ''}
+                    placeholder="0"
+                    onChange={(e) => handlePerPeriodInput('otherPostTaxAnnual', Number(e.target.value))}
+                    className="w-full"
+                  />
                 </FieldRow>
               </div>
             </div>
@@ -409,106 +503,128 @@ export default function PaycheckPage() {
               <div className="flex items-center justify-between gap-2">
                 <CardTitle>Paycheck Breakdown</CardTitle>
                 <Badge variant="outline" className="font-normal text-gray-500">
-                  {PAY_PERIOD_LABELS[inputs.payPeriod]}
+                  {PAY_PERIOD_LABELS[localInputs.payPeriod]}
                 </Badge>
               </div>
             </CardHeader>
             <CardContent className="space-y-0.5">
-              {/* Gross */}
-              <div className="flex items-center justify-between py-1.5">
-                <span className="text-sm font-bold text-gray-800">Gross Pay</span>
-                <span className="text-sm font-bold text-gray-800">
-                  {formatCurrency(result.grossPay)}
-                </span>
-              </div>
-
-              {/* Pre-tax deductions */}
-              <LineItem label="Traditional 401(k)" value={result.traditional401k} indent negative muted />
-              <LineItem label="HSA" value={result.hsa} indent negative muted />
-              <LineItem label="FSA" value={result.fsa} indent negative muted />
-              <LineItem label="Health Insurance" value={result.healthInsurance} indent negative muted />
-              <LineItem label="Dental" value={result.dental} indent negative muted />
-              <LineItem label="Commuter Benefit" value={result.commuterBenefit} indent negative muted />
-
-              {/* Taxable wages */}
-              <LineItem label="= Taxable Wages" value={result.federalTaxableWages} borderTop highlight />
-
-              {/* Federal taxes */}
-              <LineItem label="Federal Income Tax" value={result.federalIncomeTax} red />
-              <LineItem label="Social Security (6.2%)" value={result.socialSecurity} red />
-              <LineItem label="Medicare" value={result.medicare} red />
-
-              {/* State tax */}
-              {result.stateTax > 0 && (
-                <LineItem
-                  label={`${selectedState?.name ?? inputs.state} Income Tax`}
-                  value={result.stateTax}
-                  red
-                />
-              )}
-
-              {/* Local tax (e.g. NYC) */}
-              {result.localTax > 0 && (
-                <LineItem
-                  label={selectedState?.localTaxName ?? 'Local Tax'}
-                  value={result.localTax}
-                  red
-                />
-              )}
-
-              {/* Additional payroll taxes (PFML, SDI, etc.) */}
-              {result.additionalPayrollTaxes.map((t) => (
-                <LineItem key={t.name} label={t.name} value={t.amount} red />
-              ))}
-
-              {/* After-tax pay */}
-              <LineItem
-                label="= After-Tax Pay"
-                value={result.grossPay - result.totalPreTax - result.totalTaxes}
-                borderTop
-                highlight
-              />
-
-              {/* Post-tax deductions */}
-              <LineItem label="Roth 401(k)" value={result.roth401k} indent negative muted />
-              <LineItem label="Other Post-Tax" value={result.otherPostTax} indent negative muted />
-
-              {/* Net pay */}
-              <LineItem label="NET PAY" value={result.netPay} doubleBorderTop large />
-
-              {/* Rate badges */}
-              <div className="mt-4 flex flex-wrap gap-2">
-                <Badge variant="secondary" className="gap-1 text-xs">
-                  <Info className="h-3 w-3" />
-                  Effective Federal: {(result.effectiveFederalRate * 100).toFixed(1)}%
-                </Badge>
-                <Badge variant="secondary" className="gap-1 text-xs">
-                  <Info className="h-3 w-3" />
-                  Marginal Rate: {(result.marginalFederalRate * 100).toFixed(0)}%
-                </Badge>
-                {result.stateEffectiveRate > 0 && (
-                  <Badge variant="secondary" className="gap-1 text-xs">
-                    <Info className="h-3 w-3" />
-                    State Effective: {(result.stateEffectiveRate * 100).toFixed(1)}%
-                  </Badge>
-                )}
-              </div>
-
-              {/* Annual net */}
-              <div className="mt-4 rounded-lg bg-blue-50 px-4 py-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-sm text-[#1a56a8]">
-                    <DollarSign className="h-4 w-4" />
-                    <span className="font-medium">Annual Net Pay</span>
-                  </div>
-                  <span className="text-base font-bold text-[#1a56a8]">
-                    {formatCurrency(annualNet)}
-                  </span>
-                </div>
-                <p className="mt-0.5 text-xs text-blue-400">
-                  {formatCurrency(result.netPay)} × {periods} pay periods
+              {!pr.isComplete ? (
+                <p className="text-sm text-gray-400 text-center py-6">
+                  Enter your annual salary above to see your paycheck breakdown.
                 </p>
-              </div>
+              ) : (
+                <>
+                  {/* Gross */}
+                  <div className="flex items-center justify-between py-1.5">
+                    <span className="text-sm font-bold text-gray-800">Gross Pay</span>
+                    <span className="text-sm font-bold text-gray-800">
+                      {formatCurrency(pr.grossPerPaycheck)}
+                    </span>
+                  </div>
+
+                  {/* Pre-tax deductions */}
+                  <LineItem label="Traditional 401(k)" value={pr.k401TraditionalAnnual / currentPeriods} indent negative muted />
+                  <LineItem label="Roth 401(k)" value={pr.k401RothAnnual / currentPeriods} indent negative muted />
+                  <LineItem label="HSA" value={localInputs.hsaAnnual / currentPeriods} indent negative muted />
+                  <LineItem label="FSA" value={localInputs.fsaAnnual / currentPeriods} indent negative muted />
+                  <LineItem label="Health Insurance" value={localInputs.healthInsuranceAnnual / currentPeriods} indent negative muted />
+                  <LineItem label="Dental/Vision" value={localInputs.dentalAnnual / currentPeriods} indent negative muted />
+                  <LineItem label="Commuter Benefit" value={localInputs.commuterAnnual / currentPeriods} indent negative muted />
+
+                  {/* Taxable wages */}
+                  <LineItem label="= Taxable Wages" value={pr.grossPerPaycheck - pr.totalPreTaxDeductions / currentPeriods} borderTop highlight />
+
+                  {/* Federal taxes */}
+                  <LineItem label="Federal Income Tax" value={pr.federalTaxAnnual / currentPeriods} red />
+                  <LineItem label="Social Security (6.2%)" value={pr.ssAnnual / currentPeriods} red />
+                  <LineItem label="Medicare" value={pr.medicareAnnual / currentPeriods} red />
+
+                  {pr.stateTaxAnnual > 0 && (
+                    <LineItem
+                      label={`${selectedState?.name ?? localInputs.state} Income Tax`}
+                      value={pr.stateTaxAnnual / currentPeriods}
+                      red
+                    />
+                  )}
+
+                  {pr.statePfmlAnnual > 0 && (
+                    <LineItem
+                      label="State Payroll Tax"
+                      value={pr.statePfmlAnnual / currentPeriods}
+                      red
+                    />
+                  )}
+
+                  {/* After-tax pay */}
+                  <LineItem
+                    label="= After-Tax Pay"
+                    value={pr.grossPerPaycheck - pr.totalPreTaxDeductions / currentPeriods - pr.totalTaxesAnnual / currentPeriods}
+                    borderTop
+                    highlight
+                  />
+
+                  {/* Post-tax deductions */}
+                  {pr.k401RothAnnual > 0 && (
+                    <LineItem label="Roth 401(k)" value={pr.k401RothAnnual / currentPeriods} indent negative muted />
+                  )}
+                  {localInputs.otherPostTaxAnnual > 0 && (
+                    <LineItem label="Other Post-Tax" value={localInputs.otherPostTaxAnnual / currentPeriods} indent negative muted />
+                  )}
+
+                  {/* Net pay */}
+                  <LineItem label="NET PAY" value={pr.netPayPerPaycheck} doubleBorderTop large />
+
+                  {/* Rate badges */}
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Badge variant="secondary" className="gap-1 text-xs">
+                      <Info className="h-3 w-3" />
+                      Effective: {(pr.effectiveTaxRate * 100).toFixed(1)}%
+                    </Badge>
+                    <Badge variant="secondary" className="gap-1 text-xs">
+                      <Info className="h-3 w-3" />
+                      Marginal: {(pr.marginalFederalRate * 100).toFixed(0)}%
+                    </Badge>
+                    <Badge variant="secondary" className="gap-1 text-xs">
+                      <Info className="h-3 w-3" />
+                      Combined: {(pr.marginalCombinedRate * 100).toFixed(1)}%
+                    </Badge>
+                  </div>
+
+                  {/* Summary box */}
+                  <div className="mt-4 rounded-lg bg-blue-50 px-4 py-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-[#3b82f6] font-medium flex items-center gap-1">
+                        <DollarSign className="h-4 w-4" />
+                        Per paycheck
+                      </span>
+                      <span className="text-base font-bold text-[#3b82f6]">
+                        {formatCurrency(pr.netPayPerPaycheck)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-[#3b82f6] font-medium">
+                        Monthly
+                        <span className="ml-1 text-xs text-blue-400">← flows to budget automatically</span>
+                      </span>
+                      <span className="text-base font-bold text-[#3b82f6]">
+                        {formatCurrency(pr.netPayMonthly)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-[#3b82f6] font-medium">Annual</span>
+                      <span className="text-base font-bold text-[#3b82f6]">
+                        {formatCurrency(pr.netPayAnnual)}
+                      </span>
+                    </div>
+                    <div className="border-t border-blue-200 pt-2 flex items-center justify-between">
+                      <span className="text-xs text-blue-400">Tax savings from benefits</span>
+                      <span className="text-sm font-semibold text-green-600">
+                        {formatCurrency(pr.annualTaxSavingsFromBenefits)}/yr
+                      </span>
+                    </div>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
 
@@ -524,8 +640,7 @@ export default function PaycheckPage() {
                     <tr className="border-b border-gray-100 bg-gray-50">
                       <th className="px-4 py-2 text-left text-xs font-semibold text-gray-500">Benefit</th>
                       <th className="px-4 py-2 text-right text-xs font-semibold text-gray-500">Annual Amt</th>
-                      <th className="px-4 py-2 text-right text-xs font-semibold text-gray-500">Tax Savings</th>
-                      <th className="px-4 py-2 text-right text-xs font-semibold text-gray-500">Rate</th>
+                      <th className="px-4 py-2 text-right text-xs font-semibold text-gray-500">Est. Savings</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
@@ -534,9 +649,6 @@ export default function PaycheckPage() {
                         <td className="px-4 py-2.5 font-medium text-gray-700">{row.label}</td>
                         <td className="px-4 py-2.5 text-right text-gray-600">{formatCurrency(row.annual)}</td>
                         <td className="px-4 py-2.5 text-right font-semibold text-green-600">{formatCurrency(row.savings)}</td>
-                        <td className="px-4 py-2.5 text-right text-gray-400">
-                          {row.annual > 0 ? `${((row.savings / row.annual) * 100).toFixed(1)}%` : '—'}
-                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -544,9 +656,8 @@ export default function PaycheckPage() {
                     <tr className="border-t border-gray-200 bg-green-50/50">
                       <td className="px-4 py-2.5 font-semibold text-gray-700" colSpan={2}>Total Annual Savings</td>
                       <td className="px-4 py-2.5 text-right font-bold text-green-600">
-                        {formatCurrency(benefitRows.reduce((s, r) => s + r.savings, 0))}
+                        {formatCurrency(pr.annualTaxSavingsFromBenefits)}
                       </td>
-                      <td />
                     </tr>
                   </tfoot>
                 </table>

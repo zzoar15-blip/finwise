@@ -4,8 +4,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, Calculator, PieChart, CreditCard,
-  TrendingUp, BarChart3, Wallet, Sparkles, FileText,
-  Settings, ChevronRight,
+  TrendingUp, BarChart3, Sparkles, FileText, Settings,
+  LineChart, Home,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -15,19 +15,15 @@ const PRIMARY_NAV = [
 ];
 
 const TOOLS_NAV = [
-  { href: '/paycheck', label: 'Paycheck', icon: Calculator },
+  { href: '/paycheck', label: 'Paycheck Calculator', icon: Calculator },
   { href: '/budget', label: 'Budget Planner', icon: PieChart },
   { href: '/debt', label: 'Debt Simulator', icon: CreditCard },
-  { href: '/invest', label: 'Investments', icon: TrendingUp },
-  { href: '/forecast', label: 'Forecaster', icon: BarChart3 },
+  { href: '/invest', label: 'Investment Simulator', icon: TrendingUp },
+  { href: '/forecast', label: 'Scenario Forecaster', icon: BarChart3 },
+  { href: '/tools/rent-vs-buy', label: 'Rent vs. Buy', icon: Home },
 ];
 
-const BOTTOM_NAV = [
-  { href: '/advisor', label: 'AI Advisor', icon: Sparkles },
-  { href: '/settings', label: 'Settings', icon: Settings },
-];
-
-function NavLink({
+function NavItem({
   href,
   label,
   icon: Icon,
@@ -45,55 +41,57 @@ function NavLink({
     <Link
       href={href}
       className={cn(
-        'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-        indent ? 'pl-6' : '',
+        'group flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors relative',
+        indent ? 'ml-2' : '',
         active
-          ? 'bg-[#1a56a8] text-white'
-          : 'text-white/70 hover:bg-white/10 hover:text-white'
+          ? 'bg-[#1e3a5f] text-white before:absolute before:left-0 before:top-1 before:bottom-1 before:w-0.5 before:rounded-r before:bg-[#3b82f6]'
+          : 'text-white/60 hover:bg-[#1e3a5f]/60 hover:text-white'
       )}
     >
-      <Icon className="h-4 w-4 shrink-0" />
-      {label}
+      <Icon className="h-[18px] w-[18px] shrink-0" />
+      <span className="truncate">{label}</span>
     </Link>
   );
 }
 
 export function Sidebar() {
   return (
-    <aside className="hidden md:flex flex-col w-60 min-h-screen bg-[#1a2744] text-white px-3 py-6 gap-0.5 shrink-0">
+    <aside className="hidden md:flex flex-col w-60 min-h-screen bg-[#0f172a] shrink-0">
       {/* Logo */}
-      <div className="flex items-center gap-2.5 px-3 mb-6">
-        <div className="h-8 w-8 rounded-lg bg-[#1a56a8] flex items-center justify-center">
-          <Wallet className="h-4 w-4 text-white" />
+      <div className="flex items-center gap-2 px-4 py-5 mb-1">
+        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#3b82f6]">
+          <LineChart className="h-4 w-4 text-white" />
         </div>
-        <span className="text-lg font-bold tracking-tight">FinWise</span>
+        <span className="text-[15px] font-bold tracking-tight text-white">FinWise</span>
       </div>
 
-      {/* Primary nav */}
-      {PRIMARY_NAV.map((item) => (
-        <NavLink key={item.href} {...item} />
-      ))}
+      <nav className="flex flex-col gap-0.5 px-3 flex-1">
+        {/* Primary */}
+        {PRIMARY_NAV.map((item) => (
+          <NavItem key={item.href} {...item} />
+        ))}
 
-      <div className="mx-3 my-3 border-t border-white/10" />
+        {/* Divider */}
+        <div className="my-3 border-t border-white/10" />
 
-      {/* Tools section */}
-      <div className="flex items-center gap-1.5 px-3 mb-1">
-        <p className="text-xs font-semibold text-white/40 uppercase tracking-widest">Tools</p>
-        <ChevronRight className="h-3 w-3 text-white/30" />
-      </div>
-      {TOOLS_NAV.map((item) => (
-        <NavLink key={item.href} {...item} indent />
-      ))}
+        {/* Tools section */}
+        <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest text-white/30">
+          Tools
+        </p>
+        {TOOLS_NAV.map((item) => (
+          <NavItem key={item.href} {...item} indent />
+        ))}
 
-      {/* Push bottom nav to bottom */}
-      <div className="flex-1" />
+        <div className="flex-1" />
 
-      <div className="mx-3 mb-2 border-t border-white/10" />
+        {/* Divider */}
+        <div className="my-3 border-t border-white/10" />
 
-      {/* Bottom nav */}
-      {BOTTOM_NAV.map((item) => (
-        <NavLink key={item.href} {...item} />
-      ))}
+        {/* Bottom */}
+        <NavItem href="/advisor" label="AI Advisor" icon={Sparkles} />
+        <NavItem href="/settings" label="Settings" icon={Settings} />
+        <div className="h-4" />
+      </nav>
     </aside>
   );
 }

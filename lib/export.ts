@@ -1,4 +1,4 @@
-import * as XLSX from 'xlsx';
+import XLSX from 'xlsx-js-style';
 
 export function downloadXlsx(workbook: XLSX.WorkBook, filename: string) {
   XLSX.writeFile(workbook, `${filename}.xlsx`);

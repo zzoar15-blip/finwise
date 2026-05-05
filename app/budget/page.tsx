@@ -1,7 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { formatCurrency } from '@/lib/format';
+import { useFinWiseStore } from '@/lib/store';
 import {
   Card,
   CardContent,
@@ -24,66 +26,9 @@ import {
   YAxis,
   CartesianGrid,
 } from 'recharts';
-import { TrendingUp, TrendingDown, DollarSign, PiggyBank, Home, CreditCard } from 'lucide-react';
+import { TrendingUp, Lock, AlertTriangle, CheckCircle } from 'lucide-react';
 import { ExportButton } from '@/components/ExportButton';
-import { downloadCsv, downloadXlsxFromAoa } from '@/lib/export';
-
-interface BudgetData {
-  salary: number;
-  investmentIncome: number;
-  housing: number;
-  debtPayments: number;
-  k401: number;
-  rothIRA: number;
-  brokerage: number;
-  brokerageNote: string;
-  groceries: number;
-  dining: number;
-  transport: number;
-  subscriptions: number;
-  phone: number;
-  health: number;
-  travel: number;
-  misc: number;
-}
-
-const NOW_DEFAULT: BudgetData = {
-  salary: 5000,
-  investmentIncome: 0,
-  housing: 1800,
-  debtPayments: 200,
-  k401: 500,
-  rothIRA: 583,
-  brokerage: 0,
-  brokerageNote: '',
-  groceries: 400,
-  dining: 200,
-  transport: 150,
-  subscriptions: 50,
-  phone: 80,
-  health: 100,
-  travel: 100,
-  misc: 200,
-};
-
-const FUTURE_DEFAULT: BudgetData = {
-  salary: 7000,
-  investmentIncome: 500,
-  housing: 2000,
-  debtPayments: 0,
-  k401: 700,
-  rothIRA: 583,
-  brokerage: 500,
-  brokerageNote: 'JEPI',
-  groceries: 400,
-  dining: 150,
-  transport: 150,
-  subscriptions: 50,
-  phone: 80,
-  health: 100,
-  travel: 200,
-  misc: 150,
-};
+import { downloadCsv } from '@/lib/export';
 
 const CHART_COLORS = {
   Housing: '#f97316',
@@ -93,34 +38,28 @@ const CHART_COLORS = {
   Other: '#8b5cf6',
 };
 
-function derive(b: BudgetData) {
-  const totalIncome = b.salary + b.investmentIncome;
-  const savingsTotal = b.k401 + b.rothIRA + b.brokerage;
-  const livingTotal =
-    b.groceries + b.dining + b.transport + b.subscriptions + b.phone + b.health + b.travel + b.misc;
-  const totalExpenses = b.housing + b.debtPayments + savingsTotal + livingTotal;
-  const monthlySurplus = totalIncome - totalExpenses;
-  const savingsRate = totalIncome > 0 ? (savingsTotal / totalIncome) * 100 : 0;
-  const annualIncome = totalIncome * 12;
-  const annualSurplus = monthlySurplus * 12;
-  return { totalIncome, savingsTotal, livingTotal, totalExpenses, monthlySurplus, savingsRate, annualIncome, annualSurplus };
-}
-
 function savingsRateColor(rate: number) {
-  if (rate >= 20) return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
-  if (rate >= 10) return 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400';
-  return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
+  if (rate >= 20) return 'bg-green-100 text-green-800';
+  if (rate >= 10) return 'bg-amber-100 text-amber-800';
+  return 'bg-red-100 text-red-800';
 }
 
 function NumericInput({
   value,
   onChange,
-  className = '',
+  readOnly = false,
 }: {
   value: number;
-  onChange: (n: number) => void;
-  className?: string;
+  onChange?: (n: number) => void;
+  readOnly?: boolean;
 }) {
+  if (readOnly) {
+    return (
+      <span className="w-28 text-right text-sm font-medium text-gray-700 tabular-nums">
+        {formatCurrency(value)}
+      </span>
+    );
+  }
   return (
     <Input
       type="number"
@@ -128,8 +67,8 @@ function NumericInput({
       step={1}
       value={value === 0 ? '' : value}
       placeholder="0"
-      onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
-      className={`w-28 text-right ${className}`}
+      onChange={(e) => onChange && onChange(parseFloat(e.target.value) || 0)}
+      className="w-28 text-right"
     />
   );
 }
@@ -149,390 +88,386 @@ function BudgetRow({
   label,
   value,
   onChange,
-  note,
-  onNoteChange,
-  icon,
+  readOnly = false,
+  badge,
+  linkTo,
 }: {
   label: string;
   value: number;
-  onChange: (n: number) => void;
-  note?: string;
-  onNoteChange?: (s: string) => void;
-  icon?: React.ReactNode;
+  onChange?: (n: number) => void;
+  readOnly?: boolean;
+  badge?: string;
+  linkTo?: string;
 }) {
   return (
     <div className="flex items-center justify-between gap-2 py-1">
       <span className="flex items-center gap-1.5 text-sm text-foreground/80 min-w-0 flex-1">
-        {icon}
+        {readOnly && <Lock className="size-3 text-muted-foreground shrink-0" />}
         {label}
+        {badge && (
+          <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+            {badge}
+          </span>
+        )}
+        {linkTo && (
+          <Link href={linkTo} className="text-xs text-blue-500 hover:text-blue-700 ml-1">
+            →
+          </Link>
+        )}
       </span>
       <div className="flex items-center gap-1.5 shrink-0">
-        {onNoteChange !== undefined && (
-          <Input
-            type="text"
-            placeholder="ticker"
-            value={note ?? ''}
-            onChange={(e) => onNoteChange(e.target.value)}
-            className="w-20 text-xs text-right"
-          />
-        )}
         <span className="text-sm text-muted-foreground">$</span>
-        <NumericInput value={value} onChange={onChange} />
+        <NumericInput value={value} onChange={onChange} readOnly={readOnly} />
       </div>
     </div>
   );
 }
 
-function BudgetColumn({
-  label,
-  color,
-  data,
-  setData,
-}: {
-  label: string;
-  color: 'blue' | 'green';
-  data: BudgetData;
-  setData: (d: BudgetData) => void;
-}) {
-  const set = (key: keyof BudgetData) => (v: number | string) =>
-    setData({ ...data, [key]: v });
-
-  const {
-    totalIncome,
-    savingsTotal,
-    livingTotal,
-    totalExpenses,
-    monthlySurplus,
-    savingsRate,
-  } = derive(data);
-
-  const badgeClass =
-    color === 'blue'
-      ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
-      : 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
-
-  return (
-    <Card className="flex-1 min-w-0">
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          <span>{label === 'Now' ? 'Current Budget' : 'Future Budget'}</span>
-          <span
-            className={`inline-flex h-6 items-center rounded-full px-3 text-xs font-semibold ${badgeClass}`}
-          >
-            {label}
-          </span>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-0.5">
-        {/* INCOME */}
-        <SectionLabel label="Income" />
-        <BudgetRow label="Salary" value={data.salary} onChange={set('salary') as (n: number) => void} icon={<DollarSign className="size-3.5 text-muted-foreground" />} />
-        <BudgetRow label="Investment Income" value={data.investmentIncome} onChange={set('investmentIncome') as (n: number) => void} icon={<TrendingUp className="size-3.5 text-muted-foreground" />} />
-
-        {/* HOUSING */}
-        <SectionLabel label="Housing" />
-        <BudgetRow label="Housing / Rent" value={data.housing} onChange={set('housing') as (n: number) => void} icon={<Home className="size-3.5 text-muted-foreground" />} />
-
-        {/* DEBT PAYMENTS */}
-        <SectionLabel label="Debt Payments" />
-        <BudgetRow label="Debt Payments" value={data.debtPayments} onChange={set('debtPayments') as (n: number) => void} icon={<CreditCard className="size-3.5 text-muted-foreground" />} />
-
-        {/* SAVINGS & INVESTMENTS */}
-        <SectionLabel label="Savings & Investments" />
-        <BudgetRow label="401(k)" value={data.k401} onChange={set('k401') as (n: number) => void} icon={<PiggyBank className="size-3.5 text-muted-foreground" />} />
-        <BudgetRow label="Roth IRA" value={data.rothIRA} onChange={set('rothIRA') as (n: number) => void} icon={<PiggyBank className="size-3.5 text-muted-foreground" />} />
-        <BudgetRow
-          label="Brokerage"
-          value={data.brokerage}
-          onChange={set('brokerage') as (n: number) => void}
-          note={data.brokerageNote}
-          onNoteChange={set('brokerageNote') as (s: string) => void}
-          icon={<PiggyBank className="size-3.5 text-muted-foreground" />}
-        />
-
-        {/* LIVING EXPENSES */}
-        <SectionLabel label="Living Expenses" />
-        <BudgetRow label="Groceries" value={data.groceries} onChange={set('groceries') as (n: number) => void} />
-        <BudgetRow label="Dining Out" value={data.dining} onChange={set('dining') as (n: number) => void} />
-        <BudgetRow label="Transport" value={data.transport} onChange={set('transport') as (n: number) => void} />
-        <BudgetRow label="Subscriptions" value={data.subscriptions} onChange={set('subscriptions') as (n: number) => void} />
-        <BudgetRow label="Phone" value={data.phone} onChange={set('phone') as (n: number) => void} />
-        <BudgetRow label="Health" value={data.health} onChange={set('health') as (n: number) => void} />
-        <BudgetRow label="Travel" value={data.travel} onChange={set('travel') as (n: number) => void} />
-        <BudgetRow label="Misc" value={data.misc} onChange={set('misc') as (n: number) => void} />
-
-        {/* TOTALS FOOTER */}
-        <div className="mt-4 rounded-lg bg-muted/50 p-3 space-y-1.5">
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Total Income</span>
-            <span className="font-medium">{formatCurrency(totalIncome)}</span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Total Expenses</span>
-            <span className="font-medium">{formatCurrency(totalExpenses)}</span>
-          </div>
-          <Separator />
-          <div className="flex justify-between text-sm font-semibold">
-            <span>Monthly Surplus</span>
-            <span className={monthlySurplus >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
-              {monthlySurplus >= 0 ? '+' : ''}{formatCurrency(monthlySurplus)}
-            </span>
-          </div>
-          <div className="flex justify-between items-center text-sm">
-            <span className="text-muted-foreground">Savings Rate</span>
-            <span className={`inline-flex h-5 items-center rounded-full px-2 text-xs font-semibold ${savingsRateColor(savingsRate)}`}>
-              {savingsRate.toFixed(1)}%
-            </span>
-          </div>
-          <div className="flex justify-between text-xs text-muted-foreground pt-1 border-t border-border/50">
-            <span>Savings / mo</span>
-            <span>{formatCurrency(savingsTotal)}</span>
-          </div>
-          <div className="flex justify-between text-xs text-muted-foreground">
-            <span>Living / mo</span>
-            <span>{formatCurrency(livingTotal)}</span>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function SpendingPie({ data, title }: { data: BudgetData; title: string }) {
-  const { savingsTotal, livingTotal } = derive(data);
-  const pieData = [
-    { name: 'Housing', value: data.housing, color: CHART_COLORS.Housing },
-    { name: 'Debt', value: data.debtPayments, color: CHART_COLORS.Debt },
-    { name: 'Savings', value: savingsTotal, color: CHART_COLORS.Savings },
-    { name: 'Living', value: livingTotal, color: CHART_COLORS.Living },
-  ].filter((d) => d.value > 0);
-
-  return (
-    <div className="flex-1 min-w-0">
-      <p className="mb-2 text-center text-sm font-medium text-muted-foreground">{title}</p>
-      <ResponsiveContainer width="100%" height={200}>
-        <PieChart>
-          <Pie
-            data={pieData}
-            cx="50%"
-            cy="50%"
-            innerRadius={50}
-            outerRadius={80}
-            paddingAngle={2}
-            dataKey="value"
-          >
-            {pieData.map((entry) => (
-              <Cell key={entry.name} fill={entry.color} />
-            ))}
-          </Pie>
-          <Tooltip formatter={(v) => typeof v === 'number' ? formatCurrency(v) : String(v)} />
-          <Legend
-            iconType="circle"
-            iconSize={8}
-            formatter={(value) => <span className="text-xs">{value}</span>}
-          />
-        </PieChart>
-      </ResponsiveContainer>
-    </div>
-  );
-}
-
 export default function BudgetPage() {
-  const [nowData, setNowData] = useState<BudgetData>(NOW_DEFAULT);
-  const [futureData, setFutureData] = useState<BudgetData>(FUTURE_DEFAULT);
+  const paycheckResults = useFinWiseStore((s) => s.paycheckResults);
+  const paycheckInputs = useFinWiseStore((s) => s.paycheckInputs);
+  const budgetInputs = useFinWiseStore((s) => s.budgetInputs);
+  const setBudgetInputs = useFinWiseStore((s) => s.setBudgetInputs);
+  const debts = useFinWiseStore((s) => s.debts);
 
-  const nowDerived = derive(nowData);
-  const futureDerived = derive(futureData);
+  const pr = paycheckResults;
+  const pi = paycheckInputs;
+  const bi = budgetInputs;
 
-  // Bar chart comparing major categories
+  // Derived values
+  const totalDebtMinimums = debts.reduce((s, d) => s + d.minPayment, 0);
+  const totalExpenses = bi.housing + bi.utilities + bi.insurance + bi.groceries + bi.dining +
+    bi.transportation + bi.subscriptions + bi.phone + bi.healthGym + bi.travel + bi.misc;
+  const payrollSavings = (pr.k401TraditionalAnnual + pr.k401RothAnnual) / 12 +
+    pi.hsaAnnual / 12 + pi.fsaAnnual / 12;
+  const optionalSavings = bi.rothIraMonthly + bi.brokerageMonthly + bi.emergencyFundMonthly;
+  const totalSavings = payrollSavings + optionalSavings;
+  const monthlyIncome = pr.netPayMonthly + bi.investmentIncome;
+  const totalOutflows = totalExpenses + totalSavings + totalDebtMinimums;
+  const monthlySurplus = monthlyIncome - totalOutflows;
+  const savingsRate = monthlyIncome > 0 ? (totalSavings / monthlyIncome) * 100 : 0;
+
+  // Chart data
+  const pieData = [
+    { name: 'Housing', value: bi.housing, color: CHART_COLORS.Housing },
+    { name: 'Debt', value: totalDebtMinimums, color: CHART_COLORS.Debt },
+    { name: 'Savings', value: totalSavings, color: CHART_COLORS.Savings },
+    { name: 'Living', value: totalExpenses - bi.housing, color: CHART_COLORS.Living },
+  ].filter(d => d.value > 0);
+
   const barData = [
-    {
-      category: 'Housing',
-      Now: nowData.housing,
-      Future: futureData.housing,
-    },
-    {
-      category: 'Debt',
-      Now: nowData.debtPayments,
-      Future: futureData.debtPayments,
-    },
-    {
-      category: 'Savings',
-      Now: nowDerived.savingsTotal,
-      Future: futureDerived.savingsTotal,
-    },
-    {
-      category: 'Living',
-      Now: nowDerived.livingTotal,
-      Future: futureDerived.livingTotal,
-    },
-  ];
-
-  // Annual projections table rows
-  type ProjectionRow = {
-    metric: string;
-    nowVal: number;
-    futureVal: number;
-    higherIsBetter: boolean;
-  };
-
-  const projectionRows: ProjectionRow[] = [
-    {
-      metric: 'Income',
-      nowVal: nowDerived.annualIncome,
-      futureVal: futureDerived.annualIncome,
-      higherIsBetter: true,
-    },
-    {
-      metric: 'Expenses',
-      nowVal: nowDerived.totalExpenses * 12,
-      futureVal: futureDerived.totalExpenses * 12,
-      higherIsBetter: false,
-    },
-    {
-      metric: 'Surplus',
-      nowVal: nowDerived.annualSurplus,
-      futureVal: futureDerived.annualSurplus,
-      higherIsBetter: true,
-    },
-    {
-      metric: 'Savings Invested',
-      nowVal: nowDerived.savingsTotal * 12,
-      futureVal: futureDerived.savingsTotal * 12,
-      higherIsBetter: true,
-    },
-  ];
-
-  function changeColor(row: ProjectionRow): string {
-    const diff = row.futureVal - row.nowVal;
-    if (diff === 0) return 'text-muted-foreground';
-    const positive = row.higherIsBetter ? diff > 0 : diff < 0;
-    return positive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400';
-  }
-
-  const BUDGET_ROWS: Array<{ label: string; key: keyof BudgetData }> = [
-    { label: 'Monthly Salary', key: 'salary' },
-    { label: 'Investment Income', key: 'investmentIncome' },
-    { label: 'Housing', key: 'housing' },
-    { label: 'Debt Payments', key: 'debtPayments' },
-    { label: '401(k)', key: 'k401' },
-    { label: 'Roth IRA', key: 'rothIRA' },
-    { label: 'Brokerage', key: 'brokerage' },
-    { label: 'Groceries', key: 'groceries' },
-    { label: 'Dining', key: 'dining' },
-    { label: 'Transport', key: 'transport' },
-    { label: 'Subscriptions', key: 'subscriptions' },
-    { label: 'Phone', key: 'phone' },
-    { label: 'Health', key: 'health' },
-    { label: 'Travel', key: 'travel' },
-    { label: 'Misc', key: 'misc' },
-  ];
+    { category: 'Housing', Amount: bi.housing },
+    { category: 'Groceries', Amount: bi.groceries },
+    { category: 'Dining', Amount: bi.dining },
+    { category: 'Transport', Amount: bi.transportation },
+    { category: 'Savings', Amount: totalSavings },
+    { category: 'Debt', Amount: totalDebtMinimums },
+  ].filter(d => d.Amount > 0);
 
   function exportRows(): (string | number)[][] {
     return [
-      ['Category', 'Now ($/mo)', 'Future ($/mo)'],
-      ...BUDGET_ROWS.filter((r) => r.key !== 'brokerageNote').map((r) => [
-        r.label,
-        nowData[r.key] as number,
-        futureData[r.key] as number,
-      ]),
+      ['Category', 'Monthly ($)', 'Annual ($)'],
+      ['Take-home Pay', pr.netPayMonthly, pr.netPayAnnual],
+      ['Investment Income', bi.investmentIncome, bi.investmentIncome * 12],
+      ['Total Income', monthlyIncome, monthlyIncome * 12],
+      [''],
+      ['EXPENSES', '', ''],
+      ['Housing', bi.housing, bi.housing * 12],
+      ['Utilities', bi.utilities, bi.utilities * 12],
+      ['Insurance', bi.insurance, bi.insurance * 12],
+      ['Groceries', bi.groceries, bi.groceries * 12],
+      ['Dining Out', bi.dining, bi.dining * 12],
+      ['Transportation', bi.transportation, bi.transportation * 12],
+      ['Subscriptions', bi.subscriptions, bi.subscriptions * 12],
+      ['Phone', bi.phone, bi.phone * 12],
+      ['Health/Gym', bi.healthGym, bi.healthGym * 12],
+      ['Travel', bi.travel, bi.travel * 12],
+      ['Misc', bi.misc, bi.misc * 12],
+      ['Total Expenses', totalExpenses, totalExpenses * 12],
+      [''],
+      ['SAVINGS', '', ''],
+      ['401(k) Traditional (payroll)', pr.k401TraditionalAnnual / 12, pr.k401TraditionalAnnual],
+      ['Roth 401(k) (payroll)', pr.k401RothAnnual / 12, pr.k401RothAnnual],
+      ['HSA (payroll)', pi.hsaAnnual / 12, pi.hsaAnnual],
+      ['FSA (payroll)', pi.fsaAnnual / 12, pi.fsaAnnual],
+      ['Roth IRA', bi.rothIraMonthly, bi.rothIraMonthly * 12],
+      ['Brokerage', bi.brokerageMonthly, bi.brokerageMonthly * 12],
+      ['Emergency Fund', bi.emergencyFundMonthly, bi.emergencyFundMonthly * 12],
+      ['Total Savings', totalSavings, totalSavings * 12],
+      [''],
+      ['Debt Payments', totalDebtMinimums, totalDebtMinimums * 12],
+      [''],
+      ['Monthly Surplus / (Deficit)', monthlySurplus, monthlySurplus * 12],
+      ['Savings Rate', `${savingsRate.toFixed(1)}%`, ''],
     ];
   }
 
   return (
     <div className="space-y-6 max-w-7xl">
       <div className="flex items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold">Budget Planner</h1>
+        <div>
+          <h1 className="text-2xl font-bold">Budget Planner</h1>
+          <Link href="/tools/rent-vs-buy" className="text-sm text-blue-600 hover:underline">
+            Wondering if you can afford to buy? →
+          </Link>
+        </div>
         <ExportButton
-          onExportXlsx={() => downloadXlsxFromAoa('Budget', exportRows(), [24, 14, 14], 'finwise-budget')}
+          onExportXlsx={async () => {
+            const { exportBudgetWorkbook } = await import('@/lib/excel/exports/budget');
+            exportBudgetWorkbook(pi, pr, bi, debts);
+          }}
           onExportCsv={() => downloadCsv(exportRows(), 'finwise-budget')}
         />
       </div>
 
-      {/* Two-column grid */}
-      <div className="flex gap-4 flex-col lg:flex-row">
-        <BudgetColumn label="Now" color="blue" data={nowData} setData={setNowData} />
-        <BudgetColumn label="Future" color="green" data={futureData} setData={setFutureData} />
-      </div>
+      <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+        {/* LEFT PANEL — Inputs */}
+        <div className="space-y-4">
+          {/* Sync Banner */}
+          {pr.isComplete ? (
+            <div className="flex items-start gap-3 rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+              <CheckCircle className="size-4 shrink-0 mt-0.5 text-green-600" />
+              <div className="flex-1 min-w-0">
+                <p className="font-medium">Synced from paycheck calculator</p>
+                <p className="text-green-700 mt-0.5">
+                  Take-home: {formatCurrency(pr.netPayMonthly)}/mo &nbsp;|&nbsp; Effective rate: {(pr.effectiveTaxRate * 100).toFixed(1)}%
+                </p>
+                <Link href="/paycheck" className="text-green-600 hover:text-green-800 font-medium mt-1 inline-block">
+                  Update paycheck →
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-start gap-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              <AlertTriangle className="size-4 shrink-0 mt-0.5 text-amber-600" />
+              <div>
+                <p className="font-medium">Complete the paycheck calculator to auto-fill your income</p>
+                <Link href="/paycheck" className="text-amber-700 hover:text-amber-900 font-medium mt-1 inline-block">
+                  Set up paycheck →
+                </Link>
+              </div>
+            </div>
+          )}
 
-      {/* Analysis section */}
-      <div>
-        <h2 className="text-lg font-semibold mb-3">Analysis</h2>
-        <div className="grid gap-4 md:grid-cols-2">
-          {/* Donut charts */}
+          <Card>
+            <CardContent className="space-y-0.5 pt-4">
+              {/* INCOME */}
+              <SectionLabel label="Income" />
+              <BudgetRow
+                label="Take-home pay"
+                value={pr.netPayMonthly}
+                readOnly
+                linkTo="/paycheck"
+              />
+              <BudgetRow
+                label="Investment income"
+                value={bi.investmentIncome}
+                onChange={(v) => setBudgetInputs({ investmentIncome: v })}
+              />
+              <div className="flex items-center justify-between py-1.5 border-t border-gray-200 mt-1 pt-2.5">
+                <span className="text-sm font-semibold text-gray-700">Total Income</span>
+                <span className="text-sm font-bold text-gray-800 tabular-nums">
+                  {formatCurrency(monthlyIncome)}
+                </span>
+              </div>
+
+              {/* SAVINGS */}
+              <SectionLabel label="Savings & Investments" />
+              <BudgetRow
+                label="401(k) Traditional"
+                value={pr.k401TraditionalAnnual / 12}
+                readOnly
+                badge="Via payroll"
+              />
+              <BudgetRow
+                label="Roth 401(k)"
+                value={pr.k401RothAnnual / 12}
+                readOnly
+                badge="Via payroll"
+              />
+              <BudgetRow
+                label="HSA"
+                value={pi.hsaAnnual / 12}
+                readOnly
+                badge="Via payroll"
+              />
+              <BudgetRow
+                label="FSA"
+                value={pi.fsaAnnual / 12}
+                readOnly
+                badge="Via payroll"
+              />
+              <BudgetRow
+                label="Roth IRA"
+                value={bi.rothIraMonthly}
+                onChange={(v) => setBudgetInputs({ rothIraMonthly: v })}
+              />
+              <BudgetRow
+                label="Brokerage"
+                value={bi.brokerageMonthly}
+                onChange={(v) => setBudgetInputs({ brokerageMonthly: v })}
+              />
+              <BudgetRow
+                label="Emergency Fund"
+                value={bi.emergencyFundMonthly}
+                onChange={(v) => setBudgetInputs({ emergencyFundMonthly: v })}
+              />
+
+              {/* EXPENSES */}
+              <SectionLabel label="Living Expenses" />
+              <BudgetRow label="Housing / Rent" value={bi.housing} onChange={(v) => setBudgetInputs({ housing: v })} />
+              <BudgetRow label="Utilities" value={bi.utilities} onChange={(v) => setBudgetInputs({ utilities: v })} />
+              <BudgetRow label="Insurance" value={bi.insurance} onChange={(v) => setBudgetInputs({ insurance: v })} />
+              <BudgetRow label="Groceries" value={bi.groceries} onChange={(v) => setBudgetInputs({ groceries: v })} />
+              <BudgetRow label="Dining Out" value={bi.dining} onChange={(v) => setBudgetInputs({ dining: v })} />
+              <BudgetRow label="Transportation" value={bi.transportation} onChange={(v) => setBudgetInputs({ transportation: v })} />
+              <BudgetRow label="Subscriptions" value={bi.subscriptions} onChange={(v) => setBudgetInputs({ subscriptions: v })} />
+              <BudgetRow label="Phone" value={bi.phone} onChange={(v) => setBudgetInputs({ phone: v })} />
+              <BudgetRow label="Health / Gym" value={bi.healthGym} onChange={(v) => setBudgetInputs({ healthGym: v })} />
+              <BudgetRow label="Travel" value={bi.travel} onChange={(v) => setBudgetInputs({ travel: v })} />
+              <BudgetRow label="Miscellaneous" value={bi.misc} onChange={(v) => setBudgetInputs({ misc: v })} />
+
+              {/* DEBT */}
+              {debts.length > 0 && (
+                <>
+                  <SectionLabel label="Debt Payments" />
+                  {debts.map(d => (
+                    <BudgetRow
+                      key={d.id}
+                      label={d.name}
+                      value={d.minPayment}
+                      readOnly
+                    />
+                  ))}
+                  <div className="flex items-center justify-between py-1 text-sm text-muted-foreground">
+                    <span>Total Debt Minimums</span>
+                    <span className="tabular-nums font-medium">{formatCurrency(totalDebtMinimums)}</span>
+                  </div>
+                  <Link href="/debt" className="text-xs text-blue-500 hover:text-blue-700">
+                    From debt simulator →
+                  </Link>
+                </>
+              )}
+
+              {/* SUMMARY */}
+              <div className="mt-4 rounded-lg bg-muted/50 p-3 space-y-1.5">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Total Income</span>
+                  <span className="font-medium tabular-nums">{formatCurrency(monthlyIncome)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Living Expenses</span>
+                  <span className="font-medium tabular-nums">{formatCurrency(totalExpenses)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Debt Payments</span>
+                  <span className="font-medium tabular-nums">{formatCurrency(totalDebtMinimums)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Total Savings</span>
+                  <span className="font-medium tabular-nums">{formatCurrency(totalSavings)}</span>
+                </div>
+                <Separator />
+                <div className="flex justify-between text-sm font-semibold">
+                  <span>Monthly Surplus</span>
+                  <span className={monthlySurplus >= 0 ? 'text-green-600' : 'text-red-600'}>
+                    {monthlySurplus >= 0 ? '+' : ''}{formatCurrency(monthlySurplus)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-muted-foreground">Savings Rate</span>
+                  <span className={`inline-flex h-5 items-center rounded-full px-2 text-xs font-semibold ${savingsRateColor(savingsRate)}`}>
+                    {savingsRate.toFixed(1)}%
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* RIGHT PANEL — Charts */}
+        <div className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle>Spending Breakdown</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex gap-2">
-                <SpendingPie data={nowData} title="Now" />
-                <SpendingPie data={futureData} title="Future" />
-              </div>
+              <ResponsiveContainer width="100%" height={220}>
+                <PieChart>
+                  <Pie
+                    data={pieData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={50}
+                    outerRadius={85}
+                    paddingAngle={2}
+                    dataKey="value"
+                  >
+                    {pieData.map((entry) => (
+                      <Cell key={entry.name} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(v) => typeof v === 'number' ? formatCurrency(v) : String(v)} />
+                  <Legend
+                    iconType="circle"
+                    iconSize={8}
+                    formatter={(value) => <span className="text-xs">{value}</span>}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
             </CardContent>
           </Card>
 
-          {/* Grouped bar chart */}
           <Card>
             <CardHeader>
-              <CardTitle>Category Comparison</CardTitle>
+              <CardTitle>Category Breakdown</CardTitle>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={240}>
                 <BarChart data={barData} margin={{ top: 4, right: 8, left: 8, bottom: 4 }}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                   <XAxis dataKey="category" tick={{ fontSize: 11 }} />
-                  <YAxis tickFormatter={(v: number) => `$${v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}`} tick={{ fontSize: 11 }} />
+                  <YAxis
+                    tickFormatter={(v: number) => `$${v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}`}
+                    tick={{ fontSize: 11 }}
+                  />
                   <Tooltip formatter={(v) => typeof v === 'number' ? formatCurrency(v) : String(v)} />
-                  <Legend iconSize={10} formatter={(v) => <span className="text-xs">{v}</span>} />
-                  <Bar dataKey="Now" fill="#3b82f6" radius={[3, 3, 0, 0]} />
-                  <Bar dataKey="Future" fill="#22c55e" radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="Amount" fill="#3b82f6" radius={[3, 3, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
+
+          {/* Summary card */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Annual Summary</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {[
+                  { label: 'Annual Income', value: monthlyIncome * 12 },
+                  { label: 'Annual Expenses', value: totalExpenses * 12 },
+                  { label: 'Annual Savings', value: totalSavings * 12 },
+                  { label: 'Annual Debt Payments', value: totalDebtMinimums * 12 },
+                  { label: 'Annual Surplus', value: monthlySurplus * 12, isSurplus: true },
+                ].map(row => (
+                  <div key={row.label} className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">{row.label}</span>
+                    <span className={`font-medium tabular-nums ${
+                      'isSurplus' in row && row.isSurplus
+                        ? row.value >= 0 ? 'text-green-600' : 'text-red-600'
+                        : ''
+                    }`}>
+                      {formatCurrency(row.value)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
-
-      {/* Annual Projections table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Annual Projections</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border text-left text-muted-foreground">
-                  <th className="pb-2 font-medium">Metric</th>
-                  <th className="pb-2 font-medium text-right">Now (Annual)</th>
-                  <th className="pb-2 font-medium text-right">Future (Annual)</th>
-                  <th className="pb-2 font-medium text-right">Change</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/50">
-                {projectionRows.map((row) => {
-                  const diff = row.futureVal - row.nowVal;
-                  const pct = row.nowVal !== 0 ? (diff / Math.abs(row.nowVal)) * 100 : 0;
-                  return (
-                    <tr key={row.metric}>
-                      <td className="py-2.5 font-medium">{row.metric}</td>
-                      <td className="py-2.5 text-right tabular-nums">{formatCurrency(row.nowVal)}</td>
-                      <td className="py-2.5 text-right tabular-nums">{formatCurrency(row.futureVal)}</td>
-                      <td className={`py-2.5 text-right tabular-nums font-medium ${changeColor(row)}`}>
-                        {diff >= 0 ? '+' : ''}{formatCurrency(diff)}
-                        <span className="ml-1 text-xs opacity-70">
-                          ({pct >= 0 ? '+' : ''}{pct.toFixed(1)}%)
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }

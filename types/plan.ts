@@ -92,12 +92,66 @@ export interface FinancialPlan {
   updatedAt: string;
 }
 
+export interface PaycheckProfile {
+  annualSalary: number;
+  payPeriod: 'weekly' | 'biweekly' | 'semimonthly' | 'monthly';
+  filingStatus: 'single' | 'married' | 'hoh';
+  state: string;
+  nycResident: boolean;
+  traditional401kPct: number;
+  roth401kPct: number;
+  hsaPerPeriod: number;
+  fsaPerPeriod: number;
+  healthInsurancePerPeriod: number;
+  dentalPerPeriod: number;
+  commuterBenefitPerPeriod: number;
+  otherPostTaxPerPeriod: number;
+}
+
+export interface DebtProfile {
+  debts: Array<{
+    id: string;
+    name: string;
+    balance: number;
+    apr: number;
+    minPayment: number;
+  }>;
+  monthlyOverpayment: number;
+  annualBonus: number;
+}
+
+export interface InvestProfile {
+  monthlyBuy: number;
+  annualBonus: number;
+  dividendYield: number;
+  taxRate: number;
+  qualifiedPercent: number;
+  payFrequency: 'monthly' | 'quarterly';
+  years: number;
+  annualAppreciation: number;
+}
+
+export interface AIInsightsCache {
+  items: AIInsight[];
+  generatedAt: string;
+  dataHash: string;
+}
+
 export interface PlanStore {
   plan: FinancialPlan | null;
   settings: AppSettings;
+  paycheckProfile: PaycheckProfile | null;
+  debtProfile: DebtProfile | null;
+  investProfile: InvestProfile | null;
+  planLastUpdated: string | null;
+  aiInsightsCache: AIInsightsCache | null;
   setPlan: (inputs: PlanInputs) => void;
   updatePlanInputs: (partial: Partial<PlanInputs>) => void;
   setPlanInsights: (insights: PlanAIInsights) => void;
   clearPlan: () => void;
   updateSettings: (partial: Partial<AppSettings>) => void;
+  setPaycheckProfile: (profile: PaycheckProfile) => void;
+  setDebtProfile: (profile: DebtProfile) => void;
+  setInvestProfile: (profile: InvestProfile) => void;
+  setAIInsightsCache: (cache: AIInsightsCache) => void;
 }

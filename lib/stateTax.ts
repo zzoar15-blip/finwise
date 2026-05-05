@@ -449,3 +449,65 @@ export function computeStateTax(
 
   return { incomeTax, localTax, additionalTaxes };
 }
+
+export const STATE_PROPERTY_TAX_RATES: Record<string, number> = {
+  Alabama: 0.0040,
+  Alaska: 0.0119,
+  Arizona: 0.0062,
+  Arkansas: 0.0063,
+  California: 0.0073,
+  Colorado: 0.0051,
+  Connecticut: 0.0194,
+  Delaware: 0.0057,
+  Florida: 0.0083,
+  Georgia: 0.0092,
+  Hawaii: 0.0028,
+  Idaho: 0.0069,
+  Illinois: 0.0205,
+  Indiana: 0.0085,
+  Iowa: 0.0153,
+  Kansas: 0.0138,
+  Kentucky: 0.0086,
+  Louisiana: 0.0055,
+  Maine: 0.0136,
+  Maryland: 0.0112,
+  Massachusetts: 0.0110,
+  Michigan: 0.0154,
+  Minnesota: 0.0112,
+  Mississippi: 0.0052,
+  Missouri: 0.0097,
+  Montana: 0.0074,
+  Nebraska: 0.0153,
+  Nevada: 0.0060,
+  'New Hampshire': 0.0186,
+  'New Jersey': 0.0213,
+  'New Mexico': 0.0080,
+  'New York': 0.0172,
+  'North Carolina': 0.0084,
+  'North Dakota': 0.0098,
+  Ohio: 0.0153,
+  Oklahoma: 0.0090,
+  Oregon: 0.0097,
+  Pennsylvania: 0.0153,
+  'Rhode Island': 0.0153,
+  'South Carolina': 0.0057,
+  'South Dakota': 0.0117,
+  Tennessee: 0.0068,
+  Texas: 0.0166,
+  Utah: 0.0058,
+  Vermont: 0.0185,
+  Virginia: 0.0082,
+  Washington: 0.0093,
+  'West Virginia': 0.0059,
+  Wisconsin: 0.0185,
+  Wyoming: 0.0061,
+};
+
+export function getPropertyTaxRate(state: string): number {
+  if (STATE_PROPERTY_TAX_RATES[state] !== undefined) return STATE_PROPERTY_TAX_RATES[state];
+  const byAbbr = STATE_BY_ABBR[state];
+  if (byAbbr && STATE_PROPERTY_TAX_RATES[byAbbr.name] !== undefined) {
+    return STATE_PROPERTY_TAX_RATES[byAbbr.name];
+  }
+  return 0.011;
+}

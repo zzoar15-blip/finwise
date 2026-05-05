@@ -1,11 +1,14 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import Link from 'next/link';
 import { simulateDebtPayoff, buildSensitivityTable } from '@/lib/calculations/debt';
 import type { Debt, DebtResult, SensitivityRow } from '@/lib/calculations/debt';
 import { ExportButton } from '@/components/ExportButton';
-import { downloadCsv, downloadXlsxFromAoa } from '@/lib/export';
+import { downloadCsv } from '@/lib/export';
 import { formatCurrency } from '@/lib/format';
+import { useFinWiseStore } from '@/lib/store';
+import { computeBudgetSurplus } from '@/lib/calculations';
 import {
   Card,
   CardContent,
@@ -33,18 +36,13 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-import { Plus, Trash2, Calendar, Clock, TrendingDown, Sparkles } from 'lucide-react';
+import { Plus, Trash2, Calendar, Clock, TrendingDown, Sparkles, ChevronLeft, Lightbulb } from 'lucide-react';
 
 const DEBT_COLORS = ['#ef4444', '#f97316', '#eab308', '#8b5cf6', '#3b82f6'];
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
-];
-
-const INITIAL_DEBTS: Debt[] = [
-  { id: '1', name: 'Credit Card', balance: 8500, apr: 22.99, minPayment: 200 },
-  { id: '2', name: 'Car Loan', balance: 15000, apr: 6.5, minPayment: 350 },
 ];
 
 function formatDebtFreeDate(dateStr: string): string {
@@ -62,17 +60,29 @@ function formatChartDate(dateStr: string): string {
 }
 
 function shouldShowDate(dateStr: string, index: number): boolean {
-  // Show every 6 months
   const [, month] = dateStr.split('-');
   return Number(month) % 6 === 1 || index === 0;
 }
 
 export default function DebtPage() {
-  const [debts, setDebts] = useState<Debt[]>(INITIAL_DEBTS);
-  const [monthlyOverpayment, setMonthlyOverpayment] = useState(200);
+  const storeDebts = useFinWiseStore((s) => s.debts);
+  const setStoreDebts = useFinWiseStore((s) => s.setDebts);
+  const paycheckResults = useFinWiseStore((s) => s.paycheckResults);
+  const budgetInputs = useFinWiseStore((s) => s.budgetInputs);
+
+  const surplus = computeBudgetSurplus(paycheckResults, budgetInputs);
+  const surplusRounded = Math.max(0, Math.min(2000, Math.round(surplus / 100) * 100));
+
+  const [debts, setDebts] = useState<Debt[]>(storeDebts.length > 0 ? storeDebts : []);
+  const [monthlyOverpayment, setMonthlyOverpayment] = useState(surplusRounded);
   const [annualBonus, setAnnualBonus] = useState(0);
   const [bonusMonth, setBonusMonth] = useState(2);
   const [strategy, setStrategy] = useState<'avalanche' | 'snowball'>('avalanche');
+
+  function syncDebts(newDebts: Debt[]) {
+    setDebts(newDebts);
+    setStoreDebts(newDebts);
+  }
 
   const result: DebtResult = useMemo(
     () => simulateDebtPayoff(debts, monthlyOverpayment, annualBonus, bonusMonth, strategy),
@@ -87,9 +97,7 @@ export default function DebtPage() {
     [debts, monthlyOverpayment, annualBonus, bonusMonth, strategy],
   );
 
-  // Build chart data from snapshots
   const chartData = useMemo(() => {
-    // Sample every month but only label every 6 months on axis
     return result.snapshots.map((s) => {
       const row: Record<string, number | string> = { date: s.date };
       for (const d of debts) row[d.name] = s.balances[d.id] ?? 0;
@@ -106,15 +114,15 @@ export default function DebtPage() {
       apr: 0,
       minPayment: 0,
     };
-    setDebts([...debts, newDebt]);
+    syncDebts([...debts, newDebt]);
   }
 
   function removeDebt(id: string) {
-    setDebts(debts.filter((d) => d.id !== id));
+    syncDebts(debts.filter((d) => d.id !== id));
   }
 
   function updateDebt(id: string, field: keyof Debt, value: string | number) {
-    setDebts(debts.map((d) => (d.id === id ? { ...d, [field]: value } : d)));
+    syncDebts(debts.map((d) => (d.id === id ? { ...d, [field]: value } : d)));
   }
 
   const hasDebts = debts.length > 0 && debts.some((d) => d.balance > 0);
@@ -133,17 +141,22 @@ export default function DebtPage() {
 
   return (
     <div className="space-y-6 max-w-5xl">
-      <div className="flex items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold">Debt Payoff Simulator</h1>
-        {hasDebts && (
-          <ExportButton
-            onExportXlsx={() => {
-              const rows = buildExportRows();
-              downloadXlsxFromAoa('Payment Schedule', rows, rows[0].map(() => 14), `finwise-debt-${strategy}`);
-            }}
-            onExportCsv={() => downloadCsv(buildExportRows(), `finwise-debt-${strategy}`)}
-          />
-        )}
+      <div className="space-y-3">
+        <Link href="/plan" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+          <ChevronLeft className="size-3" /> My Plan
+        </Link>
+        <div className="flex items-center justify-between gap-4">
+          <h1 className="text-2xl font-bold">Debt Payoff Simulator</h1>
+          {hasDebts && (
+            <ExportButton
+              onExportXlsx={async () => {
+                const { exportDebtWorkbook } = await import('@/lib/excel/exports/debt');
+                exportDebtWorkbook(debts, monthlyOverpayment, annualBonus, bonusMonth, strategy);
+              }}
+              onExportCsv={() => downloadCsv(buildExportRows(), `finwise-debt-${strategy}`)}
+            />
+          )}
+        </div>
       </div>
 
       {/* Debts Table */}
@@ -267,7 +280,7 @@ export default function DebtPage() {
                 onClick={() => setStrategy('avalanche')}
                 className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
                   strategy === 'avalanche'
-                    ? 'border-[#1a56a8] bg-[#1a56a8] text-white'
+                    ? 'border-[#3b82f6] bg-[#3b82f6] text-white'
                     : 'border-border bg-transparent text-foreground hover:bg-muted'
                 }`}
               >
@@ -278,7 +291,7 @@ export default function DebtPage() {
                 onClick={() => setStrategy('snowball')}
                 className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
                   strategy === 'snowball'
-                    ? 'border-[#1a56a8] bg-[#1a56a8] text-white'
+                    ? 'border-[#3b82f6] bg-[#3b82f6] text-white'
                     : 'border-border bg-transparent text-foreground hover:bg-muted'
                 }`}
               >
@@ -286,6 +299,16 @@ export default function DebtPage() {
               </button>
             </div>
           </div>
+
+          {/* Budget surplus callout */}
+          {paycheckResults.isComplete && surplus > 0 && (
+            <div className="flex items-start gap-2.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5 text-sm text-blue-800">
+              <Lightbulb className="size-4 shrink-0 mt-0.5 text-blue-600" />
+              <p>
+                Based on your budget you have ~<strong>{formatCurrency(surplus)}</strong> available for extra payments
+              </p>
+            </div>
+          )}
 
           {/* Monthly overpayment slider */}
           <div className="space-y-2">
@@ -303,7 +326,7 @@ export default function DebtPage() {
               step={25}
               value={monthlyOverpayment}
               onChange={(e) => setMonthlyOverpayment(Number(e.target.value))}
-              className="w-full h-2 rounded-full bg-border accent-[#1a56a8] cursor-pointer"
+              className="w-full h-2 rounded-full bg-border accent-[#3b82f6] cursor-pointer"
             />
             <div className="flex justify-between text-xs text-muted-foreground">
               <span>$0</span>
@@ -482,8 +505,6 @@ export default function DebtPage() {
                 </thead>
                 <tbody className="divide-y divide-border/50">
                   {sensitivity.map((row, i) => {
-                    // The sensitivity table is built with extraPerMonth = baseOverpayment + increment.
-                    // The increments are [0,100,200,300,400,500], so row i corresponds to +i*100 extra.
                     const incrementAmounts = [0, 100, 200, 300, 400, 500];
                     const isCurrentRow = incrementAmounts[i] === 0;
                     return (
