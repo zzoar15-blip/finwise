@@ -65,6 +65,7 @@ export interface PlanInputs {
 
   // Step 5 — Goals
   goals: Goal[];
+  currentEmergencyFund: number;
   emergencyFundTarget: number;
   homeTarget: number;
   homeTimelineMonths: number;

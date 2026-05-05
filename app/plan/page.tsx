@@ -145,7 +145,7 @@ const EMPTY_INPUTS: PlanInputs = {
   annualBonus: 0, nycResident: false, traditional401kPct: 0, roth401kPct: 0,
   hsaPerPeriod: 0, fsaPerPeriod: 0, healthInsurancePerPeriod: 0, dentalPerPeriod: 0,
   commuterBenefitPerPeriod: 0, otherPreTaxPerPeriod: 0, expenses: ZERO_EXPENSES,
-  debts: [], goals: [], emergencyFundTarget: 0, homeTarget: 0, homeTimelineMonths: 0,
+  debts: [], goals: [], currentEmergencyFund: 0, emergencyFundTarget: 0, homeTarget: 0, homeTimelineMonths: 0,
 };
 
 // ─── Section animation wrapper ──────────────────────────────────────────────
@@ -682,6 +682,7 @@ export default function PlanPage() {
     monthlyInvestCapacity,
     taxEfficiencyScore,
     taxSuggestions,
+    emergencyFundMonthsCovered,
     waterfallData,
     priorities,
     projection,
@@ -720,6 +721,10 @@ export default function PlanPage() {
     {
       label: 'Investment capacity',
       value: heroCashflowVisible ? formatCurrency(monthlyInvestCapacity) : '—',
+    },
+    {
+      label: 'Emergency runway',
+      value: heroCashflowVisible ? `${emergencyFundMonthsCovered.toFixed(1)} months` : '—',
     },
     {
       label: 'Tax efficiency score',

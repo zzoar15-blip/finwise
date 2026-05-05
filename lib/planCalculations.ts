@@ -90,7 +90,7 @@ export interface PlanMetrics {
   projection: ProjectionMonth[];
 
   // Emergency fund
-  emergencyFundMonthsCovered: number; // months of expenses covered by surplus
+  emergencyFundMonthsCovered: number; // months of expenses covered by current emergency fund
   emergencyFundDate: string | null;
   homeMonthlyContribution: number;
   emergencyMonthlyContribution: number;
@@ -710,10 +710,11 @@ export function computePlanMetrics(
 
   // ── Emergency fund ──
   const emergencyFundMonthsCovered =
-    totalMonthlyExpenses > 0 ? monthlySurplus / totalMonthlyExpenses : 0;
+    totalMonthlyExpenses > 0 ? inputs.currentEmergencyFund / totalMonthlyExpenses : 0;
   let emergencyFundDate: string | null = null;
-  if (inputs.emergencyFundTarget > 0 && monthlySurplus > 0) {
-    const monthsNeeded = Math.ceil(inputs.emergencyFundTarget / monthlySurplus);
+  const remainingEmergencyTarget = Math.max(0, inputs.emergencyFundTarget - inputs.currentEmergencyFund);
+  if (remainingEmergencyTarget > 0 && monthlySurplus > 0) {
+    const monthsNeeded = Math.ceil(remainingEmergencyTarget / monthlySurplus);
     const target = addMonths(new Date(), monthsNeeded);
     emergencyFundDate = target.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   }
@@ -872,11 +873,12 @@ export function mergePlanMetricsWithUnifiedBudget(
       : null;
 
   const emergencyFundMonthsCovered =
-    budgetExpenses > 0 ? unifiedSurplus / budgetExpenses : 0;
+    budgetExpenses > 0 ? inputs.currentEmergencyFund / budgetExpenses : 0;
 
   let emergencyFundDate: string | null = null;
-  if (inputs.emergencyFundTarget > 0 && unifiedSurplus > 0) {
-    const monthsNeeded = Math.ceil(inputs.emergencyFundTarget / unifiedSurplus);
+  const remainingEmergencyTarget = Math.max(0, inputs.emergencyFundTarget - inputs.currentEmergencyFund);
+  if (remainingEmergencyTarget > 0 && unifiedSurplus > 0) {
+    const monthsNeeded = Math.ceil(remainingEmergencyTarget / unifiedSurplus);
     const target = addMonths(new Date(), monthsNeeded);
     emergencyFundDate = target.toLocaleDateString('en-US', {
       month: 'long',

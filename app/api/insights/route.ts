@@ -41,6 +41,7 @@ function buildContext(inputs: PlanInputs, metrics: PlanMetrics): string {
   }
 
   if (inputs.emergencyFundTarget > 0) {
+    lines.push(`Current emergency fund: ${fmt(inputs.currentEmergencyFund)}`);
     lines.push(`Emergency fund target: ${fmt(inputs.emergencyFundTarget)}`);
     lines.push(`Current emergency fund coverage: ${metrics.emergencyFundMonthsCovered.toFixed(1)} months`);
   }

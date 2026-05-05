@@ -62,6 +62,7 @@ const DEFAULT_INPUTS: PlanInputs = {
   },
   debts: [],
   goals: [],
+  currentEmergencyFund: 0,
   emergencyFundTarget: 10000,
   homeTarget: 0,
   homeTimelineMonths: 36,
@@ -1140,6 +1141,23 @@ function StepGoals({
               {/* Expanded inputs for specific goals */}
               {selected && card.id === 'emergency-fund' && (
                 <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3">
+                  <Field label="Current emergency fund balance ($)">
+                    <div className="relative">
+                      <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-gray-500">
+                        $
+                      </span>
+                      <Input
+                        type="number"
+                        min={0}
+                        step={500}
+                        className="bg-white pl-6"
+                        value={inputs.currentEmergencyFund || ''}
+                        onChange={(e) =>
+                          onChange({ currentEmergencyFund: numericValue(e.target.value) })
+                        }
+                      />
+                    </div>
+                  </Field>
                   <Field label="Target emergency fund amount ($)">
                     <div className="relative">
                       <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-gray-500">
@@ -1157,6 +1175,11 @@ function StepGoals({
                       />
                     </div>
                   </Field>
+                  <p className="text-xs text-yellow-800">
+                    Current runway: {Object.values(inputs.expenses).reduce((a, b) => a + b, 0) > 0
+                      ? (inputs.currentEmergencyFund / Object.values(inputs.expenses).reduce((a, b) => a + b, 0)).toFixed(1)
+                      : '0.0'} months of expenses.
+                  </p>
                 </div>
               )}
 
