@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import {
   LineChart,
@@ -87,6 +87,7 @@ export default function RentVsBuyPage() {
   const rentVsBuyResults = useFinWiseStore((s) => s.rentVsBuyResults);
   const setRentVsBuyInputs = useFinWiseStore((s) => s.setRentVsBuyInputs);
   const plan = usePlanStore((s) => s.plan);
+  const migratedLegacyPriceRef = useRef(false);
 
   useEffect(() => {
     if (rentVsBuyInputs) return;
@@ -100,6 +101,21 @@ export default function RentVsBuyPage() {
       }),
     );
   }, [budgetInputs?.housing, paycheckInputs?.filingStatus, paycheckInputs?.state, paycheckResults?.marginalCombinedRate, plan?.inputs?.homeTarget, rentVsBuyInputs, setRentVsBuyInputs]);
+
+  useEffect(() => {
+    if (migratedLegacyPriceRef.current) return;
+    if (!rentVsBuyInputs) return;
+    const homeTarget = plan?.inputs?.homeTarget;
+    if (!homeTarget || homeTarget <= 0) return;
+
+    // Backfill older profiles where purchasePrice was incorrectly set equal to down-payment goal.
+    const looksLikeLegacyPrice =
+      Math.abs(rentVsBuyInputs.purchasePrice - homeTarget) <= Math.max(1000, homeTarget * 0.02);
+    if (!looksLikeLegacyPrice) return;
+
+    migratedLegacyPriceRef.current = true;
+    setRentVsBuyInputs({ purchasePrice: homeTarget / 0.2 });
+  }, [plan?.inputs?.homeTarget, rentVsBuyInputs, setRentVsBuyInputs]);
 
   const inputs = rentVsBuyInputs;
   const results = rentVsBuyResults;
