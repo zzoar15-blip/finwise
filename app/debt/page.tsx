@@ -6,6 +6,7 @@ import { simulateDebtPayoff, buildSensitivityTable } from '@/lib/calculations/de
 import type { Debt, DebtResult, SensitivityRow } from '@/lib/calculations/debt';
 import { ExportButton } from '@/components/ExportButton';
 import { downloadCsv } from '@/lib/export';
+import { exportDomToPdf } from '@/lib/exportPdf';
 import { formatCurrency } from '@/lib/format';
 import { useFinWiseStore } from '@/lib/store';
 import { computeBudgetSurplus } from '@/lib/calculations';
@@ -140,22 +141,33 @@ export default function DebtPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-5xl">
+    <div className="space-y-6 max-w-5xl" id="tool-debt-export">
       <div className="space-y-3">
         <Link href="/plan" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
           <ChevronLeft className="size-3" /> My Plan
         </Link>
         <div className="flex items-center justify-between gap-4">
           <h1 className="text-2xl font-bold">Debt Payoff Simulator</h1>
-          {hasDebts && (
-            <ExportButton
-              onExportXlsx={async () => {
-                const { exportDebtWorkbook } = await import('@/lib/excel/exports/debt');
-                exportDebtWorkbook(debts, monthlyOverpayment, annualBonus, bonusMonth, strategy);
-              }}
-              onExportCsv={() => downloadCsv(buildExportRows(), `finwise-debt-${strategy}`)}
-            />
-          )}
+          <div className="flex shrink-0 items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                exportDomToPdf({ elementId: 'tool-debt-export', filenamePrefix: `finwise-debt-${strategy}` })
+              }
+            >
+              Export PDF
+            </Button>
+            {hasDebts && (
+              <ExportButton
+                onExportXlsx={async () => {
+                  const { exportDebtWorkbook } = await import('@/lib/excel/exports/debt');
+                  exportDebtWorkbook(debts, monthlyOverpayment, annualBonus, bonusMonth, strategy);
+                }}
+                onExportCsv={() => downloadCsv(buildExportRows(), `finwise-debt-${strategy}`)}
+              />
+            )}
+          </div>
         </div>
       </div>
 

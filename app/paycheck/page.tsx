@@ -22,6 +22,8 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ExportButton } from '@/components/ExportButton';
 import { downloadCsv } from '@/lib/export';
+import { exportDomToPdf } from '@/lib/exportPdf';
+import { Button } from '@/components/ui/button';
 import type { StorePaycheckInputs } from '@/lib/calculations';
 
 const PAY_PERIOD_LABELS: Record<PayPeriod, string> = {
@@ -253,7 +255,7 @@ export default function PaycheckPage() {
   }
 
   return (
-    <div className="max-w-6xl space-y-6">
+    <div className="max-w-6xl space-y-6" id="tool-paycheck-export">
       {/* Header */}
       <div className="space-y-1">
         <Link href="/plan" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
@@ -266,15 +268,26 @@ export default function PaycheckPage() {
               Estimate your take-home pay after federal and state taxes for 2025. Changes auto-save.
             </p>
           </div>
-          <ExportButton
-            label="Export"
-            onExportXlsx={async () => {
-              if (!pr.isComplete) return;
-              const { exportBudgetWorkbook } = await import('@/lib/excel/exports/budget');
-              exportBudgetWorkbook(localInputs, pr, budgetInputs, debts);
-            }}
-            onExportCsv={() => downloadCsv(buildCsvRows(), 'finwise-paycheck')}
-          />
+          <div className="flex shrink-0 items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                exportDomToPdf({ elementId: 'tool-paycheck-export', filenamePrefix: 'finwise-paycheck' })
+              }
+            >
+              Export PDF
+            </Button>
+            <ExportButton
+              label="Export"
+              onExportXlsx={async () => {
+                if (!pr.isComplete) return;
+                const { exportBudgetWorkbook } = await import('@/lib/excel/exports/budget');
+                exportBudgetWorkbook(localInputs, pr, budgetInputs, debts);
+              }}
+              onExportCsv={() => downloadCsv(buildCsvRows(), 'finwise-paycheck')}
+            />
+          </div>
         </div>
       </div>
 

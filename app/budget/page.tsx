@@ -29,6 +29,8 @@ import {
 import { TrendingUp, Lock, AlertTriangle, CheckCircle } from 'lucide-react';
 import { ExportButton } from '@/components/ExportButton';
 import { downloadCsv } from '@/lib/export';
+import { exportDomToPdf } from '@/lib/exportPdf';
+import { Button } from '@/components/ui/button';
 
 const CHART_COLORS = {
   Housing: '#f97316',
@@ -203,7 +205,7 @@ export default function BudgetPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-7xl">
+    <div className="space-y-6 max-w-7xl" id="tool-budget-export">
       <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">Budget Planner</h1>
@@ -211,13 +213,24 @@ export default function BudgetPage() {
             Wondering if you can afford to buy? →
           </Link>
         </div>
-        <ExportButton
-          onExportXlsx={async () => {
-            const { exportBudgetWorkbook } = await import('@/lib/excel/exports/budget');
-            exportBudgetWorkbook(pi, pr, bi, debts);
-          }}
-          onExportCsv={() => downloadCsv(exportRows(), 'finwise-budget')}
-        />
+        <div className="flex shrink-0 items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              exportDomToPdf({ elementId: 'tool-budget-export', filenamePrefix: 'finwise-budget' })
+            }
+          >
+            Export PDF
+          </Button>
+          <ExportButton
+            onExportXlsx={async () => {
+              const { exportBudgetWorkbook } = await import('@/lib/excel/exports/budget');
+              exportBudgetWorkbook(pi, pr, bi, debts);
+            }}
+            onExportCsv={() => downloadCsv(exportRows(), 'finwise-budget')}
+          />
+        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">

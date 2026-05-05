@@ -6,6 +6,8 @@ import { simulateInvestment } from '@/lib/calculations/invest';
 import type { InvestInputs, InvestResult } from '@/lib/calculations/invest';
 import { ExportButton } from '@/components/ExportButton';
 import { downloadCsv } from '@/lib/export';
+import { exportDomToPdf } from '@/lib/exportPdf';
+import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/lib/format';
 import { useFinWiseStore } from '@/lib/store';
 import { computeBudgetSurplus } from '@/lib/calculations';
@@ -188,7 +190,7 @@ export default function InvestPage() {
     : undefined;
 
   return (
-    <div className="max-w-7xl space-y-6">
+    <div className="max-w-7xl space-y-6" id="tool-invest-export">
       {/* Header */}
       <div className="space-y-3">
         <Link href="/plan" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
@@ -207,13 +209,24 @@ export default function InvestPage() {
               </Link>
             </div>
           </div>
-          <ExportButton
-            onExportXlsx={async () => {
-              const { exportInvestmentWorkbook } = await import('@/lib/excel/exports/investment');
-              exportInvestmentWorkbook(investmentInputs, paycheckResults);
-            }}
-            onExportCsv={() => downloadCsv(buildExportRows(), 'finwise-invest')}
-          />
+          <div className="flex shrink-0 items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                exportDomToPdf({ elementId: 'tool-invest-export', filenamePrefix: 'finwise-invest' })
+              }
+            >
+              Export PDF
+            </Button>
+            <ExportButton
+              onExportXlsx={async () => {
+                const { exportInvestmentWorkbook } = await import('@/lib/excel/exports/investment');
+                exportInvestmentWorkbook(investmentInputs, paycheckResults);
+              }}
+              onExportCsv={() => downloadCsv(buildExportRows(), 'finwise-invest')}
+            />
+          </div>
         </div>
       </div>
 

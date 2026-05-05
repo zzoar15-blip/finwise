@@ -43,6 +43,7 @@ import { simulateInvestment } from '@/lib/calculations/invest';
 import type { PlanMetrics, WaterfallEntry, TaxSuggestion, PriorityCard } from '@/lib/planCalculations';
 import type { AIInsight, PlanInputs, PlanExpenses } from '@/types/plan';
 import { formatCurrency } from '@/lib/format';
+import { exportDomToPdf } from '@/lib/exportPdf';
 import { useFinWiseStore } from '@/lib/store';
 import {
   Card,
@@ -378,27 +379,9 @@ function TaxSuggestionRow({ s }: { s: TaxSuggestion }) {
 // ─── PDF export ───────────────────────────────────────────────────────────────
 
 async function exportPDF(setExporting: (v: boolean) => void) {
-  const el = document.getElementById('financial-plan-content');
-  if (!el) return;
   setExporting(true);
   try {
-    const html2canvas = (await import('html2canvas')).default;
-    const jsPDF = (await import('jspdf')).default;
-
-    const canvas = await html2canvas(el, { scale: 1.5, useCORS: true });
-    const imgData = canvas.toDataURL('image/png');
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    const pageW = pdf.internal.pageSize.getWidth();
-    const pageH = pdf.internal.pageSize.getHeight();
-    const ratio = canvas.width / canvas.height;
-    const imgH = pageW / ratio;
-    let y = 0;
-    while (y < imgH) {
-      if (y > 0) pdf.addPage();
-      pdf.addImage(imgData, 'PNG', 0, -y, pageW, imgH);
-      y += pageH;
-    }
-    pdf.save(`finwise-plan-${new Date().toISOString().slice(0, 10)}.pdf`);
+    await exportDomToPdf({ elementId: 'financial-plan-content', filenamePrefix: 'finwise-plan' });
   } finally {
     setExporting(false);
   }

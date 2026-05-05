@@ -5,6 +5,7 @@ import { forecastScenario, findBreakeven } from '@/lib/calculations/forecast';
 import type { Scenario, ScenarioResult } from '@/lib/calculations/forecast';
 import { ExportButton } from '@/components/ExportButton';
 import { downloadCsv, downloadXlsxFromAoa } from '@/lib/export';
+import { exportDomToPdf } from '@/lib/exportPdf';
 import { formatCurrency } from '@/lib/format';
 import {
   Card,
@@ -203,7 +204,7 @@ export default function ForecastPage() {
   }
 
   return (
-    <div className="max-w-7xl space-y-6">
+    <div className="max-w-7xl space-y-6" id="tool-forecast-export">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -216,6 +217,15 @@ export default function ForecastPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              exportDomToPdf({ elementId: 'tool-forecast-export', filenamePrefix: 'finwise-forecast' })
+            }
+          >
+            Export PDF
+          </Button>
           <ExportButton
             onExportXlsx={() => {
               const rows = buildExportRows();
