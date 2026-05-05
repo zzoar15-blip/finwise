@@ -41,6 +41,7 @@ export interface FinanceStore {
   transactions: Transaction[];
   budgets: Budget[];
   addTransaction: (t: Omit<Transaction, 'id'>) => void;
+  addTransactionsBulk: (items: Array<Omit<Transaction, 'id'>>) => void;
   updateTransaction: (id: string, t: Partial<Transaction>) => void;
   deleteTransaction: (id: string) => void;
   setBudget: (category: Category, limit: number) => void;

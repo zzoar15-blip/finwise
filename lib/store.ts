@@ -199,6 +199,24 @@ export const useFinanceStore = create<FinanceStore>()(
           ],
         })),
 
+      addTransactionsBulk: (items) =>
+        set((s) => {
+          if (!items.length) return s;
+          const existingKeys = new Set(
+            s.transactions.map((t) => `${t.date}|${t.amount.toFixed(2)}|${t.type}|${t.description.trim().toLowerCase()}`)
+          );
+          const next = [...s.transactions];
+          let added = 0;
+          for (const item of items) {
+            const key = `${item.date}|${item.amount.toFixed(2)}|${item.type}|${item.description.trim().toLowerCase()}`;
+            if (existingKeys.has(key)) continue;
+            next.unshift({ ...item, id: crypto.randomUUID() });
+            existingKeys.add(key);
+            added += 1;
+          }
+          return added ? { transactions: next } : s;
+        }),
+
       updateTransaction: (id, updates) =>
         set((s) => ({
           transactions: s.transactions.map((t) =>
