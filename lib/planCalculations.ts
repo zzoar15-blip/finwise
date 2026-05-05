@@ -245,7 +245,7 @@ function buildPriorities(
         ? `Currently allocating $${Math.round(effectiveEmergencySavings).toLocaleString()}/mo, you'll hit your target in ${monthsToFund} months. Current coverage: ${covered.toFixed(1)} months of expenses.`
         : 'Set a savings rate in your plan to see your timeline.',
       action: 'See timeline',
-      href: '/forecast',
+      href: '/forecast?focus=emergency',
       color: 'yellow',
     });
   }
@@ -263,7 +263,7 @@ function buildPriorities(
         ? `Investing $${Math.round(investCap).toLocaleString()}/mo generates a $${Math.round(yr3Value).toLocaleString()} portfolio and $${Math.round(yr3Income / 12).toLocaleString()}/mo in passive income after 3 years.`
         : 'Free up surplus to begin investing.',
       action: 'Run simulation',
-      href: '/invest',
+      href: '/forecast?focus=invest',
       color: 'green',
     });
   }
@@ -279,7 +279,7 @@ function buildPriorities(
         ? `Currently allocating $${Math.round(effectiveHomeSavings).toLocaleString()}/mo toward your home fund, you'll hit your target in ${monthsNeeded} months${inputs.homeTimelineMonths ? ` (goal: ${inputs.homeTimelineMonths} months)` : ''}.`
         : 'Update your expenses to free up more savings.',
       action: 'View forecast',
-      href: '/forecast',
+      href: '/forecast?focus=home',
       color: 'blue',
     });
   }
@@ -311,7 +311,7 @@ function buildPriorities(
         ? `Investing $${Math.round(investCap).toLocaleString()}/mo at a 7% return builds significant retirement wealth. Use the Forecaster to model your timeline.`
         : 'Reduce expenses or debt to free up investment capacity.',
       action: 'Model scenarios',
-      href: '/forecast',
+      href: '/forecast?focus=retire',
       color: 'green',
     });
   }

@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { forecastScenario, findBreakeven } from '@/lib/calculations/forecast';
 import type { Scenario, ScenarioResult } from '@/lib/calculations/forecast';
 import { ExportButton } from '@/components/ExportButton';
@@ -27,7 +29,10 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-import { Plus, Trash2, TrendingUp } from 'lucide-react';
+import { Plus, Trash2, TrendingUp, Home, Shield, DollarSign, Timer } from 'lucide-react';
+import { usePlanStore } from '@/lib/planStore';
+import { useFinWiseStore } from '@/lib/store';
+import { computeUnifiedMonthlyFlow } from '@/lib/calculations';
 
 const SCENARIO_COLORS = ['#3b82f6', '#22c55e', '#f97316'] as const;
 
@@ -105,7 +110,27 @@ function ScenarioField({ label, value, prefix, suffix, onChange }: ScenarioField
 }
 
 export default function ForecastPage() {
+  const searchParams = useSearchParams();
+  const focus = searchParams.get('focus');
+  const plan = usePlanStore((s) => s.plan);
+  const budget = useFinWiseStore((s) => s.budgetInputs);
+  const paycheckInputs = useFinWiseStore((s) => s.paycheckInputs);
+  const paycheckResults = useFinWiseStore((s) => s.paycheckResults);
+  const debts = useFinWiseStore((s) => s.debts);
   const [scenarios, setScenarios] = useState<Scenario[]>(DEFAULT_SCENARIOS);
+  const [homeExtraSavings, setHomeExtraSavings] = useState(0);
+  const [homeApy, setHomeApy] = useState(4.5);
+  const [homeMonthlyGrowth, setHomeMonthlyGrowth] = useState(0);
+  const [emergencyApy, setEmergencyApy] = useState(3.5);
+  const [investMonthlyExtra, setInvestMonthlyExtra] = useState(0);
+  const [investReturn, setInvestReturn] = useState(7);
+  const [retireTarget, setRetireTarget] = useState(1_500_000);
+  const [retireReturn, setRetireReturn] = useState(7);
+
+  const flow = useMemo(
+    () => computeUnifiedMonthlyFlow(paycheckInputs, paycheckResults, budget, debts),
+    [paycheckInputs, paycheckResults, budget, debts]
+  );
 
   const results: ScenarioResult[] = useMemo(
     () => scenarios.map((s) => ({ scenario: s, points: forecastScenario(s, 10) })),
@@ -201,6 +226,254 @@ export default function ForecastPage() {
       ...results.map((r) => Math.round((r.points[i]?.netWorth ?? 0) * 100) / 100),
     ]);
     return [headers, ...rows];
+  }
+
+  const homeForecast = useMemo(() => {
+    const target = plan?.inputs.homeTarget ?? 0;
+    const timeline = Math.max(1, plan?.inputs.homeTimelineMonths || 36);
+    const baseMonthly = (budget.homeDownPaymentMonthly || 0) + homeExtraSavings;
+    const monthlyRate = Math.max(0, homeApy) / 100 / 12;
+    const growthRate = Math.max(0, homeMonthlyGrowth) / 100;
+    let balance = 0;
+    const points: Array<{ month: number; balance: number; target: number }> = [];
+    let reachedMonth: number | null = null;
+    for (let month = 1; month <= 120; month++) {
+      const contribution = baseMonthly * Math.pow(1 + growthRate, month - 1);
+      balance = (balance + contribution) * (1 + monthlyRate);
+      if (reachedMonth === null && target > 0 && balance >= target) reachedMonth = month;
+      points.push({ month, balance, target });
+    }
+    return { target, timeline, baseMonthly, points, reachedMonth };
+  }, [plan?.inputs.homeTarget, plan?.inputs.homeTimelineMonths, budget.homeDownPaymentMonthly, homeExtraSavings, homeApy, homeMonthlyGrowth]);
+
+  const emergencyForecast = useMemo(() => {
+    const target = plan?.inputs.emergencyFundTarget ?? 0;
+    const monthly = budget.emergencyFundMonthly || 0;
+    const monthlyRate = Math.max(0, emergencyApy) / 100 / 12;
+    let balance = 0;
+    const points: Array<{ month: number; balance: number; target: number }> = [];
+    let reachedMonth: number | null = null;
+    for (let month = 1; month <= 120; month++) {
+      balance = (balance + monthly) * (1 + monthlyRate);
+      if (reachedMonth === null && target > 0 && balance >= target) reachedMonth = month;
+      points.push({ month, balance, target });
+    }
+    return { target, monthly, points, reachedMonth };
+  }, [plan?.inputs.emergencyFundTarget, budget.emergencyFundMonthly, emergencyApy]);
+
+  const investForecast = useMemo(() => {
+    const baseMonthly =
+      (flow.paycheck.k401TraditionalAnnual + flow.paycheck.k401RothAnnual) / 12 +
+      budget.rothIraMonthly +
+      budget.brokerageMonthly;
+    const monthly = Math.max(0, baseMonthly + investMonthlyExtra);
+    const monthlyRate = Math.max(0, investReturn) / 100 / 12;
+    let balance = 0;
+    const points: Array<{ month: number; value: number }> = [];
+    for (let month = 1; month <= 120; month++) {
+      balance = (balance + monthly) * (1 + monthlyRate);
+      points.push({ month, value: balance });
+    }
+    return { baseMonthly, monthly, points };
+  }, [flow.paycheck.k401TraditionalAnnual, flow.paycheck.k401RothAnnual, budget.rothIraMonthly, budget.brokerageMonthly, investMonthlyExtra, investReturn]);
+
+  const retireForecast = useMemo(() => {
+    const monthly = Math.max(
+      0,
+      (flow.paycheck.k401TraditionalAnnual + flow.paycheck.k401RothAnnual) / 12 +
+        budget.rothIraMonthly +
+        budget.brokerageMonthly
+    );
+    const monthlyRate = Math.max(0, retireReturn) / 100 / 12;
+    let balance = 0;
+    const points: Array<{ month: number; value: number; target: number }> = [];
+    let hitMonth: number | null = null;
+    for (let month = 1; month <= 480; month++) {
+      balance = (balance + monthly) * (1 + monthlyRate);
+      if (hitMonth === null && balance >= retireTarget) hitMonth = month;
+      points.push({ month, value: balance, target: retireTarget });
+    }
+    return { monthly, points, hitMonth };
+  }, [flow.paycheck.k401TraditionalAnnual, flow.paycheck.k401RothAnnual, budget.rothIraMonthly, budget.brokerageMonthly, retireTarget, retireReturn]);
+
+  if (focus === 'home') {
+    return (
+      <div className="mx-auto max-w-5xl space-y-6">
+        <div className="flex items-start gap-3">
+          <Home className="size-6 text-[#3b82f6]" />
+          <div>
+            <h1 className="text-2xl font-bold">Home Down Payment Forecast</h1>
+            <p className="text-sm text-muted-foreground">
+              Goal-aware forecast using your current home savings plan with assumption toggles.
+            </p>
+            <Link href="/forecast" className="text-sm text-blue-600 hover:underline">Open generic scenario forecaster</Link>
+          </div>
+        </div>
+
+        <Card className="shadow-sm">
+          <CardHeader><CardTitle>Assumptions</CardTitle></CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-3">
+            <ScenarioField label="Extra monthly savings" value={homeExtraSavings} prefix="$" onChange={setHomeExtraSavings} />
+            <ScenarioField label="HYSA/APY (%)" value={homeApy} suffix="%" onChange={setHomeApy} />
+            <ScenarioField label="Monthly savings growth (%)" value={homeMonthlyGrowth} suffix="%" onChange={setHomeMonthlyGrowth} />
+          </CardContent>
+        </Card>
+
+        <div className="grid gap-3 sm:grid-cols-4">
+          <Stat label="Target" value={formatCurrency(homeForecast.target)} />
+          <Stat label="Current Monthly Plan" value={formatCurrency(homeForecast.baseMonthly)} />
+          <Stat label="Plan Timeline Goal" value={`${homeForecast.timeline} months`} />
+          <Stat label="Projected Hit Date" value={homeForecast.reachedMonth ? `${homeForecast.reachedMonth} months` : 'Not reached'} />
+        </div>
+
+        <Card className="shadow-sm">
+          <CardHeader><CardTitle>Down Payment Trajectory</CardTitle></CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={320}>
+              <LineChart data={homeForecast.points}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                <XAxis dataKey="month" />
+                <YAxis tickFormatter={yAxisFormatter} width={84} />
+                <Tooltip formatter={(v) => (typeof v === 'number' ? formatCurrency(v) : String(v))} />
+                <ReferenceLine y={homeForecast.target} stroke="#ef4444" strokeDasharray="4 4" />
+                <Line type="monotone" dataKey="balance" stroke="#3b82f6" strokeWidth={2.5} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (focus === 'emergency') {
+    return (
+      <div className="mx-auto max-w-5xl space-y-6">
+        <div className="flex items-start gap-3">
+          <Shield className="size-6 text-[#3b82f6]" />
+          <div>
+            <h1 className="text-2xl font-bold">Emergency Fund Forecast</h1>
+            <p className="text-sm text-muted-foreground">
+              Goal-aware emergency runway forecast from your current monthly contribution.
+            </p>
+            <Link href="/forecast" className="text-sm text-blue-600 hover:underline">Open generic scenario forecaster</Link>
+          </div>
+        </div>
+        <Card className="shadow-sm">
+          <CardHeader><CardTitle>Assumptions</CardTitle></CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2">
+            <ScenarioField label="Monthly contribution" value={emergencyForecast.monthly} prefix="$" onChange={() => {}} />
+            <ScenarioField label="HYSA/APY (%)" value={emergencyApy} suffix="%" onChange={setEmergencyApy} />
+          </CardContent>
+        </Card>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Stat label="Target" value={formatCurrency(emergencyForecast.target)} />
+          <Stat label="Monthly Contribution" value={formatCurrency(emergencyForecast.monthly)} />
+          <Stat label="Projected Hit Date" value={emergencyForecast.reachedMonth ? `${emergencyForecast.reachedMonth} months` : 'Not reached'} />
+        </div>
+        <Card className="shadow-sm">
+          <CardHeader><CardTitle>Emergency Fund Trajectory</CardTitle></CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={320}>
+              <LineChart data={emergencyForecast.points}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                <XAxis dataKey="month" />
+                <YAxis tickFormatter={yAxisFormatter} width={84} />
+                <Tooltip formatter={(v) => (typeof v === 'number' ? formatCurrency(v) : String(v))} />
+                <ReferenceLine y={emergencyForecast.target} stroke="#ef4444" strokeDasharray="4 4" />
+                <Line type="monotone" dataKey="balance" stroke="#22c55e" strokeWidth={2.5} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (focus === 'invest') {
+    return (
+      <div className="mx-auto max-w-5xl space-y-6">
+        <div className="flex items-start gap-3">
+          <DollarSign className="size-6 text-[#3b82f6]" />
+          <div>
+            <h1 className="text-2xl font-bold">Investment Growth Forecast</h1>
+            <p className="text-sm text-muted-foreground">
+              Forecast based on your synced 401(k), Roth IRA, and brokerage contribution stream.
+            </p>
+            <Link href="/forecast" className="text-sm text-blue-600 hover:underline">Open generic scenario forecaster</Link>
+          </div>
+        </div>
+        <Card className="shadow-sm">
+          <CardHeader><CardTitle>Assumptions</CardTitle></CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2">
+            <ScenarioField label="Extra monthly investing" value={investMonthlyExtra} prefix="$" onChange={setInvestMonthlyExtra} />
+            <ScenarioField label="Annual return (%)" value={investReturn} suffix="%" onChange={setInvestReturn} />
+          </CardContent>
+        </Card>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Stat label="Synced Base Contribution" value={formatCurrency(investForecast.baseMonthly)} />
+          <Stat label="Total Monthly Contribution" value={formatCurrency(investForecast.monthly)} />
+          <Stat label="Projected 10Y Value" value={formatCurrency(investForecast.points[investForecast.points.length - 1]?.value ?? 0)} />
+        </div>
+        <Card className="shadow-sm">
+          <CardHeader><CardTitle>Investment Trajectory</CardTitle></CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={320}>
+              <LineChart data={investForecast.points}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                <XAxis dataKey="month" />
+                <YAxis tickFormatter={yAxisFormatter} width={84} />
+                <Tooltip formatter={(v) => (typeof v === 'number' ? formatCurrency(v) : String(v))} />
+                <Line type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={2.5} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (focus === 'retire') {
+    return (
+      <div className="mx-auto max-w-5xl space-y-6">
+        <div className="flex items-start gap-3">
+          <Timer className="size-6 text-[#3b82f6]" />
+          <div>
+            <h1 className="text-2xl font-bold">Retirement Timeline Forecast</h1>
+            <p className="text-sm text-muted-foreground">
+              Estimate when your current contribution stream reaches your retirement target.
+            </p>
+            <Link href="/forecast" className="text-sm text-blue-600 hover:underline">Open generic scenario forecaster</Link>
+          </div>
+        </div>
+        <Card className="shadow-sm">
+          <CardHeader><CardTitle>Assumptions</CardTitle></CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2">
+            <ScenarioField label="Retirement target" value={retireTarget} prefix="$" onChange={setRetireTarget} />
+            <ScenarioField label="Annual return (%)" value={retireReturn} suffix="%" onChange={setRetireReturn} />
+          </CardContent>
+        </Card>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Stat label="Monthly Investment Stream" value={formatCurrency(retireForecast.monthly)} />
+          <Stat label="Retirement Target" value={formatCurrency(retireTarget)} />
+          <Stat label="Estimated Time to Target" value={retireForecast.hitMonth ? `${retireForecast.hitMonth} months` : 'Not reached'} />
+        </div>
+        <Card className="shadow-sm">
+          <CardHeader><CardTitle>Retirement Net Worth Path</CardTitle></CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={320}>
+              <LineChart data={retireForecast.points}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                <XAxis dataKey="month" />
+                <YAxis tickFormatter={yAxisFormatter} width={84} />
+                <Tooltip formatter={(v) => (typeof v === 'number' ? formatCurrency(v) : String(v))} />
+                <ReferenceLine y={retireTarget} stroke="#ef4444" strokeDasharray="4 4" />
+                <Line type="monotone" dataKey="value" stroke="#22c55e" strokeWidth={2.5} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (
@@ -462,5 +735,16 @@ export default function ForecastPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <Card className="shadow-sm">
+      <CardContent className="pt-4">
+        <p className="text-xs text-muted-foreground uppercase tracking-wide">{label}</p>
+        <p className="mt-1 text-lg font-bold tabular-nums">{value}</p>
+      </CardContent>
+    </Card>
   );
 }
