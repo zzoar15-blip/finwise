@@ -20,13 +20,13 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${inter.variable} h-full antialiased`}>
-      <body className="h-full bg-[#f8fafc] text-[#0f172a]">
+      <body className="h-full bg-background text-foreground">
         <Providers>
           <div className="flex h-full">
             <Sidebar />
             <div className="flex flex-1 flex-col overflow-hidden">
               <Topbar />
-              <main className="flex-1 overflow-y-auto p-6 pb-24 md:pb-6">
+              <main className="flex-1 overflow-y-auto bg-gradient-to-b from-[#e4eeef]/70 via-[#dce9eb]/70 to-[#d5e5e9]/80 p-6 pb-24 md:pb-6">
                 {children}
               </main>
             </div>
