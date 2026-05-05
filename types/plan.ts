@@ -29,7 +29,10 @@ export interface PlanExpenses {
   utilities: number;
   groceries: number;
   dining: number;
-  transportation: number;
+  carPayment: number;
+  carInsurance: number;
+  gas: number;
+  otherTransport: number;
   subscriptions: number;
   phone: number;
   health: number;

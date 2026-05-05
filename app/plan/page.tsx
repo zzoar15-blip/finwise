@@ -38,7 +38,7 @@ import type { WaterfallEntry, TaxSuggestion, PriorityCard } from '@/lib/planCalc
 import type { AIInsight, PlanInputs, PlanExpenses } from '@/types/plan';
 import { formatCurrency } from '@/lib/format';
 import { useFinWiseStore } from '@/lib/store';
-import { getEffectivePaycheckResults } from '@/lib/calculations';
+import { getEffectivePaycheckResults, getTotalTransportation } from '@/lib/calculations';
 import { PDFDownloadButton } from '@/components/pdf/PDFDownloadButton';
 import { PlanPDF } from '@/lib/pdf/PlanPDF';
 import {
@@ -133,7 +133,7 @@ function buildDataHash(inputs: PlanInputs): string {
 // ─── Empty state constants ───────────────────────────────────────────────────
 
 const ZERO_EXPENSES: PlanExpenses = {
-  housing: 0, utilities: 0, groceries: 0, dining: 0, transportation: 0,
+  housing: 0, utilities: 0, groceries: 0, dining: 0, carPayment: 0, carInsurance: 0, gas: 0, otherTransport: 0,
   subscriptions: 0, phone: 0, health: 0, travel: 0, misc: 0,
 };
 
@@ -741,6 +741,12 @@ export default function PlanPage() {
       value: heroIncomeVisible ? `${taxEfficiencyScore}/100` : '—',
     },
   ];
+  if ((budgetInputs.carPayment ?? 0) > 0) {
+    institutionalSummaryRows.splice(2, 0, {
+      label: 'Transportation',
+      value: `${formatCurrency(getTotalTransportation(budgetInputs))}/mo (car ${formatCurrency(budgetInputs.carPayment)} + insurance ${formatCurrency(budgetInputs.carInsurance)} + gas ${formatCurrency(budgetInputs.gas)})`,
+    });
+  }
 
   return (
     <div className="mx-auto max-w-5xl space-y-8 print:space-y-6">

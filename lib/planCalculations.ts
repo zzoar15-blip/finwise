@@ -300,7 +300,7 @@ function buildActionChecklist(inputs: PlanInputs, metrics: {
 function sumExpenses(e: PlanInputs['expenses']): number {
   return (
     e.housing + e.utilities + e.groceries + e.dining +
-    e.transportation + e.subscriptions + e.phone +
+    e.carPayment + e.carInsurance + e.gas + e.otherTransport + e.subscriptions + e.phone +
     e.health + e.travel + e.misc
   );
 }

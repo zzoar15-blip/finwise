@@ -35,6 +35,7 @@ import { SimpleRowsPDF } from '@/lib/pdf/SimpleRowsPDF';
 import { PageHeader } from '@/components/layout/PageHeader';
 import {
   computeUnifiedMonthlyFlow,
+  getTotalTransportation,
   getEffectivePaycheckResults,
 } from '@/lib/calculations';
 import { SyncMeta } from '@/components/SyncMeta';
@@ -147,6 +148,7 @@ export default function BudgetPage() {
   const pr = getEffectivePaycheckResults(paycheckInputs, paycheckResults);
   const pi = paycheckInputs;
   const bi = budgetInputs;
+  const totalTransportation = getTotalTransportation(bi);
 
   // Derived values
   const flow = computeUnifiedMonthlyFlow(pi, pr, bi, debts);
@@ -196,12 +198,14 @@ export default function BudgetPage() {
     { name: 'Housing', value: bi.housing, color: CHART_COLORS.Housing },
     { name: 'Debt', value: totalDebtMinimums, color: CHART_COLORS.Debt },
     { name: 'Savings (from bank)', value: optionalSavings, color: CHART_COLORS.Savings },
-    { name: 'Living', value: totalExpenses - bi.housing, color: CHART_COLORS.Living },
+    { name: 'Transportation', value: totalTransportation, color: CHART_COLORS.Living },
+    { name: 'Living', value: Math.max(0, totalExpenses - bi.housing - totalTransportation), color: CHART_COLORS.Living },
   ].filter(d => d.value > 0);
 
   const barData = [
     { category: 'Housing', Amount: bi.housing, color: CHART_COLORS.Housing },
-    { category: 'Living', Amount: Math.max(0, totalExpenses - bi.housing), color: CHART_COLORS.Living },
+    { category: 'Transportation', Amount: totalTransportation, color: CHART_COLORS.Living },
+    { category: 'Living', Amount: Math.max(0, totalExpenses - bi.housing - totalTransportation), color: CHART_COLORS.Living },
     { category: 'Savings', Amount: optionalSavings, color: CHART_COLORS.Savings },
     { category: 'Debt', Amount: totalDebtMinimums, color: CHART_COLORS.Debt },
     { category: 'Surplus', Amount: Math.max(0, monthlySurplus), color: CHART_COLORS.Surplus },
@@ -220,7 +224,13 @@ export default function BudgetPage() {
       ['Insurance', bi.insurance, bi.insurance * 12],
       ['Groceries', bi.groceries, bi.groceries * 12],
       ['Dining Out', bi.dining, bi.dining * 12],
-      ['Transportation', bi.transportation, bi.transportation * 12],
+      ['Car payment (loan/lease)', bi.carPayment, bi.carPayment * 12],
+      ['Car insurance', bi.carInsurance, bi.carInsurance * 12],
+      ['Gas / fuel', bi.gas, bi.gas * 12],
+      ['Parking & tolls', bi.parking, bi.parking * 12],
+      ['Public transit', bi.publicTransit, bi.publicTransit * 12],
+      ['Other transportation', bi.otherTransport, bi.otherTransport * 12],
+      ['Total Transportation', totalTransportation, totalTransportation * 12],
       ['Subscriptions', bi.subscriptions, bi.subscriptions * 12],
       ['Phone', bi.phone, bi.phone * 12],
       ['Health/Gym', bi.healthGym, bi.healthGym * 12],
@@ -409,7 +419,15 @@ export default function BudgetPage() {
               <BudgetRow label="Insurance" value={bi.insurance} onChange={(v) => setBudgetInputs({ insurance: v })} />
               <BudgetRow label="Groceries" value={bi.groceries} onChange={(v) => setBudgetInputs({ groceries: v })} />
               <BudgetRow label="Dining Out" value={bi.dining} onChange={(v) => setBudgetInputs({ dining: v })} />
-              <BudgetRow label="Transportation" value={bi.transportation} onChange={(v) => setBudgetInputs({ transportation: v })} />
+              <SectionLabel label="Transportation" />
+              <BudgetRow label="Car payment (loan/lease)" value={bi.carPayment} onChange={(v) => setBudgetInputs({ carPayment: v })} />
+              <BudgetRow label="Car insurance" value={bi.carInsurance} onChange={(v) => setBudgetInputs({ carInsurance: v })} />
+              <BudgetRow label="Gas / fuel" value={bi.gas} onChange={(v) => setBudgetInputs({ gas: v })} />
+              <BudgetRow label="Parking & tolls" value={bi.parking} onChange={(v) => setBudgetInputs({ parking: v })} />
+              <BudgetRow label="Public transit" value={bi.publicTransit} onChange={(v) => setBudgetInputs({ publicTransit: v })} />
+              <BudgetRow label="Other (maintenance, etc.)" value={bi.otherTransport} onChange={(v) => setBudgetInputs({ otherTransport: v })} />
+              <BudgetRow label="Total Transportation" value={totalTransportation} readOnly />
+              <SectionLabel label="Other Living Expenses" />
               <BudgetRow label="Subscriptions" value={bi.subscriptions} onChange={(v) => setBudgetInputs({ subscriptions: v })} />
               <BudgetRow label="Phone" value={bi.phone} onChange={(v) => setBudgetInputs({ phone: v })} />
               <BudgetRow label="Health / Gym" value={bi.healthGym} onChange={(v) => setBudgetInputs({ healthGym: v })} />
@@ -503,7 +521,34 @@ export default function BudgetPage() {
                       <Cell key={entry.name} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(v) => typeof v === 'number' ? formatCurrency(v) : String(v)} />
+                  <Tooltip
+                    formatter={(v) => typeof v === 'number' ? formatCurrency(v) : String(v)}
+                    content={({ active, payload }) => {
+                      if (!active || !payload?.length) return null;
+                      const point = payload[0]?.payload as { name: string; value: number } | undefined;
+                      if (!point) return null;
+                      if (point.name !== 'Transportation') {
+                        return (
+                          <div className="rounded-md border bg-white p-2 text-xs shadow-sm">
+                            <div>{point.name}</div>
+                            <div className="font-semibold">{formatCurrency(point.value)}</div>
+                          </div>
+                        );
+                      }
+                      return (
+                        <div className="space-y-0.5 rounded-md border bg-white p-2 text-xs shadow-sm">
+                          <div className="font-semibold">Transportation</div>
+                          <div>Car payment: {formatCurrency(bi.carPayment)}</div>
+                          <div>Insurance: {formatCurrency(bi.carInsurance)}</div>
+                          <div>Gas: {formatCurrency(bi.gas)}</div>
+                          <div>Parking: {formatCurrency(bi.parking)}</div>
+                          <div>Transit: {formatCurrency(bi.publicTransit)}</div>
+                          <div>Other: {formatCurrency(bi.otherTransport)}</div>
+                          <div className="font-semibold">Total: {formatCurrency(totalTransportation)}</div>
+                        </div>
+                      );
+                    }}
+                  />
                   <Legend
                     iconType="circle"
                     iconSize={8}

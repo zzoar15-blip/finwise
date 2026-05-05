@@ -1,5 +1,6 @@
 import XLSX from 'xlsx-js-style';
 import type { StorePaycheckInputs, StorePaycheckResults, StoreBudgetInputs } from '@/lib/calculations';
+import { getTotalTransportation } from '@/lib/calculations';
 import { XLS } from '../styles';
 import {
   cell,
@@ -65,8 +66,9 @@ function buildBudgetModelSheet(
   };
 
   const totalDebtMinimums = debts.reduce((s, d) => s + d.minPayment, 0);
+  const totalTransportation = getTotalTransportation(bi);
   const totalExpenses = bi.housing + bi.utilities + bi.insurance + bi.groceries + bi.dining +
-    bi.transportation + bi.subscriptions + bi.phone + bi.healthGym + bi.travel + bi.misc;
+    totalTransportation + bi.subscriptions + bi.phone + bi.healthGym + bi.travel + bi.misc;
   const totalSavingsPayroll = (pr.k401TraditionalAnnual + pr.k401RothAnnual) / 12 +
     pi.hsaAnnual / 12 + pi.fsaAnnual / 12;
   const totalSavingsOptional =
@@ -134,7 +136,13 @@ function buildBudgetModelSheet(
     [labelCell('Insurance'), inputCell(bi.insurance), formulaCell(bi.insurance * 12)],
     [labelCell('Groceries'), inputCell(bi.groceries), formulaCell(bi.groceries * 12)],
     [labelCell('Dining Out'), inputCell(bi.dining), formulaCell(bi.dining * 12)],
-    [labelCell('Transportation'), inputCell(bi.transportation), formulaCell(bi.transportation * 12)],
+    [labelCell('Car payment (loan/lease)'), inputCell(bi.carPayment), formulaCell(bi.carPayment * 12)],
+    [labelCell('Car insurance'), inputCell(bi.carInsurance), formulaCell(bi.carInsurance * 12)],
+    [labelCell('Gas / fuel'), inputCell(bi.gas), formulaCell(bi.gas * 12)],
+    [labelCell('Parking & tolls'), inputCell(bi.parking), formulaCell(bi.parking * 12)],
+    [labelCell('Public transit'), inputCell(bi.publicTransit), formulaCell(bi.publicTransit * 12)],
+    [labelCell('Other transportation'), inputCell(bi.otherTransport), formulaCell(bi.otherTransport * 12)],
+    [labelCell('Total Transportation'), subtotalCell(totalTransportation), subtotalCell(totalTransportation * 12)],
     [labelCell('Subscriptions'), inputCell(bi.subscriptions), formulaCell(bi.subscriptions * 12)],
     [labelCell('Phone'), inputCell(bi.phone), formulaCell(bi.phone * 12)],
     [labelCell('Health / Gym'), inputCell(bi.healthGym), formulaCell(bi.healthGym * 12)],
@@ -185,8 +193,9 @@ function buildMonthlyProjectionSheet(
   debts: Debt[]
 ): XLSX.WorkSheet {
   const totalDebtMinimums = debts.reduce((s, d) => s + d.minPayment, 0);
+  const totalTransportation = getTotalTransportation(bi);
   const totalExpenses = bi.housing + bi.utilities + bi.insurance + bi.groceries + bi.dining +
-    bi.transportation + bi.subscriptions + bi.phone + bi.healthGym + bi.travel + bi.misc;
+    totalTransportation + bi.subscriptions + bi.phone + bi.healthGym + bi.travel + bi.misc;
   const optionalMonthly =
     bi.rothIraMonthly + bi.brokerageMonthly + bi.emergencyFundMonthly + bi.homeDownPaymentMonthly;
   const monthlyIncome = pr.netPayMonthly + bi.investmentIncome;

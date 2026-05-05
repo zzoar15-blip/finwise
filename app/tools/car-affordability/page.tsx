@@ -40,6 +40,8 @@ export default function CarAffordabilityPage() {
     () => computeUnifiedMonthlyFlow(paycheckInputs, paycheckResults, budgetInputs, debts),
     [paycheckInputs, paycheckResults, budgetInputs, debts]
   );
+  const existingCarCosts = (budgetInputs.carPayment ?? 0) + (budgetInputs.carInsurance ?? 0) + (budgetInputs.gas ?? 0);
+  const nonCarTransport = (budgetInputs.parking ?? 0) + (budgetInputs.publicTransit ?? 0) + (budgetInputs.otherTransport ?? 0);
 
   const results = useMemo(
     () =>
@@ -48,7 +50,8 @@ export default function CarAffordabilityPage() {
         budgetSurplus: computeBudgetSurplus(paycheckResults, budgetInputs),
         hasBudgetData: Object.values(budgetInputs).some((v) => typeof v === 'number' && v > 0),
         ownershipType,
-        currentTransportBudget: budgetInputs.transportation,
+        existingCarCosts,
+        nonCarTransport,
         partnerMonthlyIncome,
         targetMonthlySavings,
         transportIncomeRatio,
@@ -93,6 +96,8 @@ export default function CarAffordabilityPage() {
       annualDepreciationUsed,
       paycheckResults,
       budgetInputs,
+      existingCarCosts,
+      nonCarTransport,
     ]
   );
 
@@ -210,8 +215,8 @@ export default function CarAffordabilityPage() {
           <div className="rounded-xl border bg-card p-4">
             <h3 className="mb-2 text-base font-semibold">What drives this number</h3>
             <Row label="Monthly surplus (from budget)" value={results.monthlySurplusFromBudget} />
-            <Row label="Existing transport budget" value={results.existingTransportBudget} />
-            <Row label="Available for all transport" value={results.availableForTransport} />
+            <Row label="Current car costs (replacing)" value={results.existingCarCosts} />
+            <Row label="Available for new car (all-in)" value={results.availableForNewCar} />
             <Row label="Conservative buffer (80%)" value={80} suffix="%" />
             <Row label="Cashflow-based max (all-in)" value={results.cashflowMax} />
             <div className="my-1 border-t border-border" />
@@ -226,7 +231,23 @@ export default function CarAffordabilityPage() {
           <div className="rounded-xl border bg-card p-4">
             <h3 className="mb-2 text-base font-semibold">How this affects your budget</h3>
             <Row label="Current monthly surplus" value={results.monthlySurplusFromBudget} />
-            <Row label="Estimated car all-in cost" value={-results.recommendedTransportBudget} />
+            <div className="my-1 border-t border-border" />
+            <p className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">Current Car Costs</p>
+            <Row label="Car payment" value={budgetInputs.carPayment ?? 0} />
+            <Row label="Insurance" value={budgetInputs.carInsurance ?? 0} />
+            <Row label="Gas" value={budgetInputs.gas ?? 0} />
+            <Row label="Total current" value={results.existingCarCosts} />
+            <div className="my-1 border-t border-border" />
+            <p className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">New Car Estimated Costs</p>
+            <Row label="New payment" value={results.maxPaymentBudget} />
+            <Row label="Insurance (est.)" value={annualInsurance / 12} />
+            <Row label="Gas (est.)" value={monthlyFuel} />
+            <Row label="Total new" value={results.recommendedTransportBudget} />
+            <div className="my-1 border-t border-border" />
+            <p className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">Budget Impact</p>
+            <Row label="Current surplus" value={results.monthlySurplusFromBudget} />
+            <Row label="Remove old costs" value={results.existingCarCosts} />
+            <Row label="Add new costs" value={-results.recommendedTransportBudget} />
             <div className="flex items-center justify-between border-b py-2 text-sm last:border-b-0">
               <span className="font-semibold">New monthly surplus</span>
               <span

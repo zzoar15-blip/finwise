@@ -50,7 +50,12 @@ export interface StoreBudgetInputs {
   insurance: number;
   groceries: number;
   dining: number;
-  transportation: number;
+  carPayment: number;
+  carInsurance: number;
+  gas: number;
+  parking: number;
+  publicTransit: number;
+  otherTransport: number;
   subscriptions: number;
   phone: number;
   healthGym: number;
@@ -101,9 +106,21 @@ export const DEFAULT_PAYCHECK_RESULTS: StorePaycheckResults = {
 
 export const DEFAULT_BUDGET_INPUTS: StoreBudgetInputs = {
   investmentIncome: 0, housing: 0, utilities: 0, insurance: 0, groceries: 0, dining: 0,
-  transportation: 0, subscriptions: 0, phone: 0, healthGym: 0, travel: 0, misc: 0,
+  carPayment: 0, carInsurance: 0, gas: 0, parking: 0, publicTransit: 0, otherTransport: 0,
+  subscriptions: 0, phone: 0, healthGym: 0, travel: 0, misc: 0,
   brokerageMonthly: 0, rothIraMonthly: 0, emergencyFundMonthly: 0, homeDownPaymentMonthly: 0,
 };
+
+export function getTotalTransportation(b: StoreBudgetInputs): number {
+  return (
+    (b.carPayment ?? 0) +
+    (b.carInsurance ?? 0) +
+    (b.gas ?? 0) +
+    (b.parking ?? 0) +
+    (b.publicTransit ?? 0) +
+    (b.otherTransport ?? 0)
+  );
+}
 
 export const DEFAULT_INVESTMENT_INPUTS: StoreInvestmentInputs = {
   monthlyBuy: 500, annualBonus: 0, dividendYield: 7, taxRate: 22,
@@ -169,8 +186,9 @@ export function getEffectivePaycheckResults(
 }
 
 export function computeTotalExpenses(budget: StoreBudgetInputs): number {
+  const totalTransportation = getTotalTransportation(budget);
   return budget.housing + budget.utilities + budget.insurance + budget.groceries +
-    budget.dining + budget.transportation + budget.subscriptions + budget.phone +
+    budget.dining + totalTransportation + budget.subscriptions + budget.phone +
     budget.healthGym + budget.travel + budget.misc;
 }
 
@@ -286,6 +304,10 @@ export function buildFinancialContext(
     lines.push(`Monthly expenses: ${fmt(expenses)}`);
     lines.push(`Monthly surplus: ${fmt(surplus)}`);
     lines.push(`Savings rate: ${savingsRate.toFixed(1)}%`);
+    lines.push(`Car payment: ${fmt(budgetInputs.carPayment)}/mo`);
+    lines.push(`Car insurance: ${fmt(budgetInputs.carInsurance)}/mo`);
+    lines.push(`Gas: ${fmt(budgetInputs.gas)}/mo`);
+    lines.push(`Total transportation: ${fmt(getTotalTransportation(budgetInputs))}/mo`);
   }
   if (debts.length > 0) {
     lines.push(`Total debt: ${fmt(totalDebt)}`);

@@ -53,7 +53,10 @@ const DEFAULT_INPUTS: PlanInputs = {
     utilities: 150,
     groceries: 400,
     dining: 200,
-    transportation: 150,
+    carPayment: 0,
+    carInsurance: 0,
+    gas: 120,
+    otherTransport: 30,
     subscriptions: 50,
     phone: 80,
     health: 50,
@@ -763,7 +766,10 @@ function StepExpenses({
         <ExpenseField label="Utilities" field="utilities" value={inputs.expenses.utilities} onChange={handleExpenseChange} />
         <ExpenseField label="Groceries" field="groceries" value={inputs.expenses.groceries} onChange={handleExpenseChange} />
         <ExpenseField label="Dining out" field="dining" value={inputs.expenses.dining} onChange={handleExpenseChange} />
-        <ExpenseField label="Transportation" field="transportation" value={inputs.expenses.transportation} onChange={handleExpenseChange} />
+        <ExpenseField label="Car payment" field="carPayment" value={inputs.expenses.carPayment} onChange={handleExpenseChange} />
+        <ExpenseField label="Car insurance" field="carInsurance" value={inputs.expenses.carInsurance} onChange={handleExpenseChange} />
+        <ExpenseField label="Gas" field="gas" value={inputs.expenses.gas} onChange={handleExpenseChange} />
+        <ExpenseField label="Other transportation (parking, transit, maintenance)" field="otherTransport" value={inputs.expenses.otherTransport} onChange={handleExpenseChange} />
         <ExpenseField label="Subscriptions" field="subscriptions" value={inputs.expenses.subscriptions} onChange={handleExpenseChange} />
         <ExpenseField label="Phone" field="phone" value={inputs.expenses.phone} onChange={handleExpenseChange} />
         <ExpenseField label="Health / gym" field="health" value={inputs.expenses.health} onChange={handleExpenseChange} />

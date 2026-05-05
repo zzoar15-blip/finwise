@@ -77,6 +77,14 @@ interface FinWiseStore {
   setForecastBaselineScenarioId: (id: string) => void;
 }
 
+type PersistedStateV1 = {
+  budgetInputs?: {
+    transportation?: number;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+};
+
 const DEFAULT_FORECAST_SCENARIOS: Scenario[] = [
   {
     id: '1',
@@ -233,7 +241,27 @@ export const useFinWiseStore = create<FinWiseStore>()(
           planLastUpdated: new Date().toISOString(),
         }),
     }),
-    { name: 'finwise-unified-store' }
+    {
+      name: 'finwise-unified-store',
+      version: 2,
+      migrate: (persistedState: unknown) => {
+        const state = (persistedState ?? {}) as PersistedStateV1;
+        const budget = state.budgetInputs ?? {};
+        const legacyTransportation =
+          typeof budget.transportation === 'number' ? budget.transportation : 0;
+        return {
+          ...state,
+          budgetInputs: {
+            ...DEFAULT_BUDGET_INPUTS,
+            ...budget,
+            otherTransport:
+              typeof budget.otherTransport === 'number'
+                ? (budget.otherTransport as number)
+                : legacyTransportation,
+          },
+        } as FinWiseStore;
+      },
+    }
   )
 );
 

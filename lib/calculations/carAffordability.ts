@@ -6,7 +6,8 @@ export interface CarAffordabilityInputs {
   budgetSurplus: number;
   hasBudgetData: boolean;
   ownershipType: 'new' | 'used';
-  currentTransportBudget: number;
+  existingCarCosts: number;
+  nonCarTransport: number;
   partnerMonthlyIncome: number;
   targetMonthlySavings: number;
   transportIncomeRatio: number;
@@ -32,8 +33,9 @@ export interface CarAffordabilityInputs {
 
 export interface CarAffordabilityResults {
   monthlySurplusFromBudget: number;
-  existingTransportBudget: number;
-  availableForTransport: number;
+  existingCarCosts: number;
+  nonCarTransport: number;
+  availableForNewCar: number;
   cashflowMax: number;
   maxByIncomeRatio: number;
   recommendedTransportBudget: number;
@@ -83,9 +85,10 @@ function principalFromPayment(payment: number, apr: number, termMonths: number):
 
 export function computeCarAffordability(inputs: CarAffordabilityInputs): CarAffordabilityResults {
   const monthlySurplusFromBudget = Math.max(0, inputs.budgetSurplus);
-  const existingTransportBudget = Math.max(0, inputs.currentTransportBudget);
-  const availableForTransport = monthlySurplusFromBudget + existingTransportBudget;
-  const cashflowMax = Math.max(0, availableForTransport * 0.8);
+  const existingCarCosts = Math.max(0, inputs.existingCarCosts);
+  const nonCarTransport = Math.max(0, inputs.nonCarTransport);
+  const availableForNewCar = monthlySurplusFromBudget + existingCarCosts;
+  const cashflowMax = Math.max(0, availableForNewCar * 0.8);
   const maxByIncomeRatio = Math.max(
     0,
     (Math.max(0, inputs.flow.paycheck.grossAnnual) / 12) * clamp(inputs.transportIncomeRatio, 0.05, 0.5),
@@ -115,12 +118,14 @@ export function computeCarAffordability(inputs: CarAffordabilityInputs): CarAffo
   const loanDepreciationLoss3Year = Math.max(0, affordableLoanCarPrice - valueAfter3Years);
   const loanTotalCost3Year = loanAtAffordable.total * 36 + inputs.loanDownPayment + loanDepreciationLoss3Year;
   const leaseTotalCost3Year = leaseAtAffordable.total * 36 + inputs.leaseDownPayment + inputs.leaseFees;
-  const newMonthlySurplusAfterRecommended = monthlySurplusFromBudget - recommendedTransportBudget;
+  const newMonthlySurplusAfterRecommended =
+    monthlySurplusFromBudget + existingCarCosts - recommendedTransportBudget;
 
   return {
     monthlySurplusFromBudget,
-    existingTransportBudget,
-    availableForTransport,
+    existingCarCosts,
+    nonCarTransport,
+    availableForNewCar,
     cashflowMax,
     maxByIncomeRatio,
     recommendedTransportBudget,
