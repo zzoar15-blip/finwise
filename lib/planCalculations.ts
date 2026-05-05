@@ -123,6 +123,12 @@ function clampScore(n: number): number {
   return Math.max(0, Math.min(100, Math.round(n)));
 }
 
+function scoreFromRange(value: number, min: number, max: number): number {
+  if (max <= min) return 0;
+  const normalized = (value - min) / (max - min);
+  return clampScore(normalized * 100);
+}
+
 function buildHealthScore(metrics: {
   monthlySurplus: number;
   monthlyTakeHome: number;
@@ -133,13 +139,20 @@ function buildHealthScore(metrics: {
   taxEfficiencyScore: number;
 }): PlanMetrics['healthScoreBreakdown'] & { total: number } {
   const cashflowRatio = metrics.monthlyTakeHome > 0 ? metrics.monthlySurplus / metrics.monthlyTakeHome : 0;
-  const cashflow = clampScore(cashflowRatio >= 0.2 ? 100 : cashflowRatio >= 0.1 ? 75 : cashflowRatio > 0 ? 55 : 20);
+  const cashflow = scoreFromRange(cashflowRatio, -0.1, 0.25);
   const debtLoad = metrics.monthlyTakeHome > 0 ? metrics.monthlyDebtMinimums / metrics.monthlyTakeHome : 0;
-  const debt = clampScore(metrics.totalDebtBalance <= 0 ? 100 : debtLoad <= 0.1 ? 80 : debtLoad <= 0.2 ? 60 : 35);
-  const emergency = clampScore(metrics.emergencyFundMonthsCovered >= 6 ? 100 : (metrics.emergencyFundMonthsCovered / 6) * 100);
-  const investing = clampScore(metrics.monthlyInvestCapacity <= 0 ? 20 : Math.min(100, 35 + metrics.monthlyInvestCapacity / 40));
+  const debt =
+    metrics.totalDebtBalance <= 0
+      ? 100
+      : scoreFromRange(0.45 - debtLoad, 0, 0.4);
+  const emergency = scoreFromRange(metrics.emergencyFundMonthsCovered, 0, 6);
+  const investRatio = metrics.monthlyTakeHome > 0 ? metrics.monthlyInvestCapacity / metrics.monthlyTakeHome : 0;
+  const investing =
+    metrics.monthlyInvestCapacity <= 0
+      ? 15
+      : scoreFromRange(investRatio, 0, 0.2);
   const tax = clampScore(metrics.taxEfficiencyScore);
-  const total = clampScore(cashflow * 0.3 + debt * 0.25 + emergency * 0.2 + investing * 0.15 + tax * 0.1);
+  const total = clampScore(cashflow * 0.32 + debt * 0.24 + emergency * 0.2 + investing * 0.14 + tax * 0.1);
   return { total, cashflow, debt, emergency, investing, tax };
 }
 
@@ -330,16 +343,23 @@ function taxEfficiency(inputs: PlanInputs, paycheckResult: PaycheckResult, perio
   const HSA_MAX = 4300;
   const FSA_MAX = 3300;
   const COMMUTER_MAX = 3780; // $315/mo × 12
-  const K401_FULL_PCT = 15; // "maxed" benchmark
+  const k401TargetPct =
+    inputs.annualSalary <= 70000
+      ? 8
+      : inputs.annualSalary <= 120000
+        ? 10
+        : inputs.annualSalary <= 200000
+          ? 12
+          : 15;
 
   // Scores (out of 100)
   const hsaScore = Math.min(annualHSA / HSA_MAX, 1) * 40;
   const k401Raw = inputs.traditional401kPct + inputs.roth401kPct;
-  const k401Score = Math.min(k401Raw / K401_FULL_PCT, 1) * 35;
+  const k401Score = Math.min(k401Raw / k401TargetPct, 1) * 35;
   const fsaScore = Math.min(annualFSA / FSA_MAX, 1) * 15;
   const commuterScore = Math.min(annualCommuter / COMMUTER_MAX, 1) * 10;
 
-  const totalScore = Math.round(hsaScore + k401Score + fsaScore + commuterScore);
+  const totalScore = clampScore(hsaScore + k401Score + fsaScore + commuterScore);
 
   const suggestions: TaxSuggestion[] = [];
 
@@ -355,15 +375,15 @@ function taxEfficiency(inputs: PlanInputs, paycheckResult: PaycheckResult, perio
     });
   }
 
-  if (k401Raw < K401_FULL_PCT) {
-    const gap = Math.max(0, K401_FULL_PCT - k401Raw);
+  if (k401Raw < k401TargetPct) {
+    const gap = Math.max(0, k401TargetPct - k401Raw);
     const annualGap = (inputs.annualSalary * gap) / 100;
     suggestions.push({
       label: `Increase 401(k) by ${gap.toFixed(0)}%`,
       currentAnnual: (inputs.annualSalary * k401Raw) / 100,
-      maxAnnual: (inputs.annualSalary * K401_FULL_PCT) / 100,
+      maxAnnual: (inputs.annualSalary * k401TargetPct) / 100,
       additionalSavings: Math.round(annualGap * (marginal + stateRate)),
-      points: Math.round((gap / K401_FULL_PCT) * 35),
+      points: Math.round((gap / k401TargetPct) * 35),
     });
   }
 
@@ -388,6 +408,8 @@ function taxEfficiency(inputs: PlanInputs, paycheckResult: PaycheckResult, perio
       points: Math.round((1 - annualCommuter / COMMUTER_MAX) * 10),
     });
   }
+
+  suggestions.sort((a, b) => b.additionalSavings - a.additionalSavings || b.points - a.points);
 
   return { score: totalScore, suggestions };
 }
