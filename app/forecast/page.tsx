@@ -9,6 +9,7 @@ import { ExportButton } from '@/components/ExportButton';
 import { downloadCsv, downloadXlsxFromAoa } from '@/lib/export';
 import { PDFDownloadButton } from '@/components/pdf/PDFDownloadButton';
 import { SimpleRowsPDF } from '@/lib/pdf/SimpleRowsPDF';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { formatCurrency } from '@/lib/format';
 import {
   Card,
@@ -39,7 +40,7 @@ import {
   ReferenceLine,
   ResponsiveContainer,
 } from 'recharts';
-import { Plus, Trash2, TrendingUp, Home, Shield, DollarSign, Timer } from 'lucide-react';
+import { Plus, Trash2, Home, Shield, DollarSign, Timer } from 'lucide-react';
 import { usePlanStore } from '@/lib/planStore';
 import { useFinWiseStore } from '@/lib/store';
 import { computeUnifiedMonthlyFlow } from '@/lib/calculations';
@@ -508,27 +509,18 @@ function ForecastPageContent() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6" id="tool-forecast-export">
-      {/* Header */}
-      <div className="rounded-2xl border border-slate-200/80 bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 p-5 text-white shadow-lg sm:p-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="flex items-start gap-3">
-            <TrendingUp className="mt-0.5 size-6 text-emerald-300" />
-            <div>
-              <p className="text-xs uppercase tracking-[0.14em] text-slate-300">Scenario Lab</p>
-              <h1 className="mt-1 text-2xl font-semibold">Forecast Outcomes With Confidence</h1>
-              <p className="mt-1 text-sm text-slate-300">
-                Compare up to 3 scenarios over 10 years, then evaluate downside and upside bands before you commit.
-              </p>
-            </div>
-          </div>
+    <div className="mx-auto max-w-[1280px] space-y-8" id="tool-forecast-export">
+      <PageHeader
+        title="Forecast Outcomes With Confidence"
+        subtitle="Compare up to 3 scenarios over 10 years, then evaluate downside and upside bands before you commit."
+        actions={
           <div className="flex flex-wrap gap-2">
-            <Badge className="bg-white/15 text-white hover:bg-white/15">Focus: {focus || 'net-worth'}</Badge>
-            <Badge className="bg-white/15 text-white hover:bg-white/15">Horizon: 10 years</Badge>
-            <Badge className="bg-white/15 text-white hover:bg-white/15">Mode: Compare</Badge>
+            <Badge variant="outline">Focus: {focus || 'net-worth'}</Badge>
+            <Badge variant="outline">Horizon: 10 years</Badge>
+            <Badge variant="outline">Mode: Compare</Badge>
           </div>
-        </div>
-      </div>
+        }
+      />
 
       <div className="flex flex-wrap gap-2">
         {[

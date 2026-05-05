@@ -21,11 +21,6 @@ import {
   Legend,
 } from 'recharts';
 import {
-  TrendingUp,
-  TrendingDown,
-  DollarSign,
-  Calendar,
-  Shield,
   Target,
   Zap,
   RefreshCw,
@@ -239,27 +234,89 @@ function MetricCard({
   label,
   value,
   valueClass = '',
-  icon,
+  accent = 'neutral',
   sub,
 }: {
   label: string;
   value: string;
   valueClass?: string;
-  icon: React.ReactNode;
+  accent?: 'green' | 'red' | 'blue' | 'neutral';
   sub?: string;
 }) {
+  const accentClass =
+    accent === 'green'
+      ? 'border-l-[#16a34a]'
+      : accent === 'red'
+      ? 'border-l-[#dc2626]'
+      : accent === 'blue'
+      ? 'border-l-[#3b82f6]'
+      : 'border-l-[#3b82f6]';
   return (
-    <Card className="flex-1 min-w-0 h-full">
-      <CardContent className="pt-4 pb-4 min-h-[108px]">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1">
-              {label}
-            </p>
-            <p className={`text-2xl font-bold tabular-nums leading-tight ${valueClass}`}>{value}</p>
-            {sub && <p className="text-xs text-muted-foreground mt-1 leading-snug">{sub}</p>}
+    <Card className={`flex-1 min-w-0 h-full border-l-[3px] ${accentClass}`}>
+      <CardContent className="pt-5 pb-5 min-h-[108px] px-6">
+        <div className="min-w-0 flex-1">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#94a3b8]">
+            {label}
+          </p>
+          <p className={`text-[28px] font-bold tabular-nums leading-tight text-[#0f172a] ${valueClass}`}>{value}</p>
+          {sub && <p className="mt-1 text-xs text-[#64748b] leading-snug">{sub}</p>}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function HealthScoreRing({
+  score,
+  cashflow,
+  debt,
+  emergency,
+}: {
+  score: number;
+  cashflow: number;
+  debt: number;
+  emergency: number;
+}) {
+  const color = score <= 40 ? '#dc2626' : score <= 60 ? '#d97706' : score <= 80 ? '#3b82f6' : '#16a34a';
+  const r = 34;
+  const c = 2 * Math.PI * r;
+  const progress = (Math.max(0, Math.min(100, score)) / 100) * c;
+  const pill = (label: string, value: number) => (
+    <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700">
+      {label} {value}
+    </span>
+  );
+  return (
+    <Card className="flex-1 min-w-0 h-full border-l-[3px] border-l-[#3b82f6]">
+      <CardContent className="pt-5 pb-5 px-6">
+        <div className="flex items-center gap-4">
+          <div className="relative h-20 w-20">
+            <svg width="80" height="80" viewBox="0 0 80 80">
+              <circle cx="40" cy="40" r={r} stroke="#e2e8f0" strokeWidth="6" fill="none" />
+              <circle
+                cx="40"
+                cy="40"
+                r={r}
+                stroke={color}
+                strokeWidth="6"
+                fill="none"
+                strokeDasharray={`${progress} ${c - progress}`}
+                strokeLinecap="round"
+                transform="rotate(-90 40 40)"
+              />
+            </svg>
+            <span className="absolute inset-0 flex items-center justify-center text-[22px] font-bold text-[#0f172a]">
+              {score}
+            </span>
           </div>
-          <div className="shrink-0 rounded-lg bg-muted/50 p-2">{icon}</div>
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#94a3b8]">Financial Health</p>
+            <div className="mt-2 flex items-center gap-2">
+              {pill('Cashflow', cashflow)}
+              {pill('Debt', debt)}
+              {pill('Emergency', emergency)}
+            </div>
+          </div>
         </div>
       </CardContent>
     </Card>
@@ -761,18 +818,17 @@ export default function PlanPage() {
 
           {/* Hero metrics */}
           <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-            <MetricCard
-              label="Financial Health"
-              value={`${financialHealthScore}/100`}
-              valueClass={financialHealthScore >= 75 ? 'text-green-600' : financialHealthScore >= 50 ? 'text-amber-600' : 'text-red-500'}
-              icon={<Shield className="size-5 text-muted-foreground" />}
-              sub={`Cashflow ${healthScoreBreakdown.cashflow} · Debt ${healthScoreBreakdown.debt} · Emergency ${healthScoreBreakdown.emergency}`}
+            <HealthScoreRing
+              score={financialHealthScore}
+              cashflow={healthScoreBreakdown.cashflow}
+              debt={healthScoreBreakdown.debt}
+              emergency={healthScoreBreakdown.emergency}
             />
             <MetricCard
               label={unifiedBudgetHero ? 'Monthly income' : 'Monthly Take-Home'}
               value={heroIncomeVisible ? formatCurrency(monthlyTakeHome) : '—'}
-              valueClass="text-green-600"
-              icon={<DollarSign className="size-5 text-green-600" />}
+              valueClass="text-[#0f172a]"
+              accent="green"
               sub={
                 unifiedBudgetHero
                   ? 'Net pay + investment income · matches Budget Planner'
@@ -783,13 +839,7 @@ export default function PlanPage() {
               label="Monthly Surplus"
               value={heroCashflowVisible ? formatCurrency(monthlySurplus) : '—'}
               valueClass={monthlySurplus >= 0 ? 'text-[#3b82f6]' : 'text-red-500'}
-              icon={
-                monthlySurplus >= 0 ? (
-                  <TrendingUp className="size-5 text-[#3b82f6]" />
-                ) : (
-                  <TrendingDown className="size-5 text-red-500" />
-                )
-              }
+              accent={monthlySurplus >= 0 ? 'blue' : 'red'}
               sub={
                 !heroCashflowVisible ? undefined
                 : monthlySurplus < 0 ? 'Spending exceeds income'
@@ -802,7 +852,7 @@ export default function PlanPage() {
               label="Savings Rate"
               value={heroCashflowVisible ? `${savingsRate.toFixed(1)}%` : '—'}
               valueClass={savingsRateColor(savingsRate)}
-              icon={<Shield className="size-5 text-muted-foreground" />}
+              accent="blue"
               sub={
                 !heroCashflowVisible ? undefined
                 : unifiedBudgetHero ?
@@ -824,27 +874,25 @@ export default function PlanPage() {
                   : '—'
               }
               valueClass={!hasDebts && heroIncomeVisible ? 'text-green-600' : ''}
-              icon={<Calendar className="size-5 text-muted-foreground" />}
+              accent={hasDebts ? 'red' : 'green'}
               sub={hasDebts && debtResult ? `${debtResult.monthsToPayoff} months away` : undefined}
             />
           </div>
 
-          <div className="mt-4 grid gap-3 md:grid-cols-3">
-            <Link href="/budget" className="rounded-xl border border-slate-200 bg-white p-3 transition hover:border-blue-300 hover:shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Execute</p>
-              <p className="mt-1 text-sm font-semibold text-slate-900">Apply budget funding</p>
-              <p className="mt-1 text-xs text-slate-600">Move your selected priorities into monthly dollars.</p>
-            </Link>
-            <Link href="/debt" className="rounded-xl border border-slate-200 bg-white p-3 transition hover:border-blue-300 hover:shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Optimize</p>
-              <p className="mt-1 text-sm font-semibold text-slate-900">Tune debt payoff strategy</p>
-              <p className="mt-1 text-xs text-slate-600">Validate avalanche/snowball and bonus month impact.</p>
-            </Link>
-            <Link href="/forecast" className="rounded-xl border border-slate-200 bg-white p-3 transition hover:border-blue-300 hover:shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Validate</p>
-              <p className="mt-1 text-sm font-semibold text-slate-900">Run scenario confidence</p>
-              <p className="mt-1 text-xs text-slate-600">Compare baseline with downside/upside risk bands.</p>
-            </Link>
+          <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Your next actions</p>
+            <div className="mt-2 space-y-2">
+              {(actionChecklist.length > 0 ? actionChecklist.slice(0, 3) : [
+                { title: 'Complete paycheck setup', rationale: 'Add salary and deductions to unlock all downstream calculators.', href: '/paycheck' },
+                { title: 'Set your core goals', rationale: 'Goals drive plan priorities and forecast recommendations.', href: '/?wizard=true' },
+                { title: 'Connect budget assumptions', rationale: 'Budget sync ensures plan cashflow and debt projections stay accurate.', href: '/budget' },
+              ]).map((item, idx) => (
+                <Link key={item.title + idx} href={item.href} className="block rounded-lg border border-slate-200 px-3 py-2 hover:border-blue-300">
+                  <p className="text-sm font-semibold text-slate-900">→ {item.title}</p>
+                  <p className="mt-0.5 text-xs text-slate-600">{item.rationale}</p>
+                </Link>
+              ))}
+            </div>
           </div>
 
           {goalWarnings.length > 0 && (
@@ -867,7 +915,7 @@ export default function PlanPage() {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Institutional Summary
+                  Plan Summary
                 </p>
                 <p className="text-sm text-slate-700 mt-0.5">
                   Safe-for-print snapshot used in PDF reports.

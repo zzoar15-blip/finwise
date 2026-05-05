@@ -30,6 +30,7 @@ import { usePlanStore } from '@/lib/planStore';
 import { useFinanceStore } from '@/lib/store';
 import { STATE_CONFIGS } from '@/lib/stateTax';
 import { CATEGORIES } from '@/lib/constants';
+import { PageHeader } from '@/components/layout/PageHeader';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -74,12 +75,11 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="max-w-3xl space-y-6">
-      <div className="rounded-2xl border border-slate-200/80 bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 p-5 text-white shadow-lg sm:p-6">
-        <p className="text-xs uppercase tracking-[0.14em] text-slate-300">Control Center</p>
-        <h1 className="mt-1 text-2xl font-semibold">Settings</h1>
-        <p className="mt-1 text-sm text-slate-300">Manage profile defaults and protect your data lifecycle.</p>
-      </div>
+    <div className="mx-auto max-w-[1280px] space-y-8">
+      <PageHeader
+        title="Settings"
+        subtitle="Manage profile defaults and protect your data lifecycle."
+      />
 
       {/* Profile */}
       <Card className="shadow-sm">

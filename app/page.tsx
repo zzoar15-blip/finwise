@@ -16,6 +16,8 @@ import {
   Home,
   CarFront,
   PiggyBank,
+  Target,
+  Sparkles,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -174,17 +176,23 @@ const QUICK_LINKS = [
 
 const FEATURE_CARDS = [
   {
-    emoji: '📊',
+    icon: BarChart3,
+    iconColor: 'text-[#3b82f6]',
+    iconBg: 'bg-blue-50',
     title: 'Clear financial snapshot',
     description: 'See exactly where your money goes',
   },
   {
-    emoji: '🎯',
+    icon: Target,
+    iconColor: 'text-[#16a34a]',
+    iconBg: 'bg-green-50',
     title: 'Personalized priorities',
     description: 'Goal-based action cards tailored to you',
   },
   {
-    emoji: '🤖',
+    icon: Sparkles,
+    iconColor: 'text-[#8b5cf6]',
+    iconBg: 'bg-violet-50',
     title: 'AI-powered insights',
     description: 'Claude analyzes your situation and surfaces what matters',
   },
@@ -398,8 +406,8 @@ function DashboardPageContent() {
                 key={f.title}
                 className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm"
               >
-                <span className="text-3xl" role="img" aria-label={f.title}>
-                  {f.emoji}
+                <span className={`inline-flex h-12 w-12 items-center justify-center rounded-full ${f.iconBg}`}>
+                  <f.icon className={`h-6 w-6 ${f.iconColor}`} />
                 </span>
                 <p className="mt-3 text-sm font-semibold text-gray-800">{f.title}</p>
                 <p className="mt-1 text-xs text-gray-500 leading-snug">{f.description}</p>

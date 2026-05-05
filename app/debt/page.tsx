@@ -1,13 +1,13 @@
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
-import Link from 'next/link';
 import { simulateDebtPayoff, buildSensitivityTable } from '@/lib/calculations/debt';
 import type { Debt, DebtResult, SensitivityRow } from '@/lib/calculations/debt';
 import { ExportButton } from '@/components/ExportButton';
 import { downloadCsv } from '@/lib/export';
 import { PDFDownloadButton } from '@/components/pdf/PDFDownloadButton';
 import { SimpleRowsPDF } from '@/lib/pdf/SimpleRowsPDF';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { formatCurrency } from '@/lib/format';
 import { useFinWiseStore } from '@/lib/store';
 import { usePlanStore } from '@/lib/planStore';
@@ -41,7 +41,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-import { Plus, Trash2, Calendar, Clock, TrendingDown, Sparkles, ChevronLeft, Lightbulb, CreditCard } from 'lucide-react';
+import { Plus, Trash2, Calendar, Clock, TrendingDown, Sparkles, Lightbulb, CreditCard } from 'lucide-react';
 
 const DEBT_COLORS = ['#ef4444', '#f97316', '#eab308', '#8b5cf6', '#3b82f6'];
 
@@ -185,18 +185,12 @@ export default function DebtPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6" id="tool-debt-export">
-      <div className="rounded-2xl border border-slate-200/80 bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 p-5 text-white shadow-lg sm:p-6">
-        <Link href="/plan" className="inline-flex items-center gap-1 text-xs text-slate-300 hover:text-white transition-colors">
-          <ChevronLeft className="size-3" /> My Plan
-        </Link>
-        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.14em] text-slate-300">Debt Strategy Lab</p>
-            <h1 className="mt-1 text-2xl font-semibold">Debt Payoff Simulator</h1>
-            <p className="mt-1 text-sm text-slate-300">Model overpayment, bonus timing, and strategy to bring your debt-free date forward.</p>
-            <div className="mt-2"><SyncMeta updatedAt={planLastUpdated} badges={['Unified Flow']} /></div>
-          </div>
+    <div className="mx-auto max-w-[1280px] space-y-8" id="tool-debt-export">
+      <PageHeader
+        backHref="/plan"
+        title="Debt Payoff Simulator"
+        subtitle="Model overpayment, bonus timing, and strategy to bring your debt-free date forward."
+        actions={
           <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto">
             <PDFDownloadButton
               className="flex-1 sm:flex-none"
@@ -214,8 +208,9 @@ export default function DebtPage() {
               />
             )}
           </div>
-        </div>
-      </div>
+        }
+      />
+      <div className="px-8"><SyncMeta updatedAt={planLastUpdated} badges={['Unified Flow']} /></div>
 
       {/* Debts Table */}
       <Card className="shadow-sm">

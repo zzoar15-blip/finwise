@@ -32,6 +32,7 @@ import { downloadCsv } from '@/lib/export';
 import { Button } from '@/components/ui/button';
 import { PDFDownloadButton } from '@/components/pdf/PDFDownloadButton';
 import { SimpleRowsPDF } from '@/lib/pdf/SimpleRowsPDF';
+import { PageHeader } from '@/components/layout/PageHeader';
 import {
   computeUnifiedMonthlyFlow,
   getEffectivePaycheckResults,
@@ -39,11 +40,11 @@ import {
 import { SyncMeta } from '@/components/SyncMeta';
 
 const CHART_COLORS = {
-  Housing: '#f97316',
-  Debt: '#ef4444',
-  Savings: '#22c55e',
-  Living: '#3b82f6',
-  Other: '#8b5cf6',
+  Debt: '#0f172a',
+  Housing: '#3b82f6',
+  Living: '#64748b',
+  Savings: '#16a34a',
+  Surplus: '#dbeafe',
 };
 
 function savingsRateColor(rate: number) {
@@ -110,10 +111,11 @@ function BudgetRow({
   return (
     <div className="flex items-center justify-between gap-2 py-1">
       <span className="flex items-center gap-1.5 text-sm text-foreground/80 min-w-0 flex-1">
-        {readOnly && <Lock className="size-3 text-muted-foreground shrink-0" />}
+        {readOnly && <Lock className="size-2.5 text-[#1e40af] shrink-0" />}
         {label}
         {badge && (
-          <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+          <span className="inline-flex items-center gap-1 rounded-full bg-[#dbeafe] px-2 py-0.5 text-[11px] font-medium text-[#1e40af]">
+            <Lock className="size-2.5" />
             {badge}
           </span>
         )}
@@ -198,12 +200,11 @@ export default function BudgetPage() {
   ].filter(d => d.value > 0);
 
   const barData = [
-    { category: 'Housing', Amount: bi.housing },
-    { category: 'Groceries', Amount: bi.groceries },
-    { category: 'Dining', Amount: bi.dining },
-    { category: 'Transport', Amount: bi.transportation },
-    { category: 'Savings (bank)', Amount: optionalSavings },
-    { category: 'Debt', Amount: totalDebtMinimums },
+    { category: 'Housing', Amount: bi.housing, color: CHART_COLORS.Housing },
+    { category: 'Living', Amount: Math.max(0, totalExpenses - bi.housing), color: CHART_COLORS.Living },
+    { category: 'Savings', Amount: optionalSavings, color: CHART_COLORS.Savings },
+    { category: 'Debt', Amount: totalDebtMinimums, color: CHART_COLORS.Debt },
+    { category: 'Surplus', Amount: Math.max(0, monthlySurplus), color: CHART_COLORS.Surplus },
   ].filter(d => d.Amount > 0);
 
   function exportRows(): (string | number)[][] {
@@ -248,29 +249,12 @@ export default function BudgetPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6" id="tool-budget-export">
-      <div className="rounded-2xl border border-slate-200/80 bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 p-5 text-white shadow-lg sm:p-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.14em] text-slate-300">Cashflow Engine</p>
-            <h1 className="mt-1 text-2xl font-semibold">Budget Planner</h1>
-            <p className="mt-1 text-sm text-slate-300">
-              Allocate dollars with synced plan assumptions and instant surplus impact.
-            </p>
-            <div className="mt-2"><SyncMeta updatedAt={planLastUpdated} badges={['Unified Flow']} /></div>
-            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-sm">
-              <Link href="/tools/rent-vs-buy" className="text-emerald-200 hover:text-white hover:underline">
-                Rent vs Buy
-              </Link>
-              <Link href="/tools/housing-affordability" className="text-emerald-200 hover:text-white hover:underline">
-                Housing Affordability
-              </Link>
-              <Link href="/tools/car-affordability" className="text-emerald-200 hover:text-white hover:underline">
-                Car Affordability
-              </Link>
-            </div>
-          </div>
-        <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto">
+    <div className="mx-auto max-w-[1280px] space-y-8" id="tool-budget-export">
+      <PageHeader
+        title="Budget Planner"
+        subtitle="Allocate dollars with synced plan assumptions and instant surplus impact."
+        actions={
+          <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto">
           <PDFDownloadButton
             className="flex-1 sm:flex-none"
             label="Export PDF"
@@ -284,8 +268,11 @@ export default function BudgetPage() {
             }}
             onExportCsv={() => downloadCsv(exportRows(), 'finwise-budget')}
           />
-        </div>
-      </div>
+          </div>
+        }
+      />
+      <div className="px-8">
+        <div className="mb-2"><SyncMeta updatedAt={planLastUpdated} badges={['Unified Flow']} /></div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
@@ -541,7 +528,11 @@ export default function BudgetPage() {
                     tick={{ fontSize: 11 }}
                   />
                   <Tooltip formatter={(v) => typeof v === 'number' ? formatCurrency(v) : String(v)} />
-                  <Bar dataKey="Amount" fill="#3b82f6" radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="Amount" radius={[3, 3, 0, 0]}>
+                    {barData.map((entry) => (
+                      <Cell key={entry.category} fill={entry.color} />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>

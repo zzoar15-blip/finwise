@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Home, ChevronLeft } from 'lucide-react';
 import { useFinWiseStore } from '@/lib/store';
 import { usePlanStore } from '@/lib/planStore';
 import { getPropertyTaxRate } from '@/lib/stateTax';
@@ -10,6 +9,7 @@ import { computeUnifiedMonthlyFlow } from '@/lib/calculations';
 import { computeHousingAffordability } from '@/lib/calculations/housingAffordability';
 import { formatCurrency } from '@/lib/format';
 import { SyncMeta } from '@/components/SyncMeta';
+import { PageHeader } from '@/components/layout/PageHeader';
 
 export default function HousingAffordabilityPage() {
   const paycheckInputs = useFinWiseStore((s) => s.paycheckInputs);
@@ -88,22 +88,14 @@ export default function HousingAffordabilityPage() {
   const readiness = affordability.recommendedMonthlyHousing > 0 && flow.paycheck.isComplete;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
-      <div className="rounded-2xl border border-slate-200/80 bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 p-5 text-white shadow-lg sm:p-6">
-        <div className="space-y-1">
-          <Link href="/" className="inline-flex items-center gap-1 text-xs text-slate-300 hover:text-white">
-            <ChevronLeft className="size-3" /> Tools
-          </Link>
-          <h1 className="mt-1 flex items-center gap-2 text-2xl font-semibold">
-            <Home className="size-6 text-emerald-300" />
-            Housing Affordability Calculator
-          </h1>
-          <p className="text-sm text-slate-300">
-            Realistic rent and mortgage affordability based on synced budget, debt, and plan assumptions.
-          </p>
-          <div className="pt-1"><SyncMeta updatedAt={planLastUpdated} badges={['Budget + Plan Synced']} /></div>
-        </div>
-      </div>
+    <div className="mx-auto max-w-[1280px] space-y-8">
+      <PageHeader
+        backHref="/"
+        backLabel="Tools"
+        title="Housing Affordability Calculator"
+        subtitle="Realistic rent and mortgage affordability based on synced budget, debt, and plan assumptions."
+      />
+      <div className="px-8"><SyncMeta updatedAt={planLastUpdated} badges={['Budget + Plan Synced']} /></div>
 
       <div className="grid gap-4 lg:grid-cols-[420px_1fr]">
         <div className="space-y-4 rounded-xl border bg-card p-4">

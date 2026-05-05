@@ -1,5 +1,16 @@
-export const formatCurrency = (n: number) =>
-  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n);
+export function formatCurrency(n: number, showCents = false): string {
+  if (n === 0) return '$0';
+  if (Math.abs(n) >= 1000000) {
+    return '$' + (n / 1000000).toFixed(1) + 'M';
+  }
+  if (showCents) {
+    return '$' + n.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  }
+  return '$' + Math.round(n).toLocaleString('en-US');
+}
 
 export const formatDate = (iso: string) =>
   new Date(iso + 'T00:00:00').toLocaleDateString('en-US', {

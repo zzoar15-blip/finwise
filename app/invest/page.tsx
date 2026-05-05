@@ -8,6 +8,7 @@ import { ExportButton } from '@/components/ExportButton';
 import { downloadCsv } from '@/lib/export';
 import { PDFDownloadButton } from '@/components/pdf/PDFDownloadButton';
 import { SimpleRowsPDF } from '@/lib/pdf/SimpleRowsPDF';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { formatCurrency } from '@/lib/format';
 import { useFinWiseStore } from '@/lib/store';
 import { computeUnifiedMonthlyFlow } from '@/lib/calculations';
@@ -32,7 +33,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-import { TrendingUp, DollarSign, Calendar, Percent, ChevronLeft, Info } from 'lucide-react';
+import { DollarSign, Calendar, Percent, Info } from 'lucide-react';
 
 type Tab = 'charts' | 'milestones' | 'targets';
 type FocusType = 'income' | 'growth';
@@ -308,25 +309,11 @@ export default function InvestPage() {
   return (
     <div className="mx-auto max-w-7xl space-y-6" id="tool-invest-export">
       {/* Header */}
-      <div className="rounded-2xl border border-slate-200/80 bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 p-5 text-white shadow-lg sm:p-6">
-        <Link href="/plan" className="inline-flex items-center gap-1 text-xs text-slate-300 hover:text-white transition-colors">
-          <ChevronLeft className="size-3" /> My Plan
-        </Link>
-        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-start gap-3">
-            <TrendingUp className="size-6 text-emerald-300" />
-            <div>
-              <p className="text-xs uppercase tracking-[0.14em] text-slate-300">Portfolio Engine</p>
-              <h1 className="mt-1 text-2xl font-semibold">Investment Income Simulator</h1>
-              <p className="text-sm text-slate-300">
-                Model growth vs income outcomes with synced contributions from paycheck and budget.
-              </p>
-              <div className="mt-2"><SyncMeta updatedAt={planLastUpdated} badges={['Unified Flow']} /></div>
-              <Link href="/tools/rent-vs-buy" className="mt-1 inline-block text-sm text-emerald-200 hover:text-white hover:underline">
-                Compare against rent-vs-buy opportunity cost
-              </Link>
-            </div>
-          </div>
+      <PageHeader
+        backHref="/plan"
+        title="Investment Income Simulator"
+        subtitle="Model growth vs income outcomes with synced contributions from paycheck and budget."
+        actions={
           <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto">
             <PDFDownloadButton
               className="flex-1 sm:flex-none"
@@ -342,7 +329,13 @@ export default function InvestPage() {
               onExportCsv={() => downloadCsv(buildExportRows(), 'finwise-invest')}
             />
           </div>
-        </div>
+        }
+      />
+      <div className="px-8">
+        <SyncMeta updatedAt={planLastUpdated} badges={['Unified Flow']} />
+        <Link href="/tools/rent-vs-buy" className="mt-1 inline-block text-sm text-blue-600 hover:underline">
+          Compare against rent-vs-buy opportunity cost
+        </Link>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[380px_1fr]">

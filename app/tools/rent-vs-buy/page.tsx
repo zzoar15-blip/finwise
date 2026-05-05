@@ -12,7 +12,6 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from 'recharts';
-import { Home, ChevronLeft } from 'lucide-react';
 import { useFinWiseStore } from '@/lib/store';
 import { usePlanStore } from '@/lib/planStore';
 import { getPropertyTaxRate } from '@/lib/stateTax';
@@ -22,13 +21,14 @@ import { downloadCsv } from '@/lib/export';
 import { PDFDownloadButton } from '@/components/pdf/PDFDownloadButton';
 import { computeRentVsBuy } from '@/lib/calculations/rentVsBuy';
 import { RentVsBuyPDF } from '@/lib/pdf/RentVsBuyPDF';
+import { PageHeader } from '@/components/layout/PageHeader';
 
 const SENTIMENT_STYLES = {
-  'strong-buy': 'bg-[#0f172a] text-white',
-  'lean-buy': 'bg-[#2563eb] text-white',
-  neutral: 'bg-gray-100 text-gray-900',
-  'lean-rent': 'bg-amber-200 text-amber-950',
-  'strong-rent': 'bg-gray-900 text-white',
+  'strong-buy': 'border-l-[4px] border-l-[#3b82f6] bg-blue-50 text-slate-900',
+  'lean-buy': 'border-l-[4px] border-l-[#3b82f6] bg-blue-50 text-slate-900',
+  neutral: 'border-l-[4px] border-l-[#d97706] bg-amber-50 text-slate-900',
+  'lean-rent': 'border-l-[4px] border-l-[#16a34a] bg-green-50 text-slate-900',
+  'strong-rent': 'border-l-[4px] border-l-[#16a34a] bg-green-50 text-slate-900',
 } as const;
 
 function yTick(v: number) {
@@ -171,21 +171,15 @@ export default function RentVsBuyPage() {
 
   return (
     <div id="rent-vs-buy-content" className="space-y-5 max-w-[1400px]">
-      <div className="rounded-2xl border border-slate-200/80 bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 p-5 text-white shadow-lg sm:p-6">
-        <div className="flex items-center justify-between gap-3">
-          <div className="space-y-1">
-            <Link href="/" className="inline-flex items-center gap-1 text-xs text-slate-300 hover:text-white">
-              <ChevronLeft className="size-3" /> Tools
-            </Link>
-            <h1 className="mt-1 flex items-center gap-2 text-2xl font-semibold">
-              <Home className="size-6 text-emerald-300" />
-              Rent vs. Buy Calculator
-            </h1>
-            <p className="text-sm text-slate-300">30-year wealth comparison with break-even timing and sensitivity analysis.</p>
-          </div>
+      <PageHeader
+        backHref="/"
+        backLabel="Tools"
+        title="Rent vs. Buy Calculator"
+        subtitle="30-year wealth comparison with break-even timing and sensitivity analysis."
+        actions={
         <div className="flex items-center gap-2">
           <PDFDownloadButton
-            className="border-white/30 bg-white/10 text-white hover:bg-white/20"
+            className=""
             label="Export PDF"
             document={
               <RentVsBuyPDF
@@ -228,8 +222,8 @@ export default function RentVsBuyPage() {
             onExportCsv={() => downloadCsv(csvRows, 'finwise-rent-vs-buy')}
           />
         </div>
-      </div>
-      </div>
+        }
+      />
 
       <div className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
         <div className="flex items-center justify-between gap-2">
@@ -337,11 +331,14 @@ export default function RentVsBuyPage() {
 
         <div className="space-y-4">
           <div className={`rounded-xl p-5 ${SENTIMENT_STYLES[results.verdictSentiment]}`}>
-            <h2 className="text-2xl font-bold">{results.verdictHeadline}</h2>
-            <p className="mt-1 text-sm opacity-95">{results.verdictDetail}</p>
-            <p className="mt-4 text-sm font-medium">
-              Break-even: {results.breakEvenYear ? `${results.breakEvenYear.toFixed(1)} years` : 'Never breaks even'}
-            </p>
+            <h2 className="text-[20px] font-bold">{results.verdictHeadline}</h2>
+            <p className="mt-1 text-[14px] leading-[1.6]">{results.verdictDetail}</p>
+            <div className="mt-4">
+              <p className="text-xs font-semibold tracking-[0.08em] text-slate-500">BREAK-EVEN</p>
+              <p className="text-[24px] font-bold">
+                {results.breakEvenYear ? `${Math.round(results.breakEvenYear)} years` : 'Never'}
+              </p>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">

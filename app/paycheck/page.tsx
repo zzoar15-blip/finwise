@@ -1,8 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useMemo } from 'react';
-import { DollarSign, Info, ChevronLeft } from 'lucide-react';
-import Link from 'next/link';
+import { DollarSign, Info } from 'lucide-react';
 import { useFinWiseStore } from '@/lib/store';
 import { PAY_PERIODS } from '@/lib/calculations/paycheck';
 import type { PayPeriod, FilingStatus } from '@/lib/calculations/paycheck';
@@ -26,6 +25,7 @@ import { PDFDownloadButton } from '@/components/pdf/PDFDownloadButton';
 import { SyncMeta } from '@/components/SyncMeta';
 import type { StorePaycheckInputs } from '@/lib/calculations';
 import { PaycheckPDF } from '@/lib/pdf/PaycheckPDF';
+import { PageHeader } from '@/components/layout/PageHeader';
 
 const PAY_PERIOD_LABELS: Record<PayPeriod, string> = {
   weekly: 'Weekly',
@@ -257,21 +257,12 @@ export default function PaycheckPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6" id="tool-paycheck-export">
-      {/* Header */}
-      <div className="rounded-2xl border border-slate-200/80 bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 p-5 text-white shadow-lg sm:p-6">
-        <Link href="/plan" className="inline-flex items-center gap-1 text-xs text-slate-300 hover:text-white transition-colors">
-          <ChevronLeft className="size-3" /> My Plan
-        </Link>
-        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.14em] text-slate-300">Income Foundation</p>
-            <h1 className="mt-1 text-2xl font-semibold">Paycheck Calculator</h1>
-            <p className="mt-1 text-sm text-slate-300">
-              Estimate true take-home after tax and benefits. Every downstream tool syncs from here.
-            </p>
-            <div className="mt-2"><SyncMeta updatedAt={planLastUpdated} badges={['Source of Truth']} /></div>
-          </div>
+    <div className="mx-auto max-w-[1280px] space-y-8" id="tool-paycheck-export">
+      <PageHeader
+        backHref="/plan"
+        title="Paycheck Calculator"
+        subtitle="Estimate true take-home after tax and benefits. Every downstream tool syncs from here."
+        actions={
           <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto">
             <PDFDownloadButton
               className="flex-1 sm:flex-none"
@@ -317,8 +308,9 @@ export default function PaycheckPage() {
               onExportCsv={() => downloadCsv(buildCsvRows(), 'finwise-paycheck')}
             />
           </div>
-        </div>
-      </div>
+        }
+      />
+      <div className="px-8"><SyncMeta updatedAt={planLastUpdated} badges={['Source of Truth']} /></div>
 
       {/* Auto-save banner */}
       {pr.isComplete && (
@@ -577,15 +569,15 @@ export default function PaycheckPage() {
                   <LineItem label="= Taxable Wages" value={pr.grossPerPaycheck - pr.totalPreTaxDeductions / currentPeriods} borderTop highlight />
 
                   {/* Federal taxes */}
-                  <LineItem label="Federal Income Tax" value={pr.federalTaxAnnual / currentPeriods} red />
-                  <LineItem label="Social Security (6.2%)" value={pr.ssAnnual / currentPeriods} red />
-                  <LineItem label="Medicare" value={pr.medicareAnnual / currentPeriods} red />
+                  <LineItem label="Federal Income Tax" value={pr.federalTaxAnnual / currentPeriods} muted />
+                  <LineItem label="Social Security (6.2%)" value={pr.ssAnnual / currentPeriods} muted />
+                  <LineItem label="Medicare" value={pr.medicareAnnual / currentPeriods} muted />
 
                   {pr.stateTaxAnnual > 0 && (
                     <LineItem
                       label={`${selectedState?.name ?? localInputs.state} Income Tax`}
                       value={pr.stateTaxAnnual / currentPeriods}
-                      red
+                      muted
                     />
                   )}
 
@@ -593,7 +585,7 @@ export default function PaycheckPage() {
                     <LineItem
                       label="State Payroll Tax"
                       value={pr.statePfmlAnnual / currentPeriods}
-                      red
+                      muted
                     />
                   )}
 
