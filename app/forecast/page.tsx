@@ -3,7 +3,7 @@
 import { Suspense, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { forecastScenario, findBreakeven } from '@/lib/calculations/forecast';
+import { forecastScenario, findBreakeven, buildConfidenceBands } from '@/lib/calculations/forecast';
 import type { Scenario, ScenarioResult } from '@/lib/calculations/forecast';
 import { ExportButton } from '@/components/ExportButton';
 import { downloadCsv, downloadXlsxFromAoa } from '@/lib/export';
@@ -19,6 +19,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import {
   LineChart,
   Line,
@@ -36,29 +44,6 @@ import { useFinWiseStore } from '@/lib/store';
 import { computeUnifiedMonthlyFlow } from '@/lib/calculations';
 
 const SCENARIO_COLORS = ['#3b82f6', '#22c55e', '#f97316'] as const;
-
-const DEFAULT_SCENARIOS: Scenario[] = [
-  {
-    id: '1',
-    name: 'Conservative',
-    color: '#3b82f6',
-    startingSalary: 80000,
-    annualRaise: 2,
-    savingsRate: 15,
-    investmentReturn: 6,
-    startingNetWorth: 10000,
-  },
-  {
-    id: '2',
-    name: 'Aggressive',
-    color: '#22c55e',
-    startingSalary: 80000,
-    annualRaise: 5,
-    savingsRate: 30,
-    investmentReturn: 8,
-    startingNetWorth: 10000,
-  },
-];
 
 function yAxisFormatter(v: number): string {
   if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
@@ -147,7 +132,10 @@ function ForecastPageContent() {
   const paycheckInputs = useFinWiseStore((s) => s.paycheckInputs);
   const paycheckResults = useFinWiseStore((s) => s.paycheckResults);
   const debts = useFinWiseStore((s) => s.debts);
-  const [scenarios, setScenarios] = useState<Scenario[]>(DEFAULT_SCENARIOS);
+  const scenarios = useFinWiseStore((s) => s.forecastScenarios);
+  const setScenarios = useFinWiseStore((s) => s.setForecastScenarios);
+  const baselineScenarioId = useFinWiseStore((s) => s.forecastBaselineScenarioId);
+  const setBaselineScenarioId = useFinWiseStore((s) => s.setForecastBaselineScenarioId);
   const [homeExtraSavings, setHomeExtraSavings] = useState(0);
   const [homeApy, setHomeApy] = useState(4.5);
   const [homeMonthlyGrowth, setHomeMonthlyGrowth] = useState(0);
@@ -166,6 +154,11 @@ function ForecastPageContent() {
     () => scenarios.map((s) => ({ scenario: s, points: forecastScenario(s, 10) })),
     [scenarios]
   );
+  const baselineScenario = scenarios.find((s) => s.id === baselineScenarioId) ?? scenarios[0];
+  const confidenceBands = useMemo(
+    () => (baselineScenario ? buildConfidenceBands(baselineScenario, 10) : []),
+    [baselineScenario]
+  );
 
   // Build chart data: one entry per year, with each scenario's net worth
   const chartData = useMemo(() => {
@@ -180,7 +173,7 @@ function ForecastPageContent() {
   }, [results]);
 
   function updateScenario(id: string, patch: Partial<Scenario>) {
-    setScenarios((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
+    setScenarios(scenarios.map((s) => (s.id === id ? { ...s, ...patch } : s)));
   }
 
   function addScenario() {
@@ -196,12 +189,16 @@ function ForecastPageContent() {
       investmentReturn: 7,
       startingNetWorth: 10000,
     };
-    setScenarios((prev) => [...prev, newScenario]);
+    setScenarios([...scenarios, newScenario]);
   }
 
   function removeScenario(id: string) {
     if (scenarios.length <= 1) return;
-    setScenarios((prev) => prev.filter((s) => s.id !== id));
+    setScenarios(scenarios.filter((s) => s.id !== id));
+    if (baselineScenarioId === id) {
+      const fallback = scenarios.find((s) => s.id !== id);
+      if (fallback) setBaselineScenarioId(fallback.id);
+    }
   }
 
   // Breakeven pairs
@@ -225,7 +222,15 @@ function ForecastPageContent() {
       i + 1,
       ...results.map((r) => Math.round((r.points[i]?.netWorth ?? 0) * 100) / 100),
     ]);
-    return [headers, ...rows];
+    return [
+      ['Assumption', 'Value'],
+      ['Baseline Scenario', baselineScenario?.name ?? 'Scenario 1'],
+      ['Horizon (years)', 10],
+      ['Confidence Band Model', 'P10/P50/P90 deterministic stress'],
+      [],
+      headers,
+      ...rows,
+    ];
   }
 
   const homeForecast = useMemo(() => {
@@ -513,6 +518,25 @@ function ForecastPageContent() {
               Add Scenario
             </Button>
           )}
+          <Dialog>
+            <DialogTrigger>
+              <Button variant="outline" size="sm" className="flex-1 sm:flex-none">Methodology</Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>How scenario math works</DialogTitle>
+                <DialogDescription>
+                  Baseline uses your selected assumptions. Confidence bands show downside and upside paths using reduced/increased raise, savings, and return assumptions.
+                </DialogDescription>
+              </DialogHeader>
+              <ul className="list-disc pl-5 text-sm text-muted-foreground space-y-1">
+                <li>P10: conservative downside path</li>
+                <li>P50: baseline assumptions</li>
+                <li>P90: optimistic upside path</li>
+                <li>Use this to compare risk before selecting a strategy</li>
+              </ul>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
@@ -553,6 +577,14 @@ function ForecastPageContent() {
                 </div>
               </CardHeader>
               <CardContent className="pt-4 space-y-3">
+                <div className="flex items-center justify-between rounded-md border border-border px-2.5 py-1.5">
+                  <Label className="text-xs text-muted-foreground">Use as baseline</Label>
+                  <input
+                    type="radio"
+                    checked={baselineScenarioId === scenario.id}
+                    onChange={() => setBaselineScenarioId(scenario.id)}
+                  />
+                </div>
                 <ScenarioField
                   label="Starting Net Worth ($)"
                   value={scenario.startingNetWorth}
@@ -634,6 +666,28 @@ function ForecastPageContent() {
           </ResponsiveContainer>
         </CardContent>
       </Card>
+
+      {confidenceBands.length > 0 && (
+        <Card className="shadow-sm">
+          <CardHeader>
+            <CardTitle>Confidence Bands ({baselineScenario?.name ?? 'Baseline'})</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={confidenceBands} margin={{ top: 4, right: 16, left: 8, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                <XAxis dataKey="year" tick={{ fontSize: 12 }} />
+                <YAxis tickFormatter={yAxisFormatter} tick={{ fontSize: 12 }} width={72} />
+                <Tooltip formatter={(v) => (typeof v === 'number' ? formatCurrency(v) : String(v))} />
+                <Legend />
+                <Line type="monotone" dataKey="p10" stroke="#ef4444" strokeWidth={2} dot={false} name="P10 (Downside)" />
+                <Line type="monotone" dataKey="p50" stroke="#3b82f6" strokeWidth={2.5} dot={false} name="P50 (Base)" />
+                <Line type="monotone" dataKey="p90" stroke="#22c55e" strokeWidth={2} dot={false} name="P90 (Upside)" />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Breakeven Analysis */}
       <Card className="shadow-sm">
@@ -732,6 +786,17 @@ function ForecastPageContent() {
               </tbody>
             </table>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle>Assumption Summary</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm text-muted-foreground space-y-1">
+          <p>Baseline scenario: <span className="font-medium text-foreground">{baselineScenario?.name ?? 'Scenario 1'}</span></p>
+          <p>Confidence bands use modified raise, savings rate, and return assumptions around baseline.</p>
+          <p>P10 = downside, P50 = baseline, P90 = upside.</p>
         </CardContent>
       </Card>
     </div>

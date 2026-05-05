@@ -16,6 +16,7 @@ import {
   computeTotalExpenses,
 } from '@/lib/calculations';
 import type { PlanInputs, PlanDebt, Goal } from '@/types/plan';
+import type { ActionChecklistItem } from '@/types/plan';
 
 export interface WaterfallEntry {
   name: string;
@@ -93,6 +94,22 @@ export interface PlanMetrics {
   emergencyFundDate: string | null;
   homeMonthlyContribution: number;
   emergencyMonthlyContribution: number;
+  financialHealthScore: number;
+  healthScoreBreakdown: {
+    cashflow: number;
+    debt: number;
+    emergency: number;
+    investing: number;
+    tax: number;
+  };
+  goalWarnings: Array<{
+    id: string;
+    level: 'warning' | 'risk';
+    title: string;
+    detail: string;
+    href: string;
+  }>;
+  actionChecklist: ActionChecklistItem[];
 }
 
 interface PlanDebtSimulationOverrides {
@@ -100,6 +117,171 @@ interface PlanDebtSimulationOverrides {
   annualBonus?: number;
   bonusMonth?: number;
   strategy?: 'avalanche' | 'snowball';
+}
+
+function clampScore(n: number): number {
+  return Math.max(0, Math.min(100, Math.round(n)));
+}
+
+function buildHealthScore(metrics: {
+  monthlySurplus: number;
+  monthlyTakeHome: number;
+  totalDebtBalance: number;
+  monthlyDebtMinimums: number;
+  emergencyFundMonthsCovered: number;
+  monthlyInvestCapacity: number;
+  taxEfficiencyScore: number;
+}): PlanMetrics['healthScoreBreakdown'] & { total: number } {
+  const cashflowRatio = metrics.monthlyTakeHome > 0 ? metrics.monthlySurplus / metrics.monthlyTakeHome : 0;
+  const cashflow = clampScore(cashflowRatio >= 0.2 ? 100 : cashflowRatio >= 0.1 ? 75 : cashflowRatio > 0 ? 55 : 20);
+  const debtLoad = metrics.monthlyTakeHome > 0 ? metrics.monthlyDebtMinimums / metrics.monthlyTakeHome : 0;
+  const debt = clampScore(metrics.totalDebtBalance <= 0 ? 100 : debtLoad <= 0.1 ? 80 : debtLoad <= 0.2 ? 60 : 35);
+  const emergency = clampScore(metrics.emergencyFundMonthsCovered >= 6 ? 100 : (metrics.emergencyFundMonthsCovered / 6) * 100);
+  const investing = clampScore(metrics.monthlyInvestCapacity <= 0 ? 20 : Math.min(100, 35 + metrics.monthlyInvestCapacity / 40));
+  const tax = clampScore(metrics.taxEfficiencyScore);
+  const total = clampScore(cashflow * 0.3 + debt * 0.25 + emergency * 0.2 + investing * 0.15 + tax * 0.1);
+  return { total, cashflow, debt, emergency, investing, tax };
+}
+
+function buildGoalWarnings(inputs: PlanInputs, metrics: {
+  monthlySurplus: number;
+  emergencyFundMonthsCovered: number;
+  homeMonthlyContribution: number;
+  emergencyMonthlyContribution: number;
+  debtResult: DebtResult | null;
+  monthlyInvestCapacity: number;
+}): PlanMetrics['goalWarnings'] {
+  const warnings: PlanMetrics['goalWarnings'] = [];
+  if (metrics.monthlySurplus < 0) {
+    warnings.push({
+      id: 'negative-surplus',
+      level: 'risk',
+      title: 'Monthly cash flow is negative',
+      detail: 'Your current plan spends more than it brings in. Goal timelines will slip until surplus is positive.',
+      href: '/budget',
+    });
+  }
+  if (inputs.goals.includes('emergency-fund') && metrics.emergencyFundMonthsCovered < 1) {
+    warnings.push({
+      id: 'low-emergency-coverage',
+      level: 'warning',
+      title: 'Emergency coverage is below one month',
+      detail: 'Build buffer first to reduce disruption risk before aggressive investing or home savings.',
+      href: '/forecast?focus=emergency',
+    });
+  }
+  if (inputs.goals.includes('save-home') && inputs.homeTarget > 0 && metrics.homeMonthlyContribution > Math.max(0, metrics.monthlySurplus)) {
+    warnings.push({
+      id: 'home-goal-unfunded',
+      level: 'warning',
+      title: 'Home timeline is underfunded',
+      detail: 'Required monthly home contribution exceeds available surplus under current assumptions.',
+      href: '/forecast?focus=home',
+    });
+  }
+  if (inputs.goals.includes('pay-debt') && metrics.debtResult && metrics.debtResult.monthsToPayoff > 120) {
+    warnings.push({
+      id: 'debt-horizon-long',
+      level: 'warning',
+      title: 'Debt payoff horizon is long',
+      detail: 'Debt-free date is over 10 years out; consider increasing overpayment or refinancing options.',
+      href: '/debt',
+    });
+  }
+  if ((inputs.goals.includes('invest-income') || inputs.goals.includes('dividend-income')) && metrics.monthlyInvestCapacity <= 0) {
+    warnings.push({
+      id: 'invest-without-capacity',
+      level: 'warning',
+      title: 'No investable monthly capacity',
+      detail: 'Investment goal is selected, but current cash flow leaves no monthly investing room.',
+      href: '/invest',
+    });
+  }
+  return warnings;
+}
+
+function buildActionChecklist(inputs: PlanInputs, metrics: {
+  monthlySurplus: number;
+  emergencyMonthlyContribution: number;
+  homeMonthlyContribution: number;
+  monthlyInvestCapacity: number;
+  debtResult: DebtResult | null;
+  taxSuggestions: TaxSuggestion[];
+  goalWarnings: PlanMetrics['goalWarnings'];
+}): ActionChecklistItem[] {
+  const items: ActionChecklistItem[] = [];
+  if (metrics.monthlySurplus < 0) {
+    items.push({
+      id: 'fix-cashflow',
+      title: 'Stabilize monthly cash flow',
+      rationale: 'A negative monthly surplus blocks every other goal.',
+      monthlyImpact: Math.ceil(Math.abs(metrics.monthlySurplus)),
+      priority: 'high',
+      href: '/budget',
+    });
+  }
+  if (inputs.goals.includes('pay-debt') && metrics.debtResult) {
+    items.push({
+      id: 'debt-overpay',
+      title: 'Increase debt overpayment',
+      rationale: 'Accelerating high-interest balances improves flexibility and reduces total interest.',
+      monthlyImpact: Math.max(100, Math.round(metrics.monthlySurplus * 0.25)),
+      priority: 'high',
+      href: '/debt',
+    });
+  }
+  if (inputs.goals.includes('emergency-fund') && metrics.emergencyMonthlyContribution > 0) {
+    items.push({
+      id: 'emergency-autosave',
+      title: 'Automate emergency fund transfer',
+      rationale: 'Consistent monthly transfers de-risk short-term shocks.',
+      monthlyImpact: metrics.emergencyMonthlyContribution,
+      priority: 'high',
+      href: '/forecast?focus=emergency',
+    });
+  }
+  if (inputs.goals.includes('save-home') && metrics.homeMonthlyContribution > 0) {
+    items.push({
+      id: 'home-fund',
+      title: 'Fund down payment intentionally',
+      rationale: 'Dedicated monthly flow keeps home timeline visible and realistic.',
+      monthlyImpact: metrics.homeMonthlyContribution,
+      priority: 'medium',
+      href: '/forecast?focus=home',
+    });
+  }
+  if (metrics.monthlyInvestCapacity > 0) {
+    items.push({
+      id: 'invest-automate',
+      title: 'Automate monthly investing',
+      rationale: 'Automated investing enforces consistency and compounds growth.',
+      monthlyImpact: Math.round(metrics.monthlyInvestCapacity),
+      priority: 'medium',
+      href: '/invest',
+    });
+  }
+  if (metrics.taxSuggestions.length > 0) {
+    const top = metrics.taxSuggestions[0];
+    items.push({
+      id: 'tax-optimize',
+      title: `Apply tax optimization: ${top.label}`,
+      rationale: `Highest available immediate tax-efficiency lift (${Math.round(top.additionalSavings).toLocaleString()}/yr).`,
+      monthlyImpact: Math.round(top.additionalSavings / 12),
+      priority: 'medium',
+      href: '/paycheck',
+    });
+  }
+  if (metrics.goalWarnings.length === 0 && metrics.monthlySurplus > 0) {
+    items.push({
+      id: 'scenario-review',
+      title: 'Run scenario comparison',
+      rationale: 'Your baseline looks stable; compare upside/downside before committing to a path.',
+      monthlyImpact: 0,
+      priority: 'low',
+      href: '/forecast',
+    });
+  }
+  return items.slice(0, 6);
 }
 
 function sumExpenses(e: PlanInputs['expenses']): number {
@@ -528,6 +710,32 @@ export function computePlanMetrics(
     emergencyMonthlyContribution,
   };
   const priorities = buildPriorities(inputs, partialMetrics);
+  const health = buildHealthScore({
+    monthlySurplus,
+    monthlyTakeHome,
+    totalDebtBalance,
+    monthlyDebtMinimums,
+    emergencyFundMonthsCovered,
+    monthlyInvestCapacity,
+    taxEfficiencyScore,
+  });
+  const goalWarnings = buildGoalWarnings(inputs, {
+    monthlySurplus,
+    emergencyFundMonthsCovered,
+    homeMonthlyContribution,
+    emergencyMonthlyContribution,
+    debtResult,
+    monthlyInvestCapacity,
+  });
+  const actionChecklist = buildActionChecklist(inputs, {
+    monthlySurplus,
+    emergencyMonthlyContribution,
+    homeMonthlyContribution,
+    monthlyInvestCapacity,
+    debtResult,
+    taxSuggestions,
+    goalWarnings,
+  });
 
   // ── 12-month projection ──
   const projection = build12MonthProjection(
@@ -561,6 +769,16 @@ export function computePlanMetrics(
     emergencyFundDate,
     homeMonthlyContribution,
     emergencyMonthlyContribution,
+    financialHealthScore: health.total,
+    healthScoreBreakdown: {
+      cashflow: health.cashflow,
+      debt: health.debt,
+      emergency: health.emergency,
+      investing: health.investing,
+      tax: health.tax,
+    },
+    goalWarnings,
+    actionChecklist,
   };
 }
 
@@ -657,6 +875,32 @@ export function mergePlanMetricsWithUnifiedBudget(
     emergencyMonthlyContribution: budgetInputs.emergencyFundMonthly,
   };
   const priorities = buildPriorities(inputs, partialMetrics);
+  const health = buildHealthScore({
+    monthlySurplus: unifiedSurplus,
+    monthlyTakeHome: monthlyIncome,
+    totalDebtBalance,
+    monthlyDebtMinimums: debtMins,
+    emergencyFundMonthsCovered,
+    monthlyInvestCapacity,
+    taxEfficiencyScore: base.taxEfficiencyScore,
+  });
+  const goalWarnings = buildGoalWarnings(inputs, {
+    monthlySurplus: unifiedSurplus,
+    emergencyFundMonthsCovered,
+    homeMonthlyContribution: budgetInputs.homeDownPaymentMonthly,
+    emergencyMonthlyContribution: budgetInputs.emergencyFundMonthly,
+    debtResult,
+    monthlyInvestCapacity,
+  });
+  const actionChecklist = buildActionChecklist(inputs, {
+    monthlySurplus: unifiedSurplus,
+    emergencyMonthlyContribution: budgetInputs.emergencyFundMonthly,
+    homeMonthlyContribution: budgetInputs.homeDownPaymentMonthly,
+    monthlyInvestCapacity,
+    debtResult,
+    taxSuggestions: base.taxSuggestions,
+    goalWarnings,
+  });
 
   const projection = build12MonthProjection(
     inputs,
@@ -742,5 +986,15 @@ export function mergePlanMetricsWithUnifiedBudget(
     emergencyFundDate,
     homeMonthlyContribution: budgetInputs.homeDownPaymentMonthly,
     emergencyMonthlyContribution: budgetInputs.emergencyFundMonthly,
+    financialHealthScore: health.total,
+    healthScoreBreakdown: {
+      cashflow: health.cashflow,
+      debt: health.debt,
+      emergency: health.emergency,
+      investing: health.investing,
+      tax: health.tax,
+    },
+    goalWarnings,
+    actionChecklist,
   };
 }

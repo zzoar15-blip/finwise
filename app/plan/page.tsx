@@ -55,6 +55,15 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import type { ActionChecklistItem } from '@/types/plan';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -318,6 +327,49 @@ function InsightCard({ insight }: { insight: AIInsight }) {
   );
 }
 
+function ActionChecklistCard({ item }: { item: ActionChecklistItem }) {
+  return (
+    <div className="rounded-xl border border-border bg-card p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold">{item.title}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{item.rationale}</p>
+        </div>
+        <Badge variant={item.priority === 'high' ? 'destructive' : item.priority === 'medium' ? 'secondary' : 'outline'}>
+          {item.priority}
+        </Badge>
+      </div>
+      <div className="mt-3 flex items-center justify-between">
+        <p className="text-xs text-muted-foreground">
+          Estimated monthly impact: <span className="font-semibold text-foreground">{formatCurrency(item.monthlyImpact)}</span>
+        </p>
+        <div className="flex items-center gap-2">
+          <Dialog>
+            <DialogTrigger>
+              <Button size="sm" variant="outline">Why</Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{item.title}</DialogTitle>
+                <DialogDescription>{item.rationale}</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-2 text-sm">
+                <p>Estimated monthly impact: <span className="font-semibold">{formatCurrency(item.monthlyImpact)}</span></p>
+                <p className="text-muted-foreground">
+                  This recommendation is generated from your current plan metrics (surplus, debt, savings, and selected goals).
+                </p>
+              </div>
+            </DialogContent>
+          </Dialog>
+          <Link href={item.href} className="text-sm font-medium text-[#3b82f6] hover:underline">
+            Do it →
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SkeletonInsightCard() {
   return (
     <div className="rounded-xl border border-border bg-card p-4 flex gap-3 animate-pulse">
@@ -383,6 +435,7 @@ export default function PlanPage() {
   const planLastUpdated = usePlanStore((s) => s.planLastUpdated);
   const aiInsightsCache = usePlanStore((s) => s.aiInsightsCache);
   const setAIInsightsCache = usePlanStore((s) => s.setAIInsightsCache);
+  const setActionChecklist = usePlanStore((s) => s.setActionChecklist);
   const goals = useFinWiseStore((s) => s.goals);
   const rentVsBuyResults = useFinWiseStore((s) => s.rentVsBuyResults);
   const paycheckResults = useFinWiseStore((s) => s.paycheckResults);
@@ -476,6 +529,10 @@ export default function PlanPage() {
       debtProfile?.strategy,
     ],
   );
+
+  useEffect(() => {
+    setActionChecklist(metrics.actionChecklist);
+  }, [metrics.actionChecklist, setActionChecklist]);
 
   // Invest metrics: prefer investProfile simulation, else use computed
   const investMetrics = useMemo(() => {
@@ -605,6 +662,10 @@ export default function PlanPage() {
     waterfallData,
     priorities,
     projection,
+    financialHealthScore,
+    healthScoreBreakdown,
+    goalWarnings,
+    actionChecklist,
   } = metrics;
 
   const insightItems = aiInsightsCache?.items ?? [];
@@ -686,6 +747,13 @@ export default function PlanPage() {
           {/* Hero metrics */}
           <div className="mt-5 flex flex-col gap-3 sm:flex-row">
             <MetricCard
+              label="Financial Health"
+              value={`${financialHealthScore}/100`}
+              valueClass={financialHealthScore >= 75 ? 'text-green-600' : financialHealthScore >= 50 ? 'text-amber-600' : 'text-red-500'}
+              icon={<Shield className="size-5 text-muted-foreground" />}
+              sub={`Cashflow ${healthScoreBreakdown.cashflow} · Debt ${healthScoreBreakdown.debt} · Emergency ${healthScoreBreakdown.emergency}`}
+            />
+            <MetricCard
               label={unifiedBudgetHero ? 'Monthly income' : 'Monthly Take-Home'}
               value={heroIncomeVisible ? formatCurrency(monthlyTakeHome) : '—'}
               valueClass="text-green-600"
@@ -745,6 +813,22 @@ export default function PlanPage() {
               sub={hasDebts && debtResult ? `${debtResult.monthsToPayoff} months away` : undefined}
             />
           </div>
+
+          {goalWarnings.length > 0 && (
+            <div className="mt-4 space-y-2">
+              {goalWarnings.map((warning) => (
+                <div key={warning.id} className={`rounded-lg border px-3 py-2 text-sm ${warning.level === 'risk' ? 'border-red-200 bg-red-50 text-red-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold">{warning.title}</p>
+                      <p className="mt-0.5">{warning.detail}</p>
+                    </div>
+                    <Link href={warning.href} className="shrink-0 font-medium underline underline-offset-2">Review</Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
 
           <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
             <div className="flex items-start justify-between gap-3">
@@ -853,6 +937,30 @@ export default function PlanPage() {
                 <div className="grid gap-3 sm:grid-cols-2">
                   {priorities.map((card) => (
                     <PriorityCardItem key={card.goal} card={card} />
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </Section>
+
+        <Section delay={0.25}>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg font-bold" style={{ color: '#0f172a' }}>
+                Action Checklist
+              </CardTitle>
+              <CardDescription>
+                Deterministic next steps generated from your current financial picture.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {actionChecklist.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No actions yet — complete your plan inputs to generate checklist items.</p>
+              ) : (
+                <div className="space-y-3">
+                  {actionChecklist.map((item) => (
+                    <ActionChecklistCard key={item.id} item={item} />
                   ))}
                 </div>
               )}

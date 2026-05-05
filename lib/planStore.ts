@@ -20,6 +20,7 @@ export const usePlanStore = create<PlanStore>()(
       investProfile: null,
       planLastUpdated: null,
       aiInsightsCache: null,
+      actionChecklist: [],
 
       setPlan: (inputs: PlanInputs) =>
         set({
@@ -65,6 +66,9 @@ export const usePlanStore = create<PlanStore>()(
 
       setAIInsightsCache: (cache: AIInsightsCache) =>
         set({ aiInsightsCache: cache }),
+
+      setActionChecklist: (items) =>
+        set({ actionChecklist: items, planLastUpdated: new Date().toISOString() }),
     }),
     { name: 'finwise-plan-store' }
   )

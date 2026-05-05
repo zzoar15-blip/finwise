@@ -140,6 +140,15 @@ export interface AIInsightsCache {
   dataHash: string;
 }
 
+export interface ActionChecklistItem {
+  id: string;
+  title: string;
+  rationale: string;
+  monthlyImpact: number;
+  priority: 'high' | 'medium' | 'low';
+  href: string;
+}
+
 export interface PlanStore {
   plan: FinancialPlan | null;
   settings: AppSettings;
@@ -148,6 +157,7 @@ export interface PlanStore {
   investProfile: InvestProfile | null;
   planLastUpdated: string | null;
   aiInsightsCache: AIInsightsCache | null;
+  actionChecklist: ActionChecklistItem[];
   setPlan: (inputs: PlanInputs) => void;
   updatePlanInputs: (partial: Partial<PlanInputs>) => void;
   setPlanInsights: (insights: PlanAIInsights) => void;
@@ -157,4 +167,5 @@ export interface PlanStore {
   setDebtProfile: (profile: DebtProfile) => void;
   setInvestProfile: (profile: InvestProfile) => void;
   setAIInsightsCache: (cache: AIInsightsCache) => void;
+  setActionChecklist: (items: ActionChecklistItem[]) => void;
 }

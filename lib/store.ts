@@ -32,6 +32,7 @@ import {
   type NetWorthItem,
   type NetWorthSnapshot,
 } from '@/lib/calculations/netWorth';
+import type { Scenario } from '@/lib/calculations/forecast';
 
 function normalizeGoalOrder(goals: string[]): string[] {
   const seen = new Set<string>();
@@ -59,6 +60,8 @@ interface FinWiseStore {
   netWorthAssets: NetWorthItem[];
   netWorthLiabilities: NetWorthItem[];
   netWorthHistory: NetWorthSnapshot[];
+  forecastScenarios: Scenario[];
+  forecastBaselineScenarioId: string | null;
 
   setPaycheckInputs: (inputs: Partial<StorePaycheckInputs>) => void;
   setBudgetInputs: (inputs: Partial<StoreBudgetInputs>) => void;
@@ -70,7 +73,32 @@ interface FinWiseStore {
   setNetWorthAssets: (items: NetWorthItem[]) => void;
   setNetWorthLiabilities: (items: NetWorthItem[]) => void;
   addNetWorthSnapshot: () => void;
+  setForecastScenarios: (items: Scenario[]) => void;
+  setForecastBaselineScenarioId: (id: string) => void;
 }
+
+const DEFAULT_FORECAST_SCENARIOS: Scenario[] = [
+  {
+    id: '1',
+    name: 'Conservative',
+    color: '#3b82f6',
+    startingSalary: 80000,
+    annualRaise: 2,
+    savingsRate: 15,
+    investmentReturn: 6,
+    startingNetWorth: 10000,
+  },
+  {
+    id: '2',
+    name: 'Aggressive',
+    color: '#22c55e',
+    startingSalary: 80000,
+    annualRaise: 5,
+    savingsRate: 30,
+    investmentReturn: 8,
+    startingNetWorth: 10000,
+  },
+];
 
 export const useFinWiseStore = create<FinWiseStore>()(
   persist(
@@ -91,6 +119,8 @@ export const useFinWiseStore = create<FinWiseStore>()(
       ],
       netWorthLiabilities: [],
       netWorthHistory: [],
+      forecastScenarios: DEFAULT_FORECAST_SCENARIOS,
+      forecastBaselineScenarioId: DEFAULT_FORECAST_SCENARIOS[0].id,
 
       setPaycheckInputs: (inputs) =>
         set((state) => {
@@ -190,6 +220,17 @@ export const useFinWiseStore = create<FinWiseStore>()(
             netWorthHistory: next,
             planLastUpdated: new Date().toISOString(),
           };
+        }),
+
+      setForecastScenarios: (items) =>
+        set({
+          forecastScenarios: items,
+          planLastUpdated: new Date().toISOString(),
+        }),
+      setForecastBaselineScenarioId: (id) =>
+        set({
+          forecastBaselineScenarioId: id,
+          planLastUpdated: new Date().toISOString(),
         }),
     }),
     { name: 'finwise-unified-store' }

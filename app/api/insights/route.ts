@@ -18,6 +18,7 @@ function buildContext(inputs: PlanInputs, metrics: PlanMetrics): string {
     `Monthly surplus: ${fmt(metrics.monthlySurplus)}`,
     `Savings rate: ${metrics.savingsRate.toFixed(1)}%`,
     `Tax efficiency score: ${metrics.taxEfficiencyScore}/100`,
+    `Financial health score: ${metrics.financialHealthScore}/100`,
     `401(k) traditional: ${inputs.traditional401kPct}%`,
     `HSA per period: ${fmt(inputs.hsaPerPeriod)}`,
     `FSA per period: ${fmt(inputs.fsaPerPeriod)}`,
@@ -57,6 +58,14 @@ function buildContext(inputs: PlanInputs, metrics: PlanMetrics): string {
     lines.push(
       `Tax optimization opportunities: ${metrics.taxSuggestions
         .map((s) => `${s.label} saves ${fmt(s.additionalSavings)}/yr`)
+        .join('; ')}`
+    );
+  }
+
+  if (metrics.goalWarnings.length > 0) {
+    lines.push(
+      `Goal warnings: ${metrics.goalWarnings
+        .map((w) => `${w.title} (${w.level})`)
         .join('; ')}`
     );
   }

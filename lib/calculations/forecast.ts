@@ -28,6 +28,13 @@ export interface Breakeven {
   year: number | null; // null if no crossover within 10 years
 }
 
+export interface ConfidenceBandPoint {
+  year: number;
+  p10: number;
+  p50: number;
+  p90: number;
+}
+
 export function forecastScenario(scenario: Scenario, years = 10): YearPoint[] {
   const points: YearPoint[] = [];
   let netWorth = scenario.startingNetWorth;
@@ -50,4 +57,36 @@ export function findBreakeven(a: YearPoint[], b: YearPoint[]): number | null {
     if (prevDiff * currDiff < 0) return a[i].year; // sign flip = crossover
   }
   return null;
+}
+
+export function buildConfidenceBands(
+  scenario: Scenario,
+  years = 10,
+): ConfidenceBandPoint[] {
+  const pessimistic = forecastScenario(
+    {
+      ...scenario,
+      annualRaise: Math.max(0, scenario.annualRaise - 1.5),
+      savingsRate: Math.max(0, scenario.savingsRate - 4),
+      investmentReturn: Math.max(1, scenario.investmentReturn - 3),
+    },
+    years,
+  );
+  const baseline = forecastScenario(scenario, years);
+  const optimistic = forecastScenario(
+    {
+      ...scenario,
+      annualRaise: scenario.annualRaise + 1.5,
+      savingsRate: scenario.savingsRate + 4,
+      investmentReturn: scenario.investmentReturn + 3,
+    },
+    years,
+  );
+
+  return baseline.map((point, idx) => ({
+    year: point.year,
+    p10: pessimistic[idx]?.netWorth ?? point.netWorth,
+    p50: point.netWorth,
+    p90: optimistic[idx]?.netWorth ?? point.netWorth,
+  }));
 }

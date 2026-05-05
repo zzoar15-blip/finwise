@@ -194,7 +194,7 @@ function DashboardPageContent() {
   const searchParams = useSearchParams();
   const wizardOpen = searchParams.get('wizard') === 'true';
 
-  const { plan, settings, setPlan, updateSettings } = usePlanStore();
+  const { plan, settings, setPlan, updateSettings, actionChecklist } = usePlanStore();
   const debtProfile = usePlanStore((s) => s.debtProfile);
   const transactions = useFinanceStore((s) => s.transactions);
   const paycheckResults = useFinWiseStore((s) => s.paycheckResults);
@@ -541,6 +541,32 @@ function DashboardPageContent() {
             ))}
           </div>
         </div>
+
+        {actionChecklist.length > 0 && (
+          <Card className="shadow-sm">
+            <CardHeader>
+              <CardTitle>Top Action Checklist</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {actionChecklist.slice(0, 3).map((item) => (
+                  <div key={item.id} className="flex items-start justify-between gap-3 rounded-lg border border-gray-200 bg-white p-3">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800">{item.title}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{item.rationale}</p>
+                    </div>
+                    <Link href={item.href} className="text-xs font-medium text-blue-600 hover:underline">
+                      Open →
+                    </Link>
+                  </div>
+                ))}
+                <Link href="/plan" className="inline-flex text-sm font-medium text-blue-600 hover:underline">
+                  See full checklist in your plan →
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Card className="shadow-sm">
           <CardHeader>
