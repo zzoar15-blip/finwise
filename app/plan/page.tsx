@@ -709,38 +709,40 @@ export default function PlanPage() {
       <div id="financial-plan-content">
         {/* ── HEADER ── */}
         <Section delay={0}>
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h1 className="text-3xl font-bold" style={{ color: '#0f172a' }}>
-                {plan?.inputs.name ? `${plan.inputs.name}'s` : 'Your'} Financial Plan
-              </h1>
-              {planLastUpdated && (
-                <p className="text-sm text-muted-foreground mt-1">
-                  Last updated {formatRelativeTime(planLastUpdated)}
-                </p>
-              )}
-            </div>
-            <div className="flex w-full items-center gap-2 print:hidden sm:w-auto">
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex-1 sm:flex-none"
-                onClick={() => exportPDF(setExporting)}
-                disabled={exporting}
-              >
-                <FileDown className="size-3.5" />
-                {exporting ? 'Exporting…' : 'Export PDF'}
-              </Button>
-              <Button
-                size="sm"
-                className="flex-1 sm:flex-none"
-                onClick={generateInsights}
-                disabled={insightsLoading}
-                style={{ background: '#3b82f6' }}
-              >
-                <RefreshCw className={`size-3.5 ${insightsLoading ? 'animate-spin' : ''}`} />
-                Refresh plan
-              </Button>
+          <div className="rounded-2xl border border-slate-200/80 bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 p-5 text-white shadow-lg sm:p-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-[0.14em] text-slate-300">Master Plan</p>
+                <h1 className="mt-2 text-3xl font-semibold tracking-tight text-white">
+                  {plan?.inputs.name ? `${plan.inputs.name}'s` : 'Your'} Financial Plan
+                </h1>
+                {planLastUpdated && (
+                  <p className="mt-1 text-sm text-slate-300">
+                    Last updated {formatRelativeTime(planLastUpdated)}
+                  </p>
+                )}
+              </div>
+              <div className="flex w-full items-center gap-2 print:hidden sm:w-auto">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1 border-white/30 bg-white/10 text-white hover:bg-white/20 sm:flex-none"
+                  onClick={() => exportPDF(setExporting)}
+                  disabled={exporting}
+                >
+                  <FileDown className="size-3.5" />
+                  {exporting ? 'Exporting…' : 'Export PDF'}
+                </Button>
+                <Button
+                  size="sm"
+                  className="flex-1 bg-white text-slate-900 hover:bg-slate-100 sm:flex-none"
+                  onClick={generateInsights}
+                  disabled={insightsLoading}
+                >
+                  <RefreshCw className={`size-3.5 ${insightsLoading ? 'animate-spin' : ''}`} />
+                  Refresh plan
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -812,6 +814,24 @@ export default function PlanPage() {
               icon={<Calendar className="size-5 text-muted-foreground" />}
               sub={hasDebts && debtResult ? `${debtResult.monthsToPayoff} months away` : undefined}
             />
+          </div>
+
+          <div className="mt-4 grid gap-3 md:grid-cols-3">
+            <Link href="/budget" className="rounded-xl border border-slate-200 bg-white p-3 transition hover:border-blue-300 hover:shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Execute</p>
+              <p className="mt-1 text-sm font-semibold text-slate-900">Apply budget funding</p>
+              <p className="mt-1 text-xs text-slate-600">Move your selected priorities into monthly dollars.</p>
+            </Link>
+            <Link href="/debt" className="rounded-xl border border-slate-200 bg-white p-3 transition hover:border-blue-300 hover:shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Optimize</p>
+              <p className="mt-1 text-sm font-semibold text-slate-900">Tune debt payoff strategy</p>
+              <p className="mt-1 text-xs text-slate-600">Validate avalanche/snowball and bonus month impact.</p>
+            </Link>
+            <Link href="/forecast" className="rounded-xl border border-slate-200 bg-white p-3 transition hover:border-blue-300 hover:shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Validate</p>
+              <p className="mt-1 text-sm font-semibold text-slate-900">Run scenario confidence</p>
+              <p className="mt-1 text-xs text-slate-600">Compare baseline with downside/upside risk bands.</p>
+            </Link>
           </div>
 
           {goalWarnings.length > 0 && (

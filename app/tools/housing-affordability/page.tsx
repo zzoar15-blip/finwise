@@ -89,19 +89,19 @@ export default function HousingAffordabilityPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="rounded-2xl border border-slate-200/80 bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 p-5 text-white shadow-lg sm:p-6">
         <div className="space-y-1">
-          <Link href="/" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+          <Link href="/" className="inline-flex items-center gap-1 text-xs text-slate-300 hover:text-white">
             <ChevronLeft className="size-3" /> Tools
           </Link>
-          <h1 className="flex items-center gap-2 text-2xl font-bold">
-            <Home className="size-6 text-[#1e3a5f]" />
+          <h1 className="mt-1 flex items-center gap-2 text-2xl font-semibold">
+            <Home className="size-6 text-emerald-300" />
             Housing Affordability Calculator
           </h1>
-          <p className="text-sm text-muted-foreground">
-            Realistic rent and mortgage affordability based on your actual budget, debts, and savings behavior.
+          <p className="text-sm text-slate-300">
+            Realistic rent and mortgage affordability based on synced budget, debt, and plan assumptions.
           </p>
-          <SyncMeta updatedAt={planLastUpdated} badges={['Budget + Plan Synced']} />
+          <div className="pt-1"><SyncMeta updatedAt={planLastUpdated} badges={['Budget + Plan Synced']} /></div>
         </div>
       </div>
 

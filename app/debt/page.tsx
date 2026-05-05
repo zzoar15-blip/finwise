@@ -184,14 +184,16 @@ export default function DebtPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6" id="tool-debt-export">
-      <div className="space-y-3">
-        <Link href="/plan" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+      <div className="rounded-2xl border border-slate-200/80 bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 p-5 text-white shadow-lg sm:p-6">
+        <Link href="/plan" className="inline-flex items-center gap-1 text-xs text-slate-300 hover:text-white transition-colors">
           <ChevronLeft className="size-3" /> My Plan
         </Link>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Debt Payoff Simulator</h1>
-            <SyncMeta updatedAt={planLastUpdated} badges={['Unified Flow']} />
+            <p className="text-xs uppercase tracking-[0.14em] text-slate-300">Debt Strategy Lab</p>
+            <h1 className="mt-1 text-2xl font-semibold">Debt Payoff Simulator</h1>
+            <p className="mt-1 text-sm text-slate-300">Model overpayment, bonus timing, and strategy to bring your debt-free date forward.</p>
+            <div className="mt-2"><SyncMeta updatedAt={planLastUpdated} badges={['Unified Flow']} /></div>
           </div>
           <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto">
             <Button

@@ -308,21 +308,22 @@ export default function InvestPage() {
   return (
     <div className="mx-auto max-w-7xl space-y-6" id="tool-invest-export">
       {/* Header */}
-      <div className="space-y-3">
-        <Link href="/plan" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+      <div className="rounded-2xl border border-slate-200/80 bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 p-5 text-white shadow-lg sm:p-6">
+        <Link href="/plan" className="inline-flex items-center gap-1 text-xs text-slate-300 hover:text-white transition-colors">
           <ChevronLeft className="size-3" /> My Plan
         </Link>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3">
-            <TrendingUp className="size-6 text-[#3b82f6]" />
+            <TrendingUp className="size-6 text-emerald-300" />
             <div>
-              <h1 className="text-2xl font-bold">Investment Income Simulator</h1>
-              <SyncMeta updatedAt={planLastUpdated} badges={['Unified Flow']} />
-              <p className="text-sm text-muted-foreground">
-                Model dividend income growth over time with custom buy schedules
+              <p className="text-xs uppercase tracking-[0.14em] text-slate-300">Portfolio Engine</p>
+              <h1 className="mt-1 text-2xl font-semibold">Investment Income Simulator</h1>
+              <p className="text-sm text-slate-300">
+                Model growth vs income outcomes with synced contributions from paycheck and budget.
               </p>
-              <Link href="/tools/rent-vs-buy" className="text-sm text-blue-600 hover:underline">
-                What if you invested your down payment? →
+              <div className="mt-2"><SyncMeta updatedAt={planLastUpdated} badges={['Unified Flow']} /></div>
+              <Link href="/tools/rent-vs-buy" className="mt-1 inline-block text-sm text-emerald-200 hover:text-white hover:underline">
+                Compare against rent-vs-buy opportunity cost
               </Link>
             </div>
           </div>

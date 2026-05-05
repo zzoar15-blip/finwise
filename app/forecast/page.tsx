@@ -484,16 +484,53 @@ function ForecastPageContent() {
   return (
     <div className="mx-auto max-w-7xl space-y-6" id="tool-forecast-export">
       {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex items-start gap-3">
-          <TrendingUp className="size-6 text-[#3b82f6]" />
-          <div>
-            <h1 className="text-2xl font-bold">Scenario Forecaster</h1>
-            <p className="text-sm text-muted-foreground">
-              Compare up to 3 financial scenarios over 10 years
-            </p>
+      <div className="rounded-2xl border border-slate-200/80 bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 p-5 text-white shadow-lg sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex items-start gap-3">
+            <TrendingUp className="mt-0.5 size-6 text-emerald-300" />
+            <div>
+              <p className="text-xs uppercase tracking-[0.14em] text-slate-300">Scenario Lab</p>
+              <h1 className="mt-1 text-2xl font-semibold">Forecast Outcomes With Confidence</h1>
+              <p className="mt-1 text-sm text-slate-300">
+                Compare up to 3 scenarios over 10 years, then evaluate downside and upside bands before you commit.
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Badge className="bg-white/15 text-white hover:bg-white/15">Focus: {focus || 'net-worth'}</Badge>
+            <Badge className="bg-white/15 text-white hover:bg-white/15">Horizon: 10 years</Badge>
+            <Badge className="bg-white/15 text-white hover:bg-white/15">Mode: Compare</Badge>
           </div>
         </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {[
+          { id: 'home', label: 'Home Goal' },
+          { id: 'emergency', label: 'Emergency Fund' },
+          { id: 'invest', label: 'Investing' },
+          { id: 'retire', label: 'Retirement' },
+          { id: 'net-worth', label: 'Net Worth' },
+        ].map((item) => {
+          const active =
+            item.id === 'net-worth' ? !focus || focus === 'net-worth' : focus === item.id;
+          return (
+            <Link
+              key={item.id}
+              href={`/forecast?focus=${item.id}`}
+              className={`inline-flex items-center rounded-md px-3 py-1.5 text-sm font-medium transition ${
+                active
+                  ? 'bg-primary text-primary-foreground'
+                  : 'border border-input bg-background hover:bg-accent hover:text-accent-foreground'
+              }`}
+            >
+              {item.label}
+            </Link>
+          );
+        })}
+      </div>
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex w-full items-center gap-2 sm:w-auto">
           <Button
             variant="outline"
@@ -553,8 +590,8 @@ function ForecastPageContent() {
         {scenarios.map((scenario) => {
           const year10 = results.find((r) => r.scenario.id === scenario.id)?.points[9]?.netWorth ?? 0;
           return (
-            <Card key={scenario.id} className="shadow-sm">
-              <CardHeader className="border-b pb-3">
+            <Card key={scenario.id} className="border-slate-200/80 shadow-sm">
+              <CardHeader className="border-b border-slate-200 pb-3">
                 <div className="flex items-center gap-2">
                   <span
                     className="size-3 rounded-full shrink-0"
@@ -576,8 +613,8 @@ function ForecastPageContent() {
                   </button>
                 </div>
               </CardHeader>
-              <CardContent className="pt-4 space-y-3">
-                <div className="flex items-center justify-between rounded-md border border-border px-2.5 py-1.5">
+              <CardContent className="space-y-3 pt-4">
+                <div className="flex items-center justify-between rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5">
                   <Label className="text-xs text-muted-foreground">Use as baseline</Label>
                   <input
                     type="radio"
@@ -615,7 +652,7 @@ function ForecastPageContent() {
                   suffix="%"
                   onChange={(v) => updateScenario(scenario.id, { investmentReturn: v })}
                 />
-                <div className="rounded-lg bg-muted/40 px-3 py-2 mt-2">
+                <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
                   <p className="text-xs text-muted-foreground">Year 10 Net Worth</p>
                   <p
                     className="text-lg font-bold tabular-nums mt-0.5"

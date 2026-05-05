@@ -12,7 +12,7 @@ function Card({
       data-slot="card"
       data-size={size}
       className={cn(
-        "group/card flex flex-col gap-4 overflow-hidden rounded-xl bg-card py-4 text-sm text-card-foreground ring-1 ring-[#1f3f55]/10 shadow-[0_8px_24px_rgba(13,34,51,0.06)] has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:gap-3 data-[size=sm]:py-3 data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
+        "group/card flex flex-col gap-4 overflow-hidden rounded-xl bg-card py-4 text-sm text-card-foreground ring-1 ring-[#1f3f55]/10 shadow-[0_8px_24px_rgba(13,34,51,0.06)] transition-[transform,box-shadow,ring-color] duration-200 ease-out motion-safe:hover:-translate-y-0.5 motion-safe:hover:shadow-[0_16px_40px_rgba(13,34,51,0.09)] motion-safe:hover:ring-primary/20 motion-safe:active:translate-y-0 motion-safe:active:shadow-[0_8px_24px_rgba(13,34,51,0.07)] has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:gap-3 data-[size=sm]:py-3 data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl motion-reduce:hover:translate-y-0 motion-reduce:hover:shadow-[0_8px_24px_rgba(13,34,51,0.06)] motion-reduce:transition-colors",
         className
       )}
       {...props}

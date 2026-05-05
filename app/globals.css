@@ -108,6 +108,22 @@
   border: 1px solid #d9e2f0;
   border-radius: 12px;
   box-shadow: 0 8px 30px rgba(13, 26, 46, 0.06);
+  transition:
+    box-shadow 200ms ease,
+    transform 200ms ease,
+    border-color 200ms ease;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .fw-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 16px 42px rgba(13, 26, 46, 0.1);
+    border-color: rgba(37, 99, 235, 0.22);
+  }
+  .fw-card:active {
+    transform: translateY(0);
+    box-shadow: 0 8px 28px rgba(13, 26, 46, 0.07);
+  }
 }
 
 .fw-label {
@@ -125,6 +141,35 @@
   padding: 20px 20px 20px 22px;
   border-left-width: 3px;
   box-shadow: 0 10px 30px rgba(13, 26, 46, 0.06);
+  transition:
+    box-shadow 200ms ease,
+    transform 200ms ease,
+    border-color 200ms ease;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .fw-metric-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 18px 44px rgba(13, 26, 46, 0.11);
+  }
+}
+
+/* Chart surfaces: soft reveal when mounted inside shadcn cards */
+@keyframes fw-chart-reveal {
+  from {
+    opacity: 0.88;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-slot='card'] .recharts-responsive-container {
+    animation: fw-chart-reveal 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
 }
 
 .fw-metric-card.positive { border-left-color: #16a34a; }
@@ -168,6 +213,12 @@
 .pdf-export-mode .pdf-export-target [class*="shadow"],
 .pdf-export-mode .pdf-export-target [style*="box-shadow"] {
   box-shadow: none !important;
+}
+
+.pdf-export-mode .pdf-export-target .recharts-responsive-container {
+  animation: none !important;
+  opacity: 1 !important;
+  transform: none !important;
 }
 
 /* Theme bridge for existing utility-heavy pages */

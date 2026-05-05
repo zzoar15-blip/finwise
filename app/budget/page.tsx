@@ -248,20 +248,27 @@ export default function BudgetPage() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-6" id="tool-budget-export">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Budget Planner</h1>
-          <SyncMeta updatedAt={planLastUpdated} badges={['Unified Flow']} />
-          <Link href="/tools/rent-vs-buy" className="text-sm text-blue-600 hover:underline">
-            Wondering if you can afford to buy? →
-          </Link>
-          <Link href="/tools/housing-affordability" className="ml-3 text-sm text-blue-600 hover:underline">
-            Calculate your realistic affordability →
-          </Link>
-          <Link href="/tools/car-affordability" className="ml-3 text-sm text-blue-600 hover:underline">
-            Run car loan vs lease calculator →
-          </Link>
-        </div>
+      <div className="rounded-2xl border border-slate-200/80 bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 p-5 text-white shadow-lg sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-[0.14em] text-slate-300">Cashflow Engine</p>
+            <h1 className="mt-1 text-2xl font-semibold">Budget Planner</h1>
+            <p className="mt-1 text-sm text-slate-300">
+              Allocate dollars with synced plan assumptions and instant surplus impact.
+            </p>
+            <div className="mt-2"><SyncMeta updatedAt={planLastUpdated} badges={['Unified Flow']} /></div>
+            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-sm">
+              <Link href="/tools/rent-vs-buy" className="text-emerald-200 hover:text-white hover:underline">
+                Rent vs Buy
+              </Link>
+              <Link href="/tools/housing-affordability" className="text-emerald-200 hover:text-white hover:underline">
+                Housing Affordability
+              </Link>
+              <Link href="/tools/car-affordability" className="text-emerald-200 hover:text-white hover:underline">
+                Car Affordability
+              </Link>
+            </div>
+          </div>
         <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto">
           <Button
             variant="outline"
@@ -281,6 +288,7 @@ export default function BudgetPage() {
             onExportCsv={() => downloadCsv(exportRows(), 'finwise-budget')}
           />
         </div>
+      </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">

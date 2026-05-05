@@ -160,20 +160,22 @@ export default function RentVsBuyPage() {
 
   return (
     <div id="rent-vs-buy-content" className="space-y-5 max-w-[1400px]">
-      <div className="flex items-center justify-between gap-3">
-        <div className="space-y-1">
-          <Link href="/" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-            <ChevronLeft className="size-3" /> Tools
-          </Link>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Home className="size-6 text-[#1e3a5f]" />
-            Rent vs. Buy Calculator
-          </h1>
-          <p className="text-sm text-muted-foreground">Full 30-year wealth comparison model with break-even and sensitivity analysis.</p>
-        </div>
+      <div className="rounded-2xl border border-slate-200/80 bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 p-5 text-white shadow-lg sm:p-6">
+        <div className="flex items-center justify-between gap-3">
+          <div className="space-y-1">
+            <Link href="/" className="inline-flex items-center gap-1 text-xs text-slate-300 hover:text-white">
+              <ChevronLeft className="size-3" /> Tools
+            </Link>
+            <h1 className="mt-1 flex items-center gap-2 text-2xl font-semibold">
+              <Home className="size-6 text-emerald-300" />
+              Rent vs. Buy Calculator
+            </h1>
+            <p className="text-sm text-slate-300">30-year wealth comparison with break-even timing and sensitivity analysis.</p>
+          </div>
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
+            className="border-white/30 bg-white/10 text-white hover:bg-white/20"
             onClick={() =>
               exportDomToPdf({ elementId: 'rent-vs-buy-content', filenamePrefix: 'finwise-rent-vs-buy' })
             }
@@ -188,6 +190,7 @@ export default function RentVsBuyPage() {
             onExportCsv={() => downloadCsv(csvRows, 'finwise-rent-vs-buy')}
           />
         </div>
+      </div>
       </div>
 
       <div className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">

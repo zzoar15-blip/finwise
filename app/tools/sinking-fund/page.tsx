@@ -126,26 +126,27 @@ export default function SinkingFundPage() {
 
   return (
     <div id="sinking-fund-content" className="mx-auto max-w-7xl space-y-6">
-      <div className="space-y-2">
-        <Link href="/" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+      <div className="rounded-2xl border border-slate-200/80 bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 p-5 text-white shadow-lg sm:p-6">
+        <Link href="/" className="inline-flex items-center gap-1 text-xs text-slate-300 hover:text-white">
           <ChevronLeft className="size-3" /> Tools
         </Link>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-start gap-3">
-            <PiggyBank className="size-6 text-[#3b82f6] mt-0.5" />
+            <PiggyBank className="mt-0.5 size-6 text-emerald-300" />
             <div>
-              <h1 className="text-2xl font-bold">Sinking Fund Planner</h1>
-              <SyncMeta updatedAt={planLastUpdated} badges={['Unified Flow']} />
-              <p className="text-sm text-muted-foreground">
-                Plan purchases like vacations or a home down payment with a dedicated monthly funding path.
+              <p className="text-xs uppercase tracking-[0.14em] text-slate-300">Goal Funding Studio</p>
+              <h1 className="mt-1 text-2xl font-semibold">Sinking Fund Planner</h1>
+              <p className="text-sm text-slate-300">
+                Plan vacations, large purchases, and down payments with scenario-based monthly funding.
               </p>
+              <div className="mt-2"><SyncMeta updatedAt={planLastUpdated} badges={['Unified Flow']} /></div>
             </div>
           </div>
           <div className="flex w-full items-center gap-2 sm:w-auto">
             <Button
               variant="outline"
               size="sm"
-              className="flex-1 sm:flex-none"
+              className="flex-1 border-white/30 bg-white/10 text-white hover:bg-white/20 sm:flex-none"
               onClick={() => exportDomToPdf({ elementId: 'sinking-fund-content', filenamePrefix: 'finwise-sinking-fund' })}
             >
               Export PDF

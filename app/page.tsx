@@ -433,31 +433,38 @@ function DashboardPageContent() {
       )}
 
       <div className="mx-auto max-w-6xl space-y-8">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">
-              {name ? `Welcome back, ${name}!` : 'Welcome back!'}
-            </h1>
-            <p className="mt-0.5 text-sm text-gray-500">
-              Last updated: {timeAgo(plan.updatedAt)}
-            </p>
-          </div>
-          <div className="flex w-full gap-2 sm:w-auto">
-            <Link
-              href="/plan"
-              className="inline-flex flex-1 items-center justify-center rounded-md bg-[#3b82f6] px-4 py-2 text-sm font-medium text-white hover:bg-[#2563eb] transition-colors sm:flex-none"
-            >
-              View Full Plan
-              <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
-            </Link>
-            <Button variant="outline" className="flex-1 sm:flex-none" onClick={openPlanWizardOrDisclosure}>
-              Update Plan
-            </Button>
+        <div className="rounded-2xl border border-slate-200/80 bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 p-5 text-white shadow-lg sm:p-6">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.14em] text-slate-300">Financial Command Center</p>
+              <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
+                {name ? `${name}, your money game plan` : 'Your money game plan'}
+              </h1>
+              <p className="mt-2 text-sm text-slate-300">
+                Last updated {timeAgo(plan.updatedAt)}. Review your runway, tackle priorities, and model outcomes.
+              </p>
+            </div>
+            <div className="flex w-full gap-2 sm:w-auto">
+              <Link
+                href="/plan"
+                className="inline-flex flex-1 items-center justify-center rounded-md bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100 transition-colors sm:flex-none"
+              >
+                Open Full Plan
+                <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+              </Link>
+              <Button
+                variant="outline"
+                className="flex-1 border-white/30 bg-white/10 text-white hover:bg-white/20 sm:flex-none"
+                onClick={openPlanWizardOrDisclosure}
+              >
+                Update Inputs
+              </Button>
+            </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <Card className="h-full shadow-sm">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Card className="h-full border-slate-200/80 shadow-sm">
             <CardHeader className="pb-1">
               <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wide">
                 Monthly Take-Home
@@ -471,7 +478,7 @@ function DashboardPageContent() {
             </CardContent>
           </Card>
 
-          <Card className="h-full shadow-sm">
+          <Card className="h-full border-slate-200/80 shadow-sm">
             <CardHeader className="pb-1">
               <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wide">
                 Monthly Surplus
@@ -491,7 +498,7 @@ function DashboardPageContent() {
             </CardContent>
           </Card>
 
-          <Card className="h-full shadow-sm">
+          <Card className="h-full border-slate-200/80 shadow-sm">
             <CardHeader className="pb-1">
               <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wide">
                 Savings Rate
@@ -507,7 +514,7 @@ function DashboardPageContent() {
             </CardContent>
           </Card>
 
-          <Card className="h-full shadow-sm">
+          <Card className="h-full border-slate-200/80 shadow-sm">
             <CardHeader className="pb-1">
               <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wide">
                 Debt-Free Date
@@ -523,8 +530,34 @@ function DashboardPageContent() {
           </Card>
         </div>
 
+        <Card className="border-slate-200/80 shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Guided Next Steps</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-3 md:grid-cols-3">
+              <Link href="/plan" className="rounded-xl border border-slate-200 bg-white p-4 transition hover:border-blue-300 hover:shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Step 1</p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">Lock priorities</p>
+                <p className="mt-1 text-xs text-slate-600">Confirm goal order and monthly allocation strategy.</p>
+              </Link>
+              <Link href="/budget" className="rounded-xl border border-slate-200 bg-white p-4 transition hover:border-blue-300 hover:shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Step 2</p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">Fund your plan</p>
+                <p className="mt-1 text-xs text-slate-600">Apply suggested budget amounts and tune surplus.</p>
+              </Link>
+              <Link href="/forecast" className="rounded-xl border border-slate-200 bg-white p-4 transition hover:border-blue-300 hover:shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Step 3</p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">Stress test scenarios</p>
+                <p className="mt-1 text-xs text-slate-600">Compare baseline vs downside/upside before committing.</p>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+
         <div>
-          <h2 className="mb-4 text-lg font-semibold text-gray-800">Tools</h2>
+          <h2 className="mb-1 text-lg font-semibold text-gray-900">Financial Workspace</h2>
+          <p className="mb-4 text-sm text-gray-500">Jump to each module with synced assumptions across plan, budget, and forecasting.</p>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-9">
             {QUICK_LINKS.map(({ href, icon: Icon, title, description }) => (
               <Link key={href} href={href} className="group block">
