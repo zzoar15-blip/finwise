@@ -47,42 +47,42 @@
 }
 
 :root {
-  /* FinWise Design System */
-  --background: #e7eef0;
-  --foreground: #0d2233;
-  --card: #f4f8f7;
-  --card-foreground: #0d2233;
-  --popover: #f4f8f7;
-  --popover-foreground: #0d2233;
-  --primary: #2f7f74;
+  /* Premium fintech theme */
+  --background: #f4f7fb;
+  --foreground: #0b1526;
+  --card: #ffffff;
+  --card-foreground: #0b1526;
+  --popover: #ffffff;
+  --popover-foreground: #0b1526;
+  --primary: #2563eb;
   --primary-foreground: #ffffff;
-  --secondary: #dbe8e4;
-  --secondary-foreground: #11354d;
-  --muted: #deeaeb;
-  --muted-foreground: #4b6274;
-  --accent: #d2e5de;
-  --accent-foreground: #13453e;
+  --secondary: #e8eefb;
+  --secondary-foreground: #17346b;
+  --muted: #eef3fb;
+  --muted-foreground: #4c5f7e;
+  --accent: #e6eeff;
+  --accent-foreground: #184a9f;
   --destructive: #dc2626;
   --destructive-foreground: #ffffff;
-  --border: #b8cbd0;
-  --input: #b8cbd0;
-  --ring: #2f7f74;
+  --border: #d9e2f0;
+  --input: #d9e2f0;
+  --ring: #2563eb;
   --radius: 0.75rem;
   /* Charts */
-  --chart-1: #2f7f74;
-  --chart-2: #123955;
-  --chart-3: #3f6d96;
-  --chart-4: #2b5b51;
-  --chart-5: #6ca7a0;
+  --chart-1: #2563eb;
+  --chart-2: #10b981;
+  --chart-3: #8b5cf6;
+  --chart-4: #f59e0b;
+  --chart-5: #06b6d4;
   /* Sidebar */
-  --sidebar: #0f2d46;
+  --sidebar: #0a1424;
   --sidebar-foreground: rgba(255, 255, 255, 0.85);
-  --sidebar-primary: #2f7f74;
+  --sidebar-primary: #2563eb;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #1a4b63;
+  --sidebar-accent: #17253e;
   --sidebar-accent-foreground: #ffffff;
   --sidebar-border: rgba(255, 255, 255, 0.08);
-  --sidebar-ring: #2f7f74;
+  --sidebar-ring: #2563eb;
 }
 
 @layer base {
@@ -95,19 +95,19 @@
     font-size: 14px;
     line-height: 1.6;
     background-image:
-      radial-gradient(circle at 15% 10%, rgba(47, 127, 116, 0.18), transparent 36%),
-      radial-gradient(circle at 85% 0%, rgba(18, 57, 85, 0.2), transparent 42%),
-      linear-gradient(180deg, #e2ecee 0%, #d8e7e8 45%, #d0e2e7 100%);
+      radial-gradient(circle at 0% 0%, rgba(37, 99, 235, 0.12), transparent 30%),
+      radial-gradient(circle at 100% 0%, rgba(16, 185, 129, 0.08), transparent 34%),
+      linear-gradient(180deg, #f8fbff 0%, #f2f6fd 42%, #edf3fb 100%);
     background-attachment: fixed;
   }
 }
 
 /* Utility classes for FinWise design tokens */
 .fw-card {
-  background: #f4f8f7;
-  border: 1px solid #b8cbd0;
+  background: #ffffff;
+  border: 1px solid #d9e2f0;
   border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(13, 34, 51, 0.06);
+  box-shadow: 0 8px 30px rgba(13, 26, 46, 0.06);
 }
 
 .fw-label {
@@ -115,16 +115,16 @@
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: #5f7383;
+  color: #5a7093;
 }
 
 .fw-metric-card {
-  background: #f4f8f7;
-  border: 1px solid #b8cbd0;
+  background: #ffffff;
+  border: 1px solid #d9e2f0;
   border-radius: 12px;
   padding: 20px 20px 20px 22px;
   border-left-width: 3px;
-  box-shadow: 0 8px 24px rgba(13, 34, 51, 0.06);
+  box-shadow: 0 10px 30px rgba(13, 26, 46, 0.06);
 }
 
 .fw-metric-card.positive { border-left-color: #16a34a; }
@@ -172,11 +172,11 @@
 
 /* Theme bridge for existing utility-heavy pages */
 @layer utilities {
-  .bg-white { background-color: #eef4f3; }
-  .text-gray-900 { color: #0d2233; }
-  .text-gray-800 { color: #17344a; }
-  .text-gray-700 { color: #355267; }
-  .text-gray-600 { color: #496378; }
-  .border-gray-200 { border-color: #c0d2d5; }
-  .border-gray-100 { border-color: #d1dee0; }
+  .bg-white { background-color: #ffffff; }
+  .text-gray-900 { color: #0b1526; }
+  .text-gray-800 { color: #12203a; }
+  .text-gray-700 { color: #33435f; }
+  .text-gray-600 { color: #556683; }
+  .border-gray-200 { border-color: #dbe3ef; }
+  .border-gray-100 { border-color: #e8edf5; }
 }

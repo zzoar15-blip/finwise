@@ -48,8 +48,8 @@ function NavItem({
         'group flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors relative',
         indent ? 'ml-2' : '',
         active
-          ? 'bg-[#1c4f63] text-white before:absolute before:left-0 before:top-1 before:bottom-1 before:w-0.5 before:rounded-r before:bg-[#5ec2ad]'
-          : 'text-white/70 hover:bg-[#1a4358]/70 hover:text-white'
+          ? 'bg-[#1c2f4d] text-white before:absolute before:left-0 before:top-1 before:bottom-1 before:w-0.5 before:rounded-r before:bg-[#60a5fa]'
+          : 'text-white/70 hover:bg-[#17253e] hover:text-white'
       )}
     >
       <Icon className="h-[18px] w-[18px] shrink-0" />
@@ -60,10 +60,10 @@ function NavItem({
 
 export function Sidebar() {
   return (
-    <aside className="hidden md:flex flex-col w-60 min-h-screen bg-gradient-to-b from-[#0d2740] via-[#103552] to-[#155548] shrink-0">
+    <aside className="hidden md:flex flex-col w-64 min-h-screen bg-gradient-to-b from-[#0a1424] via-[#101d33] to-[#172a45] shrink-0 border-r border-white/10">
       {/* Logo */}
       <div className="flex items-center gap-2 px-4 py-5 mb-1">
-        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#2f7f74]">
+        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#2563eb]">
           <LineChart className="h-4 w-4 text-white" />
         </div>
         <span className="text-[15px] font-bold tracking-tight text-white">FinWise</span>
@@ -76,10 +76,10 @@ export function Sidebar() {
         ))}
 
         {/* Divider */}
-        <div className="my-3 border-t border-white/15" />
+        <div className="my-3 border-t border-white/10" />
 
         {/* Tools section */}
-        <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest text-white/30">
+        <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest text-white/35">
           Tools
         </p>
         {TOOLS_NAV.map((item) => (
@@ -89,7 +89,7 @@ export function Sidebar() {
         <div className="flex-1" />
 
         {/* Divider */}
-        <div className="my-3 border-t border-white/15" />
+        <div className="my-3 border-t border-white/10" />
 
         {/* Bottom */}
         <NavItem href="/advisor" label="AI Advisor" icon={Sparkles} />
