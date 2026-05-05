@@ -20,8 +20,9 @@ import { Badge } from '@/components/ui/badge';
 import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard';
 import { usePlanStore } from '@/lib/planStore';
 import { useFinanceStore, useFinWiseStore } from '@/lib/store';
-import { computeBudgetSurplus, computeSavingsRate } from '@/lib/calculations';
+import { computeUnifiedMonthlyFlow } from '@/lib/calculations';
 import { computePlanMetrics } from '@/lib/planCalculations';
+import { PAY_PERIODS } from '@/lib/calculations/paycheck';
 import { formatCurrency, formatDate } from '@/lib/format';
 import { CATEGORY_ICONS } from '@/lib/constants';
 import type { PlanInputs } from '@/types/plan';
@@ -172,6 +173,10 @@ function DashboardPageContent() {
   const paycheckInputs = useFinWiseStore((s) => s.paycheckInputs);
   const budgetInputs = useFinWiseStore((s) => s.budgetInputs);
   const debts = useFinWiseStore((s) => s.debts);
+  const setPaycheckInputs = useFinWiseStore((s) => s.setPaycheckInputs);
+  const setBudgetInputs = useFinWiseStore((s) => s.setBudgetInputs);
+  const setDebts = useFinWiseStore((s) => s.setDebts);
+  const setGoals = useFinWiseStore((s) => s.setGoals);
 
   const [showWizard, setShowWizard] = useState(false);
   const [showDisclosure, setShowDisclosure] = useState(false);
@@ -183,15 +188,13 @@ function DashboardPageContent() {
 
   const recentTransactions = useMemo(() => transactions.slice(0, 5), [transactions]);
 
-  const unifiedSurplus = useMemo(() => {
-    if (!paycheckResults.isComplete) return null;
-    return computeBudgetSurplus(paycheckResults, budgetInputs, debts);
-  }, [paycheckResults, budgetInputs, debts]);
-
-  const unifiedSavingsRate = useMemo(() => {
-    if (!paycheckResults.isComplete) return null;
-    return computeSavingsRate(paycheckResults, paycheckInputs, budgetInputs);
-  }, [paycheckResults, paycheckInputs, budgetInputs]);
+  const flow = useMemo(
+    () => computeUnifiedMonthlyFlow(paycheckInputs, paycheckResults, budgetInputs, debts),
+    [paycheckInputs, paycheckResults, budgetInputs, debts],
+  );
+  const effectivePaycheckResults = flow.paycheck;
+  const unifiedSurplus = effectivePaycheckResults.isComplete ? flow.monthlySurplus : null;
+  const unifiedSavingsRate = effectivePaycheckResults.isComplete ? flow.savingsRate : null;
 
   useEffect(() => {
     if (!wizardOpen) return;
@@ -207,6 +210,49 @@ function DashboardPageContent() {
   }, [updateSettings]);
 
   function handleUpdatePlan(inputs: PlanInputs) {
+    const periods = PAY_PERIODS[inputs.payPeriod] || 26;
+    // Keep Plan and calculator stores synchronized so metrics match across pages.
+    setPaycheckInputs({
+      annualSalary: inputs.annualSalary,
+      state: inputs.state,
+      filingStatus: inputs.filingStatus,
+      payPeriod: inputs.payPeriod,
+      nycResident: inputs.nycResident,
+      k401TraditionalPct: inputs.traditional401kPct,
+      k401RothPct: inputs.roth401kPct,
+      hsaAnnual: inputs.hsaPerPeriod * periods,
+      fsaAnnual: inputs.fsaPerPeriod * periods,
+      healthInsuranceAnnual: inputs.healthInsurancePerPeriod * periods,
+      dentalAnnual: inputs.dentalPerPeriod * periods,
+      visionAnnual: 0,
+      commuterAnnual: inputs.commuterBenefitPerPeriod * periods,
+      otherPreTaxAnnual: inputs.otherPreTaxPerPeriod * periods,
+      otherPostTaxAnnual: 0,
+      additionalWithholding: 0,
+    });
+    setBudgetInputs({
+      housing: inputs.expenses.housing,
+      utilities: inputs.expenses.utilities,
+      insurance: 0,
+      groceries: inputs.expenses.groceries,
+      dining: inputs.expenses.dining,
+      transportation: inputs.expenses.transportation,
+      subscriptions: inputs.expenses.subscriptions,
+      phone: inputs.expenses.phone,
+      healthGym: inputs.expenses.health,
+      travel: inputs.expenses.travel,
+      misc: inputs.expenses.misc,
+    });
+    setDebts(
+      inputs.debts.map((d) => ({
+        id: d.id,
+        name: d.name,
+        balance: d.balance,
+        apr: d.apr,
+        minPayment: d.minPayment,
+      })),
+    );
+    setGoals(inputs.goals as string[]);
     setPlan(inputs);
     setShowWizard(false);
   }
@@ -290,8 +336,8 @@ function DashboardPageContent() {
   const surplus = unifiedSurplus ?? metrics?.monthlySurplus ?? 0;
   const savingsRate = unifiedSavingsRate ?? metrics?.savingsRate ?? 0;
   const takeHome =
-    paycheckResults.isComplete ?
-      paycheckResults.netPayMonthly
+    effectivePaycheckResults.isComplete ?
+      effectivePaycheckResults.netPayMonthly
     : metrics?.monthlyTakeHome ?? 0;
   const debtFreeDate = metrics?.debtFreeDate;
 
@@ -340,7 +386,7 @@ function DashboardPageContent() {
             </CardHeader>
             <CardContent>
               <p className="text-2xl font-bold text-gray-900">{formatCurrency(takeHome)}</p>
-              {paycheckResults.isComplete && (
+              {effectivePaycheckResults.isComplete && (
                 <p className="text-[10px] text-muted-foreground mt-1">Net pay from Paycheck Calculator</p>
               )}
             </CardContent>

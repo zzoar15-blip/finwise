@@ -9,7 +9,7 @@ import { downloadCsv } from '@/lib/export';
 import { exportDomToPdf } from '@/lib/exportPdf';
 import { formatCurrency } from '@/lib/format';
 import { useFinWiseStore } from '@/lib/store';
-import { computeBudgetSurplus } from '@/lib/calculations';
+import { computeUnifiedMonthlyFlow } from '@/lib/calculations';
 import {
   Card,
   CardContent,
@@ -69,10 +69,15 @@ export default function DebtPage() {
   const storeDebts = useFinWiseStore((s) => s.debts);
   const setStoreDebts = useFinWiseStore((s) => s.setDebts);
   const paycheckResults = useFinWiseStore((s) => s.paycheckResults);
+  const paycheckInputs = useFinWiseStore((s) => s.paycheckInputs);
   const budgetInputs = useFinWiseStore((s) => s.budgetInputs);
 
   const [debts, setDebts] = useState<Debt[]>(storeDebts.length > 0 ? storeDebts : []);
-  const surplus = computeBudgetSurplus(paycheckResults, budgetInputs, debts);
+  const flow = useMemo(
+    () => computeUnifiedMonthlyFlow(paycheckInputs, paycheckResults, budgetInputs, debts),
+    [paycheckInputs, paycheckResults, budgetInputs, debts],
+  );
+  const surplus = flow.monthlySurplus;
   const surplusRounded = Math.max(0, Math.min(2000, Math.round(surplus / 100) * 100));
 
   const [monthlyOverpayment, setMonthlyOverpayment] = useState(surplusRounded);
@@ -313,7 +318,7 @@ export default function DebtPage() {
           </div>
 
           {/* Budget surplus callout */}
-          {paycheckResults.isComplete && surplus > 0 && (
+          {flow.paycheck.isComplete && surplus > 0 && (
             <div className="flex items-start gap-2.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5 text-sm text-blue-800">
               <Lightbulb className="size-4 shrink-0 mt-0.5 text-blue-600" />
               <p>

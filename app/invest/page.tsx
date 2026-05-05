@@ -10,7 +10,7 @@ import { exportDomToPdf } from '@/lib/exportPdf';
 import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/lib/format';
 import { useFinWiseStore } from '@/lib/store';
-import { computeBudgetSurplus } from '@/lib/calculations';
+import { computeUnifiedMonthlyFlow } from '@/lib/calculations';
 import {
   Card,
   CardContent,
@@ -109,15 +109,19 @@ export default function InvestPage() {
   const investmentInputs = useFinWiseStore((s) => s.investmentInputs);
   const setInvestmentInputs = useFinWiseStore((s) => s.setInvestmentInputs);
   const paycheckResults = useFinWiseStore((s) => s.paycheckResults);
+  const paycheckInputs = useFinWiseStore((s) => s.paycheckInputs);
   const budgetInputs = useFinWiseStore((s) => s.budgetInputs);
   const debts = useFinWiseStore((s) => s.debts);
 
-  const surplus = computeBudgetSurplus(paycheckResults, budgetInputs, debts);
-  const availableForInvesting = Math.max(0, surplus);
+  const flow = useMemo(
+    () => computeUnifiedMonthlyFlow(paycheckInputs, paycheckResults, budgetInputs, debts),
+    [paycheckInputs, paycheckResults, budgetInputs, debts],
+  );
+  const availableForInvesting = Math.max(0, flow.monthlySurplus);
 
   // Default tax rate from paycheck if complete
-  const defaultTaxRate = paycheckResults.isComplete
-    ? Math.round(paycheckResults.marginalCombinedRate * 100)
+  const defaultTaxRate = flow.paycheck.isComplete
+    ? Math.round(flow.paycheck.marginalCombinedRate * 100)
     : investmentInputs.taxRate;
 
   const [monthlyBuy, setMonthlyBuyState] = useState(
@@ -184,8 +188,8 @@ export default function InvestPage() {
     ];
   }
 
-  const taxRateNote = paycheckResults.isComplete
-    ? `From your paycheck data (marginal combined: ${(paycheckResults.marginalCombinedRate * 100).toFixed(1)}%)`
+  const taxRateNote = flow.paycheck.isComplete
+    ? `From your paycheck data (marginal combined: ${(flow.paycheck.marginalCombinedRate * 100).toFixed(1)}%)`
     : undefined;
 
   return (
@@ -221,7 +225,7 @@ export default function InvestPage() {
             <ExportButton
               onExportXlsx={async () => {
                 const { exportInvestmentWorkbook } = await import('@/lib/excel/exports/investment');
-                exportInvestmentWorkbook(investmentInputs, paycheckResults);
+                exportInvestmentWorkbook(investmentInputs, flow.paycheck);
               }}
               onExportCsv={() => downloadCsv(buildExportRows(), 'finwise-invest')}
             />
@@ -244,7 +248,7 @@ export default function InvestPage() {
               max={5000}
               step={50}
               onChange={setMonthlyBuy}
-              note={availableForInvesting > 0 && paycheckResults.isComplete
+              note={availableForInvesting > 0 && flow.paycheck.isComplete
                 ? `Budget surplus after debts: ${formatCurrency(availableForInvesting)}/mo`
                 : undefined}
             />

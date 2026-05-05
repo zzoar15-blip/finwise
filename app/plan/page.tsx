@@ -45,6 +45,7 @@ import type { AIInsight, PlanInputs, PlanExpenses } from '@/types/plan';
 import { formatCurrency } from '@/lib/format';
 import { exportDomToPdf } from '@/lib/exportPdf';
 import { useFinWiseStore } from '@/lib/store';
+import { getEffectivePaycheckResults } from '@/lib/calculations';
 import {
   Card,
   CardContent,
@@ -450,12 +451,16 @@ export default function PlanPage() {
     () => computePlanMetrics(effectiveInputs),
     [effectiveInputs],
   );
+  const effectivePaycheckResults = useMemo(
+    () => getEffectivePaycheckResults(paycheckInputs, paycheckResults),
+    [paycheckInputs, paycheckResults],
+  );
 
   const metrics = useMemo(
     () =>
       mergePlanMetricsWithUnifiedBudget(
         baseMetrics,
-        paycheckResults,
+        effectivePaycheckResults,
         paycheckInputs,
         budgetInputs,
         finWiseDebts,
@@ -463,7 +468,7 @@ export default function PlanPage() {
       ),
     [
       baseMetrics,
-      paycheckResults,
+      effectivePaycheckResults,
       paycheckInputs,
       budgetInputs,
       finWiseDebts,
@@ -491,7 +496,7 @@ export default function PlanPage() {
 
   const hasPaycheckData = effectiveInputs.annualSalary > 0;
   const hasExpenseData = Object.values(effectiveInputs.expenses).some(v => v > 0);
-  const unifiedBudgetHero = paycheckResults.isComplete;
+  const unifiedBudgetHero = effectivePaycheckResults.isComplete;
   /** Income / surplus cards: show synced numbers when paycheck store is filled, even if wizard expenses are blank. */
   const heroIncomeVisible = hasPaycheckData || unifiedBudgetHero;
   const heroCashflowVisible =
@@ -500,7 +505,7 @@ export default function PlanPage() {
     ? finWiseDebts.some((d) => d.balance > 0)
     : effectiveInputs.debts.some((d) => d.balance > 0);
   const hasAnyData = hasPaycheckData || hasDebtData;
-  const hasHomeGoal = goals.includes('Save for a home');
+  const hasHomeGoal = goals.includes('Save for a home') || goals.includes('save-home');
 
   // generateInsights — wrapped in useCallback; does NOT depend on aiInsightsCache to avoid loops
   const generateInsights = useCallback(async () => {

@@ -72,6 +72,17 @@ export interface StoreInvestmentInputs {
   annualAppreciation: number;
 }
 
+export interface UnifiedMonthlyFlow {
+  paycheck: StorePaycheckResults;
+  monthlyIncome: number;
+  totalExpenses: number;
+  optionalSavings: number;
+  debtMinimums: number;
+  cashOutflows: number;
+  monthlySurplus: number;
+  savingsRate: number;
+}
+
 export const DEFAULT_PAYCHECK_INPUTS: StorePaycheckInputs = {
   annualSalary: 0, state: 'CA', filingStatus: 'single', payPeriod: 'biweekly',
   k401TraditionalPct: 0, k401RothPct: 0, hsaAnnual: 0, fsaAnnual: 0,
@@ -144,6 +155,17 @@ export function computePaycheck(inputs: StorePaycheckInputs): StorePaycheckResul
   };
 }
 
+/**
+ * Returns current paycheck results, recomputing from inputs when persisted
+ * results are stale/incomplete.
+ */
+export function getEffectivePaycheckResults(
+  paycheckInputs: StorePaycheckInputs,
+  paycheckResults: StorePaycheckResults,
+): StorePaycheckResults {
+  return paycheckResults.isComplete ? paycheckResults : computePaycheck(paycheckInputs);
+}
+
 export function computeTotalExpenses(budget: StoreBudgetInputs): number {
   return budget.housing + budget.utilities + budget.insurance + budget.groceries +
     budget.dining + budget.transportation + budget.subscriptions + budget.phone +
@@ -193,6 +215,37 @@ export function computeSavingsRate(
   return ((payrollAnnual + optionalAnnual) / grossAnnual) * 100;
 }
 
+/**
+ * Canonical monthly cash-flow snapshot shared across dashboards/tools.
+ */
+export function computeUnifiedMonthlyFlow(
+  paycheckInputs: StorePaycheckInputs,
+  paycheckResults: StorePaycheckResults,
+  budget: StoreBudgetInputs,
+  debts: Array<{ minPayment: number }> = [],
+): UnifiedMonthlyFlow {
+  const paycheck = getEffectivePaycheckResults(paycheckInputs, paycheckResults);
+  const monthlyIncome = paycheck.netPayMonthly + budget.investmentIncome;
+  const totalExpenses = computeTotalExpenses(budget);
+  const optionalSavings = computeOptionalMonthlySavings(budget);
+  const debtMinimums = debts.reduce((s, d) => s + d.minPayment, 0);
+  const cashOutflows = totalExpenses + optionalSavings + debtMinimums;
+  const monthlySurplus = paycheck.isComplete ? monthlyIncome - cashOutflows : 0;
+  const savingsRate = paycheck.isComplete
+    ? computeSavingsRate(paycheck, paycheckInputs, budget)
+    : 0;
+  return {
+    paycheck,
+    monthlyIncome,
+    totalExpenses,
+    optionalSavings,
+    debtMinimums,
+    cashOutflows,
+    monthlySurplus,
+    savingsRate,
+  };
+}
+
 export function buildFinancialContext(
   paycheckInputs: StorePaycheckInputs,
   paycheckResults: StorePaycheckResults,
@@ -203,20 +256,22 @@ export function buildFinancialContext(
 ): string {
   const fmt = (n: number) => `$${Math.round(n).toLocaleString()}`;
   const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
-  const surplus = computeBudgetSurplus(paycheckResults, budgetInputs, debts);
-  const expenses = computeTotalExpenses(budgetInputs);
-  const savingsRate = computeSavingsRate(paycheckResults, paycheckInputs, budgetInputs);
+  const flow = computeUnifiedMonthlyFlow(paycheckInputs, paycheckResults, budgetInputs, debts);
+  const effectivePaycheck = flow.paycheck;
+  const surplus = flow.monthlySurplus;
+  const expenses = flow.totalExpenses;
+  const savingsRate = flow.savingsRate;
   const totalDebt = debts.reduce((s, d) => s + d.balance, 0);
   const lines: string[] = [];
-  if (paycheckResults.isComplete) {
+  if (effectivePaycheck.isComplete) {
     lines.push(`Annual salary: ${fmt(paycheckInputs.annualSalary)}`);
     lines.push(`State: ${paycheckInputs.state}, Filing: ${paycheckInputs.filingStatus}`);
-    lines.push(`Gross per paycheck: ${fmt(paycheckResults.grossPerPaycheck)}`);
-    lines.push(`Net monthly take-home: ${fmt(paycheckResults.netPayMonthly)}`);
-    lines.push(`Effective tax rate: ${pct(paycheckResults.effectiveTaxRate)}`);
-    lines.push(`Marginal federal rate: ${pct(paycheckResults.marginalFederalRate)}`);
-    lines.push(`Annual tax savings from benefits: ${fmt(paycheckResults.annualTaxSavingsFromBenefits)}`);
-    lines.push(`401(k) traditional: ${fmt(paycheckResults.k401TraditionalAnnual)}/yr`);
+    lines.push(`Gross per paycheck: ${fmt(effectivePaycheck.grossPerPaycheck)}`);
+    lines.push(`Net monthly take-home: ${fmt(effectivePaycheck.netPayMonthly)}`);
+    lines.push(`Effective tax rate: ${pct(effectivePaycheck.effectiveTaxRate)}`);
+    lines.push(`Marginal federal rate: ${pct(effectivePaycheck.marginalFederalRate)}`);
+    lines.push(`Annual tax savings from benefits: ${fmt(effectivePaycheck.annualTaxSavingsFromBenefits)}`);
+    lines.push(`401(k) traditional: ${fmt(effectivePaycheck.k401TraditionalAnnual)}/yr`);
     if (paycheckInputs.hsaAnnual > 0) lines.push(`HSA: ${fmt(paycheckInputs.hsaAnnual)}/yr`);
     if (paycheckInputs.fsaAnnual > 0) lines.push(`FSA: ${fmt(paycheckInputs.fsaAnnual)}/yr`);
   }

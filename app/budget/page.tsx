@@ -31,6 +31,10 @@ import { ExportButton } from '@/components/ExportButton';
 import { downloadCsv } from '@/lib/export';
 import { exportDomToPdf } from '@/lib/exportPdf';
 import { Button } from '@/components/ui/button';
+import {
+  computeUnifiedMonthlyFlow,
+  getEffectivePaycheckResults,
+} from '@/lib/calculations';
 
 const CHART_COLORS = {
   Housing: '#f97316',
@@ -132,28 +136,21 @@ export default function BudgetPage() {
   const setBudgetInputs = useFinWiseStore((s) => s.setBudgetInputs);
   const debts = useFinWiseStore((s) => s.debts);
 
-  const pr = paycheckResults;
+  const pr = getEffectivePaycheckResults(paycheckInputs, paycheckResults);
   const pi = paycheckInputs;
   const bi = budgetInputs;
 
   // Derived values
-  const totalDebtMinimums = debts.reduce((s, d) => s + d.minPayment, 0);
-  const totalExpenses = bi.housing + bi.utilities + bi.insurance + bi.groceries + bi.dining +
-    bi.transportation + bi.subscriptions + bi.phone + bi.healthGym + bi.travel + bi.misc;
+  const flow = computeUnifiedMonthlyFlow(pi, pr, bi, debts);
+  const totalDebtMinimums = flow.debtMinimums;
+  const totalExpenses = flow.totalExpenses;
   const payrollSavingsMonthly = (pr.k401TraditionalAnnual + pr.k401RothAnnual) / 12 +
     pi.hsaAnnual / 12 + pi.fsaAnnual / 12;
-  const optionalSavings = bi.rothIraMonthly + bi.brokerageMonthly + bi.emergencyFundMonthly;
-  const monthlyIncome = pr.netPayMonthly + bi.investmentIncome;
-  /** Outflows from take-home (payroll savings already embedded in net pay). */
-  const cashOutflows = totalExpenses + optionalSavings + totalDebtMinimums;
-  const monthlySurplus = monthlyIncome - cashOutflows;
-  const savingsRate =
-    pr.grossAnnual > 0
-      ? (((pr.k401TraditionalAnnual + pr.k401RothAnnual + pi.hsaAnnual + pi.fsaAnnual) +
-          optionalSavings * 12) /
-          pr.grossAnnual) *
-        100
-      : 0;
+  const optionalSavings = flow.optionalSavings;
+  const monthlyIncome = flow.monthlyIncome;
+  const cashOutflows = flow.cashOutflows;
+  const monthlySurplus = flow.monthlySurplus;
+  const savingsRate = flow.savingsRate;
 
   // Chart data — optional savings + debt + living; housing called out in pie
   const pieData = [
