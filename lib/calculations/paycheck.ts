@@ -16,6 +16,7 @@ export interface PaycheckInputs {
   healthInsurancePerPeriod: number; // $
   dentalPerPeriod: number; // $
   commuterBenefitPerPeriod: number; // $
+  otherPreTaxPerPeriod: number; // $
   // Post-tax
   roth401kPct: number; // %
   otherPostTaxPerPeriod: number; // $
@@ -34,6 +35,7 @@ export interface PaycheckResult {
   healthInsurance: number;
   dental: number;
   commuterBenefit: number;
+  otherPreTax: number;
   totalPreTax: number;
   federalTaxableWages: number;
   ficaWages: number;
@@ -118,7 +120,7 @@ export function calculatePaycheck(inp: PaycheckInputs): PaycheckResult {
   const trad401k = gross * (inp.traditional401kPct / 100);
   const sec125 = inp.hsaPerPeriod + inp.fsaPerPeriod +
     inp.healthInsurancePerPeriod + inp.dentalPerPeriod +
-    inp.commuterBenefitPerPeriod;
+    inp.commuterBenefitPerPeriod + inp.otherPreTaxPerPeriod;
   const totalPreTax = trad401k + sec125;
 
   const annualTrad401k = trad401k * periods;
@@ -187,6 +189,7 @@ export function calculatePaycheck(inp: PaycheckInputs): PaycheckResult {
     healthInsurance: inp.healthInsurancePerPeriod,
     dental: inp.dentalPerPeriod,
     commuterBenefit: inp.commuterBenefitPerPeriod,
+    otherPreTax: inp.otherPreTaxPerPeriod,
     totalPreTax,
     federalTaxableWages: gross - totalPreTax,
     ficaWages: ficaPerPeriod,

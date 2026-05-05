@@ -125,6 +125,7 @@ export function computePaycheck(inputs: StorePaycheckInputs): StorePaycheckResul
     healthInsurancePerPeriod: inputs.healthInsuranceAnnual / periods,
     dentalPerPeriod: (inputs.dentalAnnual + inputs.visionAnnual) / periods,
     commuterBenefitPerPeriod: inputs.commuterAnnual / periods,
+    otherPreTaxPerPeriod: inputs.otherPreTaxAnnual / periods,
     otherPostTaxPerPeriod: inputs.otherPostTaxAnnual / periods,
   });
   const marginalCombined = result.marginalFederalRate + result.stateEffectiveRate + 0.0765;

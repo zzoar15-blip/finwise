@@ -136,3 +136,31 @@
 /* Hide scrollbar for mobile nav */
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* PDF export safe mode: force print-safe palette and remove visual effects
+   that can degrade html2canvas/jsPDF reliability. */
+.pdf-export-mode .pdf-export-target,
+.pdf-export-mode .pdf-export-target * {
+  color: #0f172a !important;
+  text-shadow: none !important;
+  filter: none !important;
+}
+
+.pdf-export-mode .pdf-export-target {
+  background: #ffffff !important;
+}
+
+.pdf-export-mode .pdf-export-target .bg-muted,
+.pdf-export-mode .pdf-export-target [class*="bg-muted"] {
+  background-color: #f8fafc !important;
+}
+
+.pdf-export-mode .pdf-export-target .text-muted-foreground,
+.pdf-export-mode .pdf-export-target [class*="text-muted-foreground"] {
+  color: #475569 !important;
+}
+
+.pdf-export-mode .pdf-export-target [class*="shadow"],
+.pdf-export-mode .pdf-export-target [style*="box-shadow"] {
+  box-shadow: none !important;
+}

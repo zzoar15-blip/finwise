@@ -359,7 +359,8 @@ function PaycheckPreview({ inputs }: { inputs: PlanInputs }) {
         dentalPerPeriod: inputs.dentalPerPeriod,
         commuterBenefitPerPeriod: inputs.commuterBenefitPerPeriod,
         roth401kPct: inputs.roth401kPct,
-        otherPostTaxPerPeriod: inputs.otherPreTaxPerPeriod,
+        otherPreTaxPerPeriod: inputs.otherPreTaxPerPeriod,
+        otherPostTaxPerPeriod: 0,
       });
     } catch {
       return null;
@@ -674,7 +675,8 @@ function StepExpenses({
         dentalPerPeriod: inputs.dentalPerPeriod,
         commuterBenefitPerPeriod: inputs.commuterBenefitPerPeriod,
         roth401kPct: inputs.roth401kPct,
-        otherPostTaxPerPeriod: inputs.otherPreTaxPerPeriod,
+        otherPreTaxPerPeriod: inputs.otherPreTaxPerPeriod,
+        otherPostTaxPerPeriod: 0,
       });
       return (result.netPay * PAY_PERIODS[inputs.payPeriod]) / 12;
     } catch {

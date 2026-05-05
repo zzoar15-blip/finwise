@@ -16,6 +16,10 @@ export async function exportDomToPdf(options: {
     return false;
   }
 
+  const rootEl = document.documentElement;
+  rootEl.classList.add('pdf-export-mode');
+  el.classList.add('pdf-export-target');
+
   try {
     const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
       import('html2canvas'),
@@ -75,5 +79,8 @@ export async function exportDomToPdf(options: {
       `PDF export failed (${msg}). If this page has live charts, try again after scrolling the full report into view, or use CSV / Excel export instead.`,
     );
     return false;
+  } finally {
+    rootEl.classList.remove('pdf-export-mode');
+    el.classList.remove('pdf-export-target');
   }
 }

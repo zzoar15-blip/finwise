@@ -378,8 +378,9 @@ export function computePlanMetrics(inputs: PlanInputs): PlanMetrics {
     healthInsurancePerPeriod: inputs.healthInsurancePerPeriod,
     dentalPerPeriod: inputs.dentalPerPeriod,
     commuterBenefitPerPeriod: inputs.commuterBenefitPerPeriod,
+    otherPreTaxPerPeriod: inputs.otherPreTaxPerPeriod,
     roth401kPct: inputs.roth401kPct,
-    otherPostTaxPerPeriod: inputs.otherPreTaxPerPeriod, // includes "other pre-tax"
+    otherPostTaxPerPeriod: 0,
   });
 
   const monthlyTakeHome = (paycheckResult.netPay * periods) / 12;

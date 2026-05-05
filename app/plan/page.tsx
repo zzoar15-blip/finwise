@@ -640,6 +640,25 @@ export default function PlanPage() {
     passiveIncome: Math.round(p.passiveIncome * 10),
     milestone: p.milestone,
   }));
+  const institutionalSummaryRows: Array<{ label: string; value: string }> = [
+    { label: 'Monthly income', value: heroIncomeVisible ? formatCurrency(monthlyTakeHome) : '—' },
+    { label: 'Living expenses', value: heroCashflowVisible ? formatCurrency(metrics.totalMonthlyExpenses) : '—' },
+    { label: 'Monthly surplus', value: heroCashflowVisible ? formatCurrency(monthlySurplus) : '—' },
+    { label: 'Savings rate', value: heroCashflowVisible ? `${savingsRate.toFixed(1)}%` : '—' },
+    { label: 'Debt balance', value: hasDebts ? formatCurrency(totalDebtBalance) : 'No debts' },
+    {
+      label: 'Debt-free date',
+      value: hasDebts && debtFreeDate ? formatMonthYear(debtFreeDate) : '—',
+    },
+    {
+      label: 'Investment capacity',
+      value: heroCashflowVisible ? formatCurrency(monthlyInvestCapacity) : '—',
+    },
+    {
+      label: 'Tax efficiency score',
+      value: heroIncomeVisible ? `${taxEfficiencyScore}/100` : '—',
+    },
+  ];
 
   return (
     <div className="mx-auto max-w-5xl space-y-8 print:space-y-6">
@@ -742,6 +761,39 @@ export default function PlanPage() {
               icon={<Calendar className="size-5 text-muted-foreground" />}
               sub={hasDebts && debtResult ? `${debtResult.monthsToPayoff} months away` : undefined}
             />
+          </div>
+
+          <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Institutional Summary
+                </p>
+                <p className="text-sm text-slate-700 mt-0.5">
+                  Safe-for-print snapshot used in PDF reports.
+                </p>
+              </div>
+              <Badge variant="secondary" className="text-[11px]">
+                For informational use
+              </Badge>
+            </div>
+            <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200">
+              <table className="w-full text-sm">
+                <tbody className="divide-y divide-slate-100">
+                  {institutionalSummaryRows.map((row) => (
+                    <tr key={row.label} className="bg-white">
+                      <td className="px-3 py-2 text-slate-600">{row.label}</td>
+                      <td className="px-3 py-2 text-right font-semibold tabular-nums text-slate-900">
+                        {row.value}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+              Educational use only. Outputs are model-based estimates, not investment, tax, or legal advice.
+            </p>
           </div>
         </Section>
 
