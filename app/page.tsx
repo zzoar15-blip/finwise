@@ -195,6 +195,7 @@ function DashboardPageContent() {
   const wizardOpen = searchParams.get('wizard') === 'true';
 
   const { plan, settings, setPlan, updateSettings } = usePlanStore();
+  const debtProfile = usePlanStore((s) => s.debtProfile);
   const transactions = useFinanceStore((s) => s.transactions);
   const paycheckResults = useFinWiseStore((s) => s.paycheckResults);
   const paycheckInputs = useFinWiseStore((s) => s.paycheckInputs);
@@ -212,9 +213,48 @@ function DashboardPageContent() {
     wizardOpen && !settings.acceptedInstitutionalDisclosure,
   );
 
+  const effectivePlanInputs = (() => {
+    if (!plan) return null;
+    if (debtProfile?.debts?.length) {
+      return {
+        ...plan.inputs,
+        debts: debtProfile.debts.map((d) => ({
+          id: d.id,
+          name: d.name,
+          debtType: 'other' as const,
+          balance: d.balance,
+          apr: d.apr,
+          minPayment: d.minPayment,
+        })),
+      };
+    }
+    if (debts.length > 0) {
+      return {
+        ...plan.inputs,
+        debts: debts.map((d) => ({
+          id: d.id,
+          name: d.name,
+          debtType: 'other' as const,
+          balance: d.balance,
+          apr: d.apr,
+          minPayment: d.minPayment,
+        })),
+      };
+    }
+    return plan.inputs;
+  })();
+
   const metrics = useMemo(
-    () => (plan ? computePlanMetrics(plan.inputs) : null),
-    [plan],
+    () =>
+      effectivePlanInputs
+        ? computePlanMetrics(effectivePlanInputs, {
+          monthlyOverpayment: debtProfile?.monthlyOverpayment ?? 0,
+          annualBonus: debtProfile?.annualBonus ?? 0,
+          bonusMonth: debtProfile?.bonusMonth ?? 2,
+          strategy: debtProfile?.strategy ?? 'avalanche',
+        })
+        : null,
+    [effectivePlanInputs, debtProfile?.monthlyOverpayment, debtProfile?.annualBonus, debtProfile?.bonusMonth, debtProfile?.strategy],
   );
 
   const recentTransactions = useMemo(() => transactions.slice(0, 5), [transactions]);

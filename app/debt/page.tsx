@@ -89,8 +89,8 @@ export default function DebtPage() {
     debtProfile?.monthlyOverpayment ?? surplusRounded,
   );
   const [annualBonus, setAnnualBonus] = useState(debtProfile?.annualBonus ?? 0);
-  const [bonusMonth, setBonusMonth] = useState(2);
-  const [strategy, setStrategy] = useState<'avalanche' | 'snowball'>('avalanche');
+  const [bonusMonth, setBonusMonth] = useState(debtProfile?.bonusMonth ?? 2);
+  const [strategy, setStrategy] = useState<'avalanche' | 'snowball'>(debtProfile?.strategy ?? 'avalanche');
   const hydratedDebtProfileRef = useRef(false);
 
   useEffect(() => {
@@ -98,6 +98,8 @@ export default function DebtPage() {
     hydratedDebtProfileRef.current = true;
     setMonthlyOverpayment(Math.max(0, debtProfile.monthlyOverpayment ?? 0));
     setAnnualBonus(Math.max(0, debtProfile.annualBonus ?? 0));
+    setBonusMonth(Math.min(12, Math.max(1, debtProfile.bonusMonth ?? 2)));
+    setStrategy(debtProfile.strategy ?? 'avalanche');
     if (storeDebts.length === 0 && debtProfile.debts.length > 0) {
       setStoreDebts(debtProfile.debts.map((d) => ({
         id: d.id,
@@ -120,8 +122,10 @@ export default function DebtPage() {
       })),
       monthlyOverpayment,
       annualBonus,
+      bonusMonth,
+      strategy,
     });
-  }, [debts, monthlyOverpayment, annualBonus, setDebtProfile]);
+  }, [debts, monthlyOverpayment, annualBonus, bonusMonth, strategy, setDebtProfile]);
 
   const result: DebtResult = useMemo(
     () => simulateDebtPayoff(debts, monthlyOverpayment, annualBonus, bonusMonth, strategy),

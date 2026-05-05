@@ -119,6 +119,8 @@ export interface DebtProfile {
   }>;
   monthlyOverpayment: number;
   annualBonus: number;
+  bonusMonth: number;
+  strategy: 'avalanche' | 'snowball';
 }
 
 export interface InvestProfile {

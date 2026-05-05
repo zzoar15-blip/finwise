@@ -98,6 +98,8 @@ export interface PlanMetrics {
 interface PlanDebtSimulationOverrides {
   monthlyOverpayment?: number;
   annualBonus?: number;
+  bonusMonth?: number;
+  strategy?: 'avalanche' | 'snowball';
 }
 
 function sumExpenses(e: PlanInputs['expenses']): number {
@@ -472,8 +474,8 @@ export function computePlanMetrics(
       debts,
       Math.max(0, debtOverrides.monthlyOverpayment ?? 0),
       Math.max(0, debtOverrides.annualBonus ?? 0),
-      2,
-      'avalanche',
+      debtOverrides.bonusMonth ?? 2,
+      debtOverrides.strategy ?? 'avalanche',
     )
     : null;
   const debtFreeDate = debtResult?.debtFreeDate ?? null;
@@ -574,6 +576,7 @@ export function mergePlanMetricsWithUnifiedBudget(
   budgetInputs: StoreBudgetInputs,
   debts: Array<{ id?: string; name?: string; balance?: number; apr?: number; minPayment: number }>,
   inputs: PlanInputs,
+  debtOverrides: PlanDebtSimulationOverrides = {},
 ): PlanMetrics {
   if (!paycheckResults.isComplete) {
     return base;
@@ -602,7 +605,13 @@ export function mergePlanMetricsWithUnifiedBudget(
   const hasDebts = unifiedDebts.length > 0;
   const totalDebtBalance = unifiedDebts.reduce((s, d) => s + d.balance, 0);
   const debtResult = hasDebts
-    ? simulateDebtPayoff(unifiedDebts, 0, 0, 2, 'avalanche')
+    ? simulateDebtPayoff(
+      unifiedDebts,
+      Math.max(0, debtOverrides.monthlyOverpayment ?? 0),
+      Math.max(0, debtOverrides.annualBonus ?? 0),
+      debtOverrides.bonusMonth ?? 2,
+      debtOverrides.strategy ?? 'avalanche',
+    )
     : null;
   const debtFreeDate = debtResult?.debtFreeDate ?? null;
 

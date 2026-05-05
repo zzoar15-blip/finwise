@@ -437,8 +437,10 @@ export default function PlanPage() {
       computePlanMetrics(effectiveInputs, {
         monthlyOverpayment: debtProfile?.monthlyOverpayment ?? 0,
         annualBonus: debtProfile?.annualBonus ?? 0,
+        bonusMonth: debtProfile?.bonusMonth ?? 2,
+        strategy: debtProfile?.strategy ?? 'avalanche',
       }),
-    [effectiveInputs, debtProfile?.monthlyOverpayment, debtProfile?.annualBonus],
+    [effectiveInputs, debtProfile?.monthlyOverpayment, debtProfile?.annualBonus, debtProfile?.bonusMonth, debtProfile?.strategy],
   );
   const effectivePaycheckResults = useMemo(
     () => getEffectivePaycheckResults(paycheckInputs, paycheckResults),
@@ -454,6 +456,12 @@ export default function PlanPage() {
         budgetInputs,
         finWiseDebts,
         effectiveInputs,
+        {
+          monthlyOverpayment: debtProfile?.monthlyOverpayment ?? 0,
+          annualBonus: debtProfile?.annualBonus ?? 0,
+          bonusMonth: debtProfile?.bonusMonth ?? 2,
+          strategy: debtProfile?.strategy ?? 'avalanche',
+        },
       ),
     [
       baseMetrics,
@@ -462,6 +470,10 @@ export default function PlanPage() {
       budgetInputs,
       finWiseDebts,
       effectiveInputs,
+      debtProfile?.monthlyOverpayment,
+      debtProfile?.annualBonus,
+      debtProfile?.bonusMonth,
+      debtProfile?.strategy,
     ],
   );
 
