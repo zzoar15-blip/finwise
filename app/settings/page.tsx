@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Wallet, Check, Download, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -41,12 +41,6 @@ export default function SettingsPage() {
   const [displayName, setDisplayName] = useState(settings.displayName);
   const [defaultState, setDefaultState] = useState(settings.defaultState);
   const [saved, setSaved] = useState(false);
-
-  // Sync local state when settings change (e.g. hydration)
-  useEffect(() => {
-    setDisplayName(settings.displayName);
-    setDefaultState(settings.defaultState);
-  }, [settings.displayName, settings.defaultState]);
 
   function handleSave() {
     updateSettings({ displayName, defaultState });

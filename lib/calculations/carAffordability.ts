@@ -1,4 +1,5 @@
 import type { UnifiedMonthlyFlow } from '@/lib/calculations';
+import { binarySearchMax, clamp, pmt, toMonthlyRate } from '@/lib/calculations/shared';
 
 export interface CarAffordabilityInputs {
   flow: UnifiedMonthlyFlow;
@@ -46,17 +47,10 @@ export interface CarAffordabilityResults {
   leaseTotalCost3Year: number;
 }
 
-function pmt(principal: number, monthlyRate: number, months: number): number {
-  if (principal <= 0) return 0;
-  if (monthlyRate <= 0) return principal / Math.max(1, months);
-  const growth = Math.pow(1 + monthlyRate, months);
-  return principal * (monthlyRate * growth) / (growth - 1);
-}
-
 function loanMonthlyAllIn(price: number, i: CarAffordabilityInputs): { payment: number; total: number } {
   const tax = price * Math.max(0, i.salesTaxRate);
   const financed = Math.max(0, price + tax + i.purchaseFees - i.loanDownPayment - i.tradeInValue);
-  const payment = pmt(financed, Math.max(0, i.loanApr) / 12, Math.max(1, i.loanTermMonths));
+  const payment = pmt(financed, toMonthlyRate(Math.max(0, i.loanApr)), Math.max(1, i.loanTermMonths));
   const total = payment + i.annualInsurance / 12 + i.monthlyFuel + i.monthlyMaintenance;
   return { payment, total };
 }
@@ -77,15 +71,7 @@ function solveAffordablePrice(
   calc: (price: number) => { payment: number; total: number },
 ): number {
   if (targetMonthly <= 0) return 0;
-  let low = 0;
-  let high = 200000;
-  for (let idx = 0; idx < 40; idx += 1) {
-    const mid = (low + high) / 2;
-    const total = calc(mid).total;
-    if (total > targetMonthly) high = mid;
-    else low = mid;
-  }
-  return low;
+  return binarySearchMax(0, 200000, 40, (value) => calc(value).total <= targetMonthly);
 }
 
 export function computeCarAffordability(inputs: CarAffordabilityInputs): CarAffordabilityResults {
@@ -93,7 +79,7 @@ export function computeCarAffordability(inputs: CarAffordabilityInputs): CarAffo
   const nonTransportOutflows =
     Math.max(0, inputs.flow.cashOutflows - inputs.currentTransportBudget) + Math.max(0, inputs.targetMonthlySavings);
   const maxByCashflow = Math.max(0, monthlyIncomeHousehold - nonTransportOutflows);
-  const maxByIncomeRatio = Math.max(0, monthlyIncomeHousehold * Math.max(0.05, inputs.transportIncomeRatio));
+  const maxByIncomeRatio = Math.max(0, monthlyIncomeHousehold * clamp(inputs.transportIncomeRatio, 0.05, 0.5));
   const recommendedTransportBudget = Math.max(0, Math.min(maxByCashflow, maxByIncomeRatio));
   const conservativeTransportBudget = Math.max(0, Math.min(recommendedTransportBudget, monthlyIncomeHousehold * 0.12));
 

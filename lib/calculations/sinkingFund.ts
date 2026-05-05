@@ -1,3 +1,5 @@
+import { addMonths, diffMonths, round2, toMonthlyRate, yearMonth } from '@/lib/calculations/shared';
+
 export type SinkingFundGoalType = 'vacation' | 'down-payment' | 'custom';
 export type SinkingFundMode = 'target-date' | 'monthly-contribution';
 
@@ -31,25 +33,8 @@ export interface SinkingFundResults {
   schedule: SinkingFundPoint[];
 }
 
-function addMonth(ym: string, offset: number): string {
-  const [y, m] = ym.split('-').map(Number);
-  const d = new Date(y, m - 1 + offset, 1);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-}
-
-function diffMonths(startYm: string, endYm: string): number {
-  const [sy, sm] = startYm.split('-').map(Number);
-  const [ey, em] = endYm.split('-').map(Number);
-  return Math.max(0, (ey - sy) * 12 + (em - sm));
-}
-
-function round2(n: number): number {
-  return Math.round(n * 100) / 100;
-}
-
 function nowYm(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  return yearMonth(new Date());
 }
 
 export const DEFAULT_SINKING_FUND_INPUTS: SinkingFundInputs = {
@@ -59,13 +44,13 @@ export const DEFAULT_SINKING_FUND_INPUTS: SinkingFundInputs = {
   currentSavings: 500,
   annualYieldPct: 4,
   monthlyContribution: 300,
-  targetDate: addMonth(nowYm(), 12),
+  targetDate: addMonths(nowYm(), 12),
   mode: 'target-date',
 };
 
 export function computeSinkingFund(inputs: SinkingFundInputs): SinkingFundResults {
   const startYm = nowYm();
-  const monthlyRate = Math.max(0, inputs.annualYieldPct) / 100 / 12;
+  const monthlyRate = toMonthlyRate(Math.max(0, inputs.annualYieldPct) / 100);
   const target = Math.max(0, inputs.targetAmount);
   const current = Math.max(0, inputs.currentSavings);
 
@@ -98,7 +83,7 @@ export function computeSinkingFund(inputs: SinkingFundInputs): SinkingFundResult
 
     schedule.push({
       month: m,
-      date: addMonth(startYm, m),
+      date: addMonths(startYm, m),
       contribution: round2(contributionForSchedule),
       interest: round2(interest),
       balance: round2(balance),
@@ -116,7 +101,7 @@ export function computeSinkingFund(inputs: SinkingFundInputs): SinkingFundResult
 
   const monthsToGoal = completionMonth;
   const projectedCompletionDate =
-    completionMonth === null ? null : addMonth(startYm, completionMonth);
+    completionMonth === null ? null : addMonths(startYm, completionMonth);
 
   return {
     requiredMonthlyContribution: round2(requiredMonthlyContribution),

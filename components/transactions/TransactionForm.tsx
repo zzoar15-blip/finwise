@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useForm, type Resolver } from 'react-hook-form';
+import { useForm, useWatch, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
@@ -51,8 +51,8 @@ export function TransactionForm({ open, onClose, editing }: Props) {
     register,
     handleSubmit,
     setValue,
-    watch,
     reset,
+    control,
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema) as Resolver<FormData>,
@@ -63,7 +63,8 @@ export function TransactionForm({ open, onClose, editing }: Props) {
     },
   });
 
-  const type = watch('type');
+  const type = useWatch({ control, name: 'type' });
+  const category = useWatch({ control, name: 'category' });
 
   useEffect(() => {
     if (editing) {
@@ -139,7 +140,7 @@ export function TransactionForm({ open, onClose, editing }: Props) {
             <div className="space-y-1">
               <Label>Category</Label>
               <Select
-                value={watch('category')}
+                value={category}
                 onValueChange={(v) => setValue('category', v as FormData['category'])}
               >
                 <SelectTrigger>

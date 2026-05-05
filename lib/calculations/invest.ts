@@ -1,3 +1,5 @@
+import { yearMonth } from '@/lib/calculations/shared';
+
 export interface InvestInputs {
   monthlyBuy: number;
   annualBonus: number; // hits in February
@@ -68,7 +70,6 @@ export function simulateInvestment(inp: InvestInputs): InvestResult {
 
   const monthly: MonthPoint[] = [];
   let portfolioValue = 0;
-  let totalInvested = 0;
 
   const now = new Date();
   const startYear = now.getFullYear();
@@ -83,10 +84,8 @@ export function simulateInvestment(inp: InvestInputs): InvestResult {
 
     // Purchases
     portfolioValue += inp.monthlyBuy;
-    totalInvested += inp.monthlyBuy;
     if (isFebruary && inp.annualBonus > 0) {
       portfolioValue += inp.annualBonus;
-      totalInvested += inp.annualBonus;
     }
 
     // Price appreciation
@@ -103,7 +102,7 @@ export function simulateInvestment(inp: InvestInputs): InvestResult {
 
     monthly.push({
       month: m + 1,
-      date: dateObj.toISOString().slice(0, 7),
+      date: yearMonth(dateObj),
       portfolioValue,
       grossMonthlyIncome: grossIncome,
       afterTaxMonthlyIncome: afterTaxIncome,
@@ -123,7 +122,8 @@ export function simulateInvestment(inp: InvestInputs): InvestResult {
       portfolioValue: last?.portfolioValue ?? 0,
       grossAnnualIncome: yearMonths.reduce((s, m) => s + m.grossMonthlyIncome, 0),
       afterTaxAnnualIncome: yearMonths.reduce((s, m) => s + m.afterTaxMonthlyIncome, 0),
-      totalInvested: monthly.filter(m => m.year <= y).reduce((s, _) => s, totalInvested),
+      totalInvested:
+        y * inp.monthlyBuy * 12 + (inp.annualBonus > 0 ? y * inp.annualBonus : 0),
     });
   }
 

@@ -229,10 +229,6 @@ export function buildScenarioVerdict(winner: ScenarioResult['winner'], differenc
 
 export function buildVerdict(
   breakEvenYear: number | null,
-  _plannedStay: number,
-  _winner: ScenarioResult['winner'],
-  _difference: number,
-  _ptr: number,
 ) {
   if (!breakEvenYear) {
     return {
@@ -330,7 +326,7 @@ export function computeRentVsBuy(rawInputs: RentVsBuyInputs): RentVsBuyResults {
   const plannedWinner: ScenarioResult['winner'] = Math.abs(plannedDiff) < 5000 ? 'tie' : plannedDiff > 0 ? 'buy' : 'rent';
 
   const breakEvenYear = core.breakEvenMonth ? core.breakEvenMonth / 12 : null;
-  const verdict = buildVerdict(breakEvenYear, inputs.plannedStayYears, plannedWinner, plannedDiff, priceToRentRatio);
+  const verdict = buildVerdict(breakEvenYear);
 
   return {
     breakEvenMonth: core.breakEvenMonth,

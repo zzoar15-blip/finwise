@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Home, Users, ChevronLeft } from 'lucide-react';
+import { Home, ChevronLeft } from 'lucide-react';
 import { useFinWiseStore } from '@/lib/store';
 import { usePlanStore } from '@/lib/planStore';
 import { getPropertyTaxRate } from '@/lib/stateTax';
@@ -18,7 +18,6 @@ export default function HousingAffordabilityPage() {
   const debts = useFinWiseStore((s) => s.debts);
   const planLastUpdated = useFinWiseStore((s) => s.planLastUpdated);
   const plan = usePlanStore((s) => s.plan);
-  const didSeedDownPaymentFromPlan = useRef(false);
 
   const [partnerMonthlyIncome, setPartnerMonthlyIncome] = useState(0);
   const [partnerMonthlyGrossIncome, setPartnerMonthlyGrossIncome] = useState(0);
@@ -26,7 +25,7 @@ export default function HousingAffordabilityPage() {
   const [targetMonthlySavings, setTargetMonthlySavings] = useState(300);
   const [annualMortgageRate, setAnnualMortgageRate] = useState(0.0675);
   const [loanTermYears, setLoanTermYears] = useState(30);
-  const [downPaymentCash, setDownPaymentCash] = useState(80000);
+  const [downPaymentCash, setDownPaymentCash] = useState(plan?.inputs?.homeTarget || 80000);
   const [downPaymentPct, setDownPaymentPct] = useState(0.2);
   const [monthlyHoa, setMonthlyHoa] = useState(0);
   const [annualPropertyTaxRate, setAnnualPropertyTaxRate] = useState(() =>
@@ -36,15 +35,6 @@ export default function HousingAffordabilityPage() {
   const [annualMaintenanceRate, setAnnualMaintenanceRate] = useState(0.01);
   const [pmiRateAnnual, setPmiRateAnnual] = useState(0.008);
   const [closingCostPct, setClosingCostPct] = useState(0.03);
-
-  useEffect(() => {
-    const homeGoal = plan?.inputs?.homeTarget ?? 0;
-    if (didSeedDownPaymentFromPlan.current) return;
-    if (homeGoal > 0) {
-      setDownPaymentCash(homeGoal);
-      didSeedDownPaymentFromPlan.current = true;
-    }
-  }, [plan?.inputs?.homeTarget]);
 
   const flow = useMemo(
     () => computeUnifiedMonthlyFlow(paycheckInputs, paycheckResults, budgetInputs, debts),

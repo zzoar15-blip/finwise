@@ -1,3 +1,5 @@
+import { EPSILON, yearMonth } from '@/lib/calculations/shared';
+
 export interface Debt {
   id: string;
   name: string;
@@ -43,7 +45,7 @@ function runSimulation(
   const maxMonths = 600;
 
   for (let m = 0; m < maxMonths; m++) {
-    if (!current.some(d => d.balance > 0.01)) break;
+    if (!current.some(d => d.balance > EPSILON)) break;
 
     const calMonth = ((startCalMonth - 1 + m) % 12) + 1;
 
@@ -67,23 +69,23 @@ function runSimulation(
         const pay = Math.min(d.balance, d.minPayment, available);
         d.balance -= pay;
         available -= pay;
-        if (d.balance < 0.01) d.balance = 0;
+        if (d.balance < EPSILON) d.balance = 0;
       }
     }
 
     // Apply extra to target debt
-    const active = current.filter(d => d.balance > 0.01);
+    const active = current.filter(d => d.balance > EPSILON);
     if (strategy === 'avalanche') {
       active.sort((a, b) => b.apr - a.apr);
     } else {
       active.sort((a, b) => a.balance - b.balance);
     }
     for (const d of active) {
-      if (available <= 0.01) break;
+      if (available <= EPSILON) break;
       const pay = Math.min(d.balance, available);
       d.balance -= pay;
       available -= pay;
-      if (d.balance < 0.01) d.balance = 0;
+      if (d.balance < EPSILON) d.balance = 0;
     }
 
     const balances: Record<string, number> = {};
@@ -93,7 +95,7 @@ function runSimulation(
     const date = new Date(now.getFullYear(), now.getMonth() + m + 1, 1);
     snapshots.push({
       month: m + 1,
-      date: date.toISOString().slice(0, 7),
+      date: yearMonth(date),
       balances,
       totalBalance: Object.values(balances).reduce((s, v) => s + v, 0),
       cumulativeInterest,
@@ -127,7 +129,7 @@ export function simulateDebtPayoff(
     debts, minBudget, 0, 0, strategy, startMonth
   );
 
-  const lastPayoffMonth = snapshots.findIndex(s => s.totalBalance < 0.01);
+  const lastPayoffMonth = snapshots.findIndex(s => s.totalBalance < EPSILON);
   const monthsToPayoff = lastPayoffMonth >= 0 ? lastPayoffMonth + 1 : snapshots.length;
   const debtFreeDate = snapshots[monthsToPayoff - 1]?.date ?? '';
 
@@ -162,7 +164,7 @@ export function buildSensitivityTable(
     const { snapshots, totalInterest } = runSimulation(
       debts, budget, annualBonus, bonusMonth, strategy, startMonth
     );
-    const lastPayoff = snapshots.findIndex(s => s.totalBalance < 0.01);
+    const lastPayoff = snapshots.findIndex(s => s.totalBalance < EPSILON);
     const months = lastPayoff >= 0 ? lastPayoff + 1 : snapshots.length;
     return {
       extraPerMonth: overpayment,

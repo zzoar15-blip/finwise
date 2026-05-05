@@ -5,15 +5,19 @@ export function downloadXlsx(workbook: XLSX.WorkBook, filename: string) {
 }
 
 export function downloadCsv(rows: (string | number)[][], filename: string) {
+  const escapeCell = (cell: string | number) => {
+    const raw = String(cell);
+    // Prevent spreadsheet formula injection on CSV open.
+    const safe = /^[=+\-@]/.test(raw) ? `'${raw}` : raw;
+    return safe.includes(',') || safe.includes('"') || safe.includes('\n')
+      ? `"${safe.replace(/"/g, '""')}"`
+      : safe;
+  };
+
   const csv = rows
     .map((row) =>
       row
-        .map((cell) => {
-          const s = String(cell);
-          return s.includes(',') || s.includes('"') || s.includes('\n')
-            ? `"${s.replace(/"/g, '""')}"`
-            : s;
-        })
+        .map(escapeCell)
         .join(',')
     )
     .join('\n');

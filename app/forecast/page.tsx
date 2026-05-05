@@ -81,6 +81,35 @@ interface ScenarioFieldProps {
   onChange: (v: number) => void;
 }
 
+function ForecastTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: Array<{ name: string; value: number; color: string }>;
+  label?: string | number;
+}) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="rounded-lg border border-border bg-popover p-3 shadow-md text-sm">
+      <p className="mb-2 font-semibold">Year {label}</p>
+      {payload.map((p) => (
+        <div key={p.name} className="flex items-center justify-between gap-4">
+          <span className="flex items-center gap-1.5">
+            <span
+              className="inline-block size-2.5 rounded-full"
+              style={{ background: p.color }}
+            />
+            {p.name}
+          </span>
+          <span className="font-medium tabular-nums">{formatCurrency(p.value)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function ScenarioField({ label, value, prefix, suffix, onChange }: ScenarioFieldProps) {
   return (
     <div className="space-y-1">
@@ -189,36 +218,6 @@ export default function ForecastPage() {
     }
     return pairs;
   }, [results]);
-
-  // Custom tooltip for the line chart
-  const CustomTooltip = ({
-    active,
-    payload,
-    label,
-  }: {
-    active?: boolean;
-    payload?: Array<{ name: string; value: number; color: string }>;
-    label?: string | number;
-  }) => {
-    if (!active || !payload?.length) return null;
-    return (
-      <div className="rounded-lg border border-border bg-popover p-3 shadow-md text-sm">
-        <p className="mb-2 font-semibold">Year {label}</p>
-        {payload.map((p) => (
-          <div key={p.name} className="flex items-center justify-between gap-4">
-            <span className="flex items-center gap-1.5">
-              <span
-                className="inline-block size-2.5 rounded-full"
-                style={{ background: p.color }}
-              />
-              {p.name}
-            </span>
-            <span className="font-medium tabular-nums">{formatCurrency(p.value)}</span>
-          </div>
-        ))}
-      </div>
-    );
-  };
 
   function buildExportRows(): (string | number)[][] {
     const headers = ['Year', ...results.map((r) => `${r.scenario.name} Net Worth ($)`)];
@@ -618,7 +617,7 @@ export default function ForecastPage() {
                 tick={{ fontSize: 12 }}
                 width={72}
               />
-              <Tooltip content={<CustomTooltip />} />
+              <Tooltip content={<ForecastTooltip />} />
               <Legend />
               {scenarios.map((s) => (
                 <Line

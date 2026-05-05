@@ -243,8 +243,7 @@ export default function SinkingFundPage() {
         <div className="space-y-4">
           {budgetDrivenMonthly !== null && (
             <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
-              Down payment flex sync is active: <span className="font-semibold">{formatCurrency(budgetDrivenMonthly)}/mo</span> is now driving your Budget's
-              `Home Down Payment Fund`.
+              Down payment flex sync is active: <span className="font-semibold">{formatCurrency(budgetDrivenMonthly)}/mo</span> is now driving your Budget home down payment fund.
             </div>
           )}
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

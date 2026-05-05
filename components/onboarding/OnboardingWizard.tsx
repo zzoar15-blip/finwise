@@ -192,6 +192,129 @@ function Field({
   );
 }
 
+function PaycheckPreviewRow({
+  label,
+  value,
+  muted,
+  indent,
+}: {
+  label: string;
+  value: number;
+  muted?: boolean;
+  indent?: boolean;
+}) {
+  return (
+    <div
+      className={`flex items-center justify-between gap-2 ${indent ? 'pl-3 text-gray-500' : ''}`}
+    >
+      <span className={`text-sm ${muted ? 'text-gray-500' : 'text-gray-700'}`}>{label}</span>
+      <span className={`tabular-nums text-sm ${muted ? 'text-gray-500' : 'text-gray-700'}`}>
+        {formatCurrency(value)}
+      </span>
+    </div>
+  );
+}
+
+function BenefitsSliderField({
+  label,
+  value,
+  max,
+  field,
+  hint,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  max: number;
+  field: keyof PlanInputs;
+  hint?: string;
+  onChange: (patch: Partial<PlanInputs>) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center justify-between">
+        <Label className="text-sm font-medium text-gray-700">{label}</Label>
+        <span className="rounded bg-blue-50 px-2 py-0.5 text-sm font-semibold text-[#3b82f6]">
+          {value}%
+        </span>
+      </div>
+      <input
+        type="range"
+        min={0}
+        max={max}
+        step={0.5}
+        value={value}
+        onChange={(e) => onChange({ [field]: parseFloat(e.target.value) })}
+        className="h-2 w-full cursor-pointer appearance-none rounded-full bg-gray-200 accent-[#3b82f6]"
+      />
+      {hint && <p className="text-xs text-gray-500">{hint}</p>}
+    </div>
+  );
+}
+
+function BenefitsDollarField({
+  label,
+  value,
+  field,
+  hint,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  field: keyof PlanInputs;
+  hint?: string;
+  onChange: (patch: Partial<PlanInputs>) => void;
+}) {
+  return (
+    <Field label={label} hint={hint}>
+      <div className="relative">
+        <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-gray-500">
+          $
+        </span>
+        <Input
+          type="number"
+          min={0}
+          step={10}
+          className="pl-6"
+          value={value || ''}
+          onChange={(e) => onChange({ [field]: numericValue(e.target.value) })}
+        />
+      </div>
+    </Field>
+  );
+}
+
+function ExpenseField({
+  label,
+  field,
+  value,
+  onChange,
+}: {
+  label: string;
+  field: keyof PlanExpenses;
+  value: number;
+  onChange: (field: keyof PlanExpenses, value: number) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Label className="text-sm font-medium text-gray-700">{label}</Label>
+      <div className="relative">
+        <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-gray-500">
+          $
+        </span>
+        <Input
+          type="number"
+          min={0}
+          step={10}
+          className="pl-6"
+          value={value || ''}
+          onChange={(e) => onChange(field, numericValue(e.target.value))}
+        />
+      </div>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Step 1 — Income
 // ---------------------------------------------------------------------------
@@ -385,74 +508,51 @@ function PaycheckPreview({ inputs }: { inputs: PlanInputs }) {
 
   const annualNet = result.netPay * periods;
 
-  function Row({
-    label,
-    value,
-    muted,
-    indent,
-  }: {
-    label: string;
-    value: number;
-    muted?: boolean;
-    indent?: boolean;
-  }) {
-    return (
-      <div
-        className={`flex items-center justify-between gap-2 ${indent ? 'pl-3 text-gray-500' : ''}`}
-      >
-        <span className={`text-sm ${muted ? 'text-gray-500' : 'text-gray-700'}`}>{label}</span>
-        <span className={`tabular-nums text-sm ${muted ? 'text-gray-500' : 'text-gray-700'}`}>
-          {formatCurrency(value)}
-        </span>
-      </div>
-    );
-  }
-
   return (
     <div className="rounded-xl border border-blue-100 bg-white p-5 shadow-sm">
       <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-gray-400">
         {periodLabel[inputs.payPeriod]} Paycheck Preview
       </p>
 
-      <Row label="Gross pay" value={result.grossPay} />
+      <PaycheckPreviewRow label="Gross pay" value={result.grossPay} />
 
       <div className="my-2 border-t border-dashed border-gray-100" />
 
       <p className="mb-1 text-xs font-medium text-gray-400">Pre-tax deductions</p>
       {result.traditional401k > 0 && (
-        <Row label="401(k) Traditional" value={-result.traditional401k} indent muted />
+        <PaycheckPreviewRow label="401(k) Traditional" value={-result.traditional401k} indent muted />
       )}
-      {result.hsa > 0 && <Row label="HSA" value={-result.hsa} indent muted />}
-      {result.fsa > 0 && <Row label="FSA" value={-result.fsa} indent muted />}
+      {result.hsa > 0 && <PaycheckPreviewRow label="HSA" value={-result.hsa} indent muted />}
+      {result.fsa > 0 && <PaycheckPreviewRow label="FSA" value={-result.fsa} indent muted />}
       {result.healthInsurance > 0 && (
-        <Row label="Health insurance" value={-result.healthInsurance} indent muted />
+        <PaycheckPreviewRow label="Health insurance" value={-result.healthInsurance} indent muted />
       )}
-      {result.dental > 0 && <Row label="Dental/Vision" value={-result.dental} indent muted />}
+      {result.dental > 0 && <PaycheckPreviewRow label="Dental/Vision" value={-result.dental} indent muted />}
       {result.commuterBenefit > 0 && (
-        <Row label="Commuter benefit" value={-result.commuterBenefit} indent muted />
+        <PaycheckPreviewRow label="Commuter benefit" value={-result.commuterBenefit} indent muted />
       )}
       {result.totalPreTax > 0 && (
-        <Row label="Total pre-tax" value={-result.totalPreTax} muted />
+        <PaycheckPreviewRow label="Total pre-tax" value={-result.totalPreTax} muted />
       )}
 
       <div className="my-2 border-t border-dashed border-gray-100" />
 
       <p className="mb-1 text-xs font-medium text-gray-400">Taxes</p>
-      <Row label="Federal income tax" value={-result.federalIncomeTax} indent muted />
-      <Row label="Social Security" value={-result.socialSecurity} indent muted />
-      <Row label="Medicare" value={-result.medicare} indent muted />
+      <PaycheckPreviewRow label="Federal income tax" value={-result.federalIncomeTax} indent muted />
+      <PaycheckPreviewRow label="Social Security" value={-result.socialSecurity} indent muted />
+      <PaycheckPreviewRow label="Medicare" value={-result.medicare} indent muted />
       {result.stateTax > 0 && (
-        <Row label={`${inputs.state} state tax`} value={-result.stateTax} indent muted />
+        <PaycheckPreviewRow label={`${inputs.state} state tax`} value={-result.stateTax} indent muted />
       )}
-      {result.localTax > 0 && <Row label="NYC local tax" value={-result.localTax} indent muted />}
+      {result.localTax > 0 && <PaycheckPreviewRow label="NYC local tax" value={-result.localTax} indent muted />}
       {result.additionalPayrollTaxes.map((t) => (
-        <Row key={t.name} label={t.name} value={-t.amount} indent muted />
+        <PaycheckPreviewRow key={t.name} label={t.name} value={-t.amount} indent muted />
       ))}
 
       {result.roth401k > 0 && (
         <>
           <div className="my-2 border-t border-dashed border-gray-100" />
-          <Row label="Roth 401(k)" value={-result.roth401k} muted />
+          <PaycheckPreviewRow label="Roth 401(k)" value={-result.roth401k} muted />
         </>
       )}
 
@@ -492,71 +592,6 @@ function StepBenefits({
   inputs: PlanInputs;
   onChange: (patch: Partial<PlanInputs>) => void;
 }) {
-  function SliderField({
-    label,
-    value,
-    max,
-    field,
-    hint,
-  }: {
-    label: string;
-    value: number;
-    max: number;
-    field: keyof PlanInputs;
-    hint?: string;
-  }) {
-    return (
-      <div className="flex flex-col gap-1.5">
-        <div className="flex items-center justify-between">
-          <Label className="text-sm font-medium text-gray-700">{label}</Label>
-          <span className="rounded bg-blue-50 px-2 py-0.5 text-sm font-semibold text-[#3b82f6]">
-            {value}%
-          </span>
-        </div>
-        <input
-          type="range"
-          min={0}
-          max={max}
-          step={0.5}
-          value={value}
-          onChange={(e) => onChange({ [field]: parseFloat(e.target.value) })}
-          className="h-2 w-full cursor-pointer appearance-none rounded-full bg-gray-200 accent-[#3b82f6]"
-        />
-        {hint && <p className="text-xs text-gray-500">{hint}</p>}
-      </div>
-    );
-  }
-
-  function DollarField({
-    label,
-    value,
-    field,
-    hint,
-  }: {
-    label: string;
-    value: number;
-    field: keyof PlanInputs;
-    hint?: string;
-  }) {
-    return (
-      <Field label={label} hint={hint}>
-        <div className="relative">
-          <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-gray-500">
-            $
-          </span>
-          <Input
-            type="number"
-            min={0}
-            step={10}
-            className="pl-6"
-            value={value || ''}
-            onChange={(e) => onChange({ [field]: numericValue(e.target.value) })}
-          />
-        </div>
-      </Field>
-    );
-  }
-
   const total401k = inputs.traditional401kPct + inputs.roth401kPct;
 
   return (
@@ -576,19 +611,21 @@ function StepBenefits({
               401(k) Contributions
             </p>
             <div className="flex flex-col gap-4">
-              <SliderField
+              <BenefitsSliderField
                 label="Traditional 401(k)"
                 value={inputs.traditional401kPct}
                 max={30}
                 field="traditional401kPct"
                 hint="Pre-tax — lowers your taxable income now"
+                onChange={onChange}
               />
-              <SliderField
+              <BenefitsSliderField
                 label="Roth 401(k)"
                 value={inputs.roth401kPct}
                 max={30}
                 field="roth401kPct"
                 hint="Post-tax — grows tax-free"
+                onChange={onChange}
               />
               {total401k > 23500 / (inputs.annualSalary / 100) && (
                 <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
@@ -603,38 +640,44 @@ function StepBenefits({
               Pre-tax benefits (per pay period)
             </p>
             <div className="flex flex-col gap-4">
-              <DollarField
+              <BenefitsDollarField
                 label="HSA contribution"
                 value={inputs.hsaPerPeriod}
                 field="hsaPerPeriod"
                 hint="Health Savings Account — triple tax advantage"
+                onChange={onChange}
               />
-              <DollarField
+              <BenefitsDollarField
                 label="FSA contribution"
                 value={inputs.fsaPerPeriod}
                 field="fsaPerPeriod"
                 hint="Flexible Spending Account"
+                onChange={onChange}
               />
-              <DollarField
+              <BenefitsDollarField
                 label="Health insurance premium"
                 value={inputs.healthInsurancePerPeriod}
                 field="healthInsurancePerPeriod"
+                onChange={onChange}
               />
-              <DollarField
+              <BenefitsDollarField
                 label="Dental / Vision premium"
                 value={inputs.dentalPerPeriod}
                 field="dentalPerPeriod"
+                onChange={onChange}
               />
-              <DollarField
+              <BenefitsDollarField
                 label="Commuter benefit"
                 value={inputs.commuterBenefitPerPeriod}
                 field="commuterBenefitPerPeriod"
                 hint="Transit / parking — pre-tax up to IRS limit"
+                onChange={onChange}
               />
-              <DollarField
+              <BenefitsDollarField
                 label="Other pre-tax deductions"
                 value={inputs.otherPreTaxPerPeriod}
                 field="otherPreTaxPerPeriod"
+                onChange={onChange}
               />
             </div>
           </div>
@@ -691,37 +734,14 @@ function StepExpenses({
 
   const surplus = monthlyNetPay - totalExpenses;
   const surplusColor = surplus >= 0 ? 'text-green-600' : 'text-red-500';
-
-  function ExpenseField({
-    label,
-    field,
-  }: {
-    label: string;
-    field: keyof PlanExpenses;
-  }) {
-    return (
-      <div className="flex flex-col gap-1.5">
-        <Label className="text-sm font-medium text-gray-700">{label}</Label>
-        <div className="relative">
-          <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-gray-500">
-            $
-          </span>
-          <Input
-            type="number"
-            min={0}
-            step={10}
-            className="pl-6"
-            value={inputs.expenses[field] || ''}
-            onChange={(e) =>
-              onChange({
-                expenses: { ...inputs.expenses, [field]: numericValue(e.target.value) },
-              })
-            }
-          />
-        </div>
-      </div>
-    );
-  }
+  const handleExpenseChange = useCallback(
+    (field: keyof PlanExpenses, value: number) => {
+      onChange({
+        expenses: { ...inputs.expenses, [field]: value },
+      });
+    },
+    [inputs.expenses, onChange],
+  );
 
   return (
     <div className="flex flex-col gap-5">
@@ -733,16 +753,16 @@ function StepExpenses({
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <ExpenseField label="Housing (rent/mortgage)" field="housing" />
-        <ExpenseField label="Utilities" field="utilities" />
-        <ExpenseField label="Groceries" field="groceries" />
-        <ExpenseField label="Dining out" field="dining" />
-        <ExpenseField label="Transportation" field="transportation" />
-        <ExpenseField label="Subscriptions" field="subscriptions" />
-        <ExpenseField label="Phone" field="phone" />
-        <ExpenseField label="Health / gym" field="health" />
-        <ExpenseField label="Travel" field="travel" />
-        <ExpenseField label="Miscellaneous" field="misc" />
+        <ExpenseField label="Housing (rent/mortgage)" field="housing" value={inputs.expenses.housing} onChange={handleExpenseChange} />
+        <ExpenseField label="Utilities" field="utilities" value={inputs.expenses.utilities} onChange={handleExpenseChange} />
+        <ExpenseField label="Groceries" field="groceries" value={inputs.expenses.groceries} onChange={handleExpenseChange} />
+        <ExpenseField label="Dining out" field="dining" value={inputs.expenses.dining} onChange={handleExpenseChange} />
+        <ExpenseField label="Transportation" field="transportation" value={inputs.expenses.transportation} onChange={handleExpenseChange} />
+        <ExpenseField label="Subscriptions" field="subscriptions" value={inputs.expenses.subscriptions} onChange={handleExpenseChange} />
+        <ExpenseField label="Phone" field="phone" value={inputs.expenses.phone} onChange={handleExpenseChange} />
+        <ExpenseField label="Health / gym" field="health" value={inputs.expenses.health} onChange={handleExpenseChange} />
+        <ExpenseField label="Travel" field="travel" value={inputs.expenses.travel} onChange={handleExpenseChange} />
+        <ExpenseField label="Miscellaneous" field="misc" value={inputs.expenses.misc} onChange={handleExpenseChange} />
       </div>
 
       {/* Summary bar */}
@@ -1066,7 +1086,7 @@ function StepGoals({
       <div>
         <h2 className="text-xl font-semibold text-gray-900">What are your financial goals?</h2>
         <p className="mt-1 text-sm text-gray-500">
-          Select all that apply. We'll build your personalized plan around these.
+          Select all that apply. We&apos;ll build your personalized plan around these.
         </p>
       </div>
 

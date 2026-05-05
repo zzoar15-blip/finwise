@@ -32,7 +32,7 @@ export function exportBudgetWorkbook(
   const ws1 = buildBudgetModelSheet(paycheckInputs, paycheckResults, budgetInputs, debts);
   XLSX.utils.book_append_sheet(wb, ws1, 'Budget Model');
 
-  const ws2 = buildMonthlyProjectionSheet(paycheckResults, budgetInputs, debts, paycheckInputs);
+  const ws2 = buildMonthlyProjectionSheet(paycheckResults, budgetInputs, debts);
   XLSX.utils.book_append_sheet(wb, ws2, 'Monthly Projection');
 
   const ws3 = buildTaxEfficiencySheet(paycheckInputs, paycheckResults);
@@ -69,7 +69,8 @@ function buildBudgetModelSheet(
     bi.transportation + bi.subscriptions + bi.phone + bi.healthGym + bi.travel + bi.misc;
   const totalSavingsPayroll = (pr.k401TraditionalAnnual + pr.k401RothAnnual) / 12 +
     pi.hsaAnnual / 12 + pi.fsaAnnual / 12;
-  const totalSavingsOptional = bi.rothIraMonthly + bi.brokerageMonthly + bi.emergencyFundMonthly;
+  const totalSavingsOptional =
+    bi.rothIraMonthly + bi.brokerageMonthly + bi.emergencyFundMonthly + bi.homeDownPaymentMonthly;
   const totalSavings = totalSavingsPayroll + totalSavingsOptional;
   const monthlyIncome = pr.netPayMonthly + bi.investmentIncome;
   const cashOutflows = totalExpenses + totalSavingsOptional + totalDebtMinimums;
@@ -149,6 +150,7 @@ function buildBudgetModelSheet(
     [labelCell('Roth IRA'), inputCell(bi.rothIraMonthly), formulaCell(bi.rothIraMonthly * 12)],
     [labelCell('Brokerage / Investments'), inputCell(bi.brokerageMonthly), formulaCell(bi.brokerageMonthly * 12)],
     [labelCell('Emergency Fund'), inputCell(bi.emergencyFundMonthly), formulaCell(bi.emergencyFundMonthly * 12)],
+    [labelCell('Home Down Payment Fund'), inputCell(bi.homeDownPaymentMonthly), formulaCell(bi.homeDownPaymentMonthly * 12)],
     [cell('Subtotal — payroll savings (included in net pay above)', { font: { sz: 9, italic: true, color: { rgb: '6b7280' } } }), formulaCell(totalSavingsPayroll), formulaCell(totalSavingsPayroll * 12)],
     [labelCell('Total savings & investments (all channels)'), subtotalCell(totalSavings), subtotalCell(totalSavings * 12)],
     [blankCell()],
@@ -180,13 +182,13 @@ function buildBudgetModelSheet(
 function buildMonthlyProjectionSheet(
   pr: StorePaycheckResults,
   bi: StoreBudgetInputs,
-  debts: Debt[],
-  pi: StorePaycheckInputs
+  debts: Debt[]
 ): XLSX.WorkSheet {
   const totalDebtMinimums = debts.reduce((s, d) => s + d.minPayment, 0);
   const totalExpenses = bi.housing + bi.utilities + bi.insurance + bi.groceries + bi.dining +
     bi.transportation + bi.subscriptions + bi.phone + bi.healthGym + bi.travel + bi.misc;
-  const optionalMonthly = bi.rothIraMonthly + bi.brokerageMonthly + bi.emergencyFundMonthly;
+  const optionalMonthly =
+    bi.rothIraMonthly + bi.brokerageMonthly + bi.emergencyFundMonthly + bi.homeDownPaymentMonthly;
   const monthlyIncome = pr.netPayMonthly + bi.investmentIncome;
   const monthlySurplus = monthlyIncome - totalExpenses - optionalMonthly - totalDebtMinimums;
   const savingsFromBank = optionalMonthly;

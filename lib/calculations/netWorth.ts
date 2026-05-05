@@ -1,3 +1,5 @@
+import { yearMonth } from '@/lib/calculations/shared';
+
 export interface NetWorthItem {
   id: string;
   name: string;
@@ -30,6 +32,5 @@ export function computeNetWorthTotals(
 }
 
 export function currentYearMonth(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  return yearMonth(new Date());
 }

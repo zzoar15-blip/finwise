@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { formatCurrency } from '@/lib/format';
 import { useFinWiseStore } from '@/lib/store';
@@ -12,7 +12,6 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import {
   PieChart,
@@ -27,7 +26,7 @@ import {
   YAxis,
   CartesianGrid,
 } from 'recharts';
-import { TrendingUp, Lock, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Lock, AlertTriangle, CheckCircle } from 'lucide-react';
 import { ExportButton } from '@/components/ExportButton';
 import { downloadCsv } from '@/lib/export';
 import { exportDomToPdf } from '@/lib/exportPdf';
@@ -154,7 +153,6 @@ export default function BudgetPage() {
     pi.hsaAnnual / 12 + pi.fsaAnnual / 12;
   const optionalSavings = flow.optionalSavings;
   const monthlyIncome = flow.monthlyIncome;
-  const cashOutflows = flow.cashOutflows;
   const monthlySurplus = flow.monthlySurplus;
   const savingsRate = flow.savingsRate;
   const sinkingFundDrivenHomeMonthly = useMemo(() => {

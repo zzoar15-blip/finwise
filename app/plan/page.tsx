@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -40,7 +40,7 @@ import {
 import { usePlanStore } from '@/lib/planStore';
 import { computePlanMetrics, mergePlanMetricsWithUnifiedBudget } from '@/lib/planCalculations';
 import { simulateInvestment } from '@/lib/calculations/invest';
-import type { PlanMetrics, WaterfallEntry, TaxSuggestion, PriorityCard } from '@/lib/planCalculations';
+import type { WaterfallEntry, TaxSuggestion, PriorityCard } from '@/lib/planCalculations';
 import type { AIInsight, PlanInputs, PlanExpenses } from '@/types/plan';
 import { formatCurrency } from '@/lib/format';
 import { exportDomToPdf } from '@/lib/exportPdf';
@@ -173,23 +173,6 @@ function EmptySection({ title, desc, ctaLabel, ctaHref }: { title: string; desc:
       </Link>
     </div>
   );
-}
-
-// ─── Waterfall custom bar shape ──────────────────────────────────────────────
-
-interface WaterfallBarShapeProps {
-  x?: number;
-  y?: number;
-  width?: number;
-  height?: number;
-  payload?: WaterfallEntry & { base: number };
-  fill?: string;
-}
-
-function WaterfallBarShape(props: WaterfallBarShapeProps) {
-  const { x = 0, y = 0, width = 0, height = 0, fill = '#ccc' } = props;
-  if (width <= 0 || Math.abs(height) < 0.5) return null;
-  return <rect x={x} y={y} width={width} height={Math.abs(height)} fill={fill} rx={2} />;
 }
 
 // ─── Waterfall chart ─────────────────────────────────────────────────────────
@@ -412,10 +395,11 @@ export default function PlanPage() {
   const [insightsError, setInsightsError] = useState<string | null>(null);
 
   // 800ms loading splash
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  if (loading && timerRef.current === null) {
-    timerRef.current = setTimeout(() => setLoading(false), 800);
-  }
+  useEffect(() => {
+    if (!loading) return;
+    const timer = setTimeout(() => setLoading(false), 800);
+    return () => clearTimeout(timer);
+  }, [loading]);
 
   // Build effective inputs by merging plan + profiles
   const effectiveInputs = useMemo((): PlanInputs => {
@@ -531,23 +515,7 @@ export default function PlanPage() {
     } finally {
       setInsightsLoading(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveInputs, metrics, hasPaycheckData, insightsLoading, setAIInsightsCache]);
-
-  // Auto-generate insights once when paycheck data first appears
-  const hasTriggeredInsights = useRef(false);
-  useEffect(() => {
-    if (!hasPaycheckData || hasTriggeredInsights.current) return;
-    hasTriggeredInsights.current = true;
-
-    const cache = aiInsightsCache;
-    if (cache) {
-      const ageMs = Date.now() - new Date(cache.generatedAt).getTime();
-      if (ageMs < 60 * 60 * 1000) return; // less than 1 hour old — skip
-    }
-    generateInsights();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasPaycheckData]);
 
   // ── Loading state ──
   if (loading) {
@@ -623,9 +591,7 @@ export default function PlanPage() {
   } = metrics;
 
   const insightItems = aiInsightsCache?.items ?? [];
-  const insightsFresh = aiInsightsCache
-    ? Date.now() - new Date(aiInsightsCache.generatedAt).getTime() < 24 * 60 * 60 * 1000
-    : false;
+  const insightsFresh = Boolean(aiInsightsCache);
   const showInsights = insightsFresh && insightItems.length > 0;
 
   const potentialScoreGain = taxSuggestions.reduce((s, t) => s + t.points, 0);

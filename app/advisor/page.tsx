@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Sparkles, Send, Square, Trash2, AlertCircle, User, Bot } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { useAdvisor } from '@/lib/useAdvisor';
 import { useFinWiseStore } from '@/lib/store';
 import { cn } from '@/lib/utils';

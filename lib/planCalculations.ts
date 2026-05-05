@@ -324,7 +324,6 @@ function build12MonthProjection(
   monthlySurplus: number,
   debtResult: DebtResult | null,
   investResult: InvestResult | null,
-  expensesTotal: number,
 ): ProjectionMonth[] {
   const now = new Date();
   const months: ProjectionMonth[] = [];
@@ -491,7 +490,6 @@ export function computePlanMetrics(inputs: PlanInputs): PlanMetrics {
     monthlySurplus,
     debtResult,
     investResult,
-    totalMonthlyExpenses,
   );
 
   return {
@@ -613,7 +611,6 @@ export function mergePlanMetricsWithUnifiedBudget(
     unifiedSurplus,
     debtResult,
     investResult,
-    budgetExpenses,
   );
 
   const grossMonthly = paycheckResults.grossAnnual / 12;

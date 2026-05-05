@@ -1,5 +1,5 @@
 import XLSX from 'xlsx-js-style';
-import { simulateDebtPayoff, buildSensitivityTable } from '@/lib/calculations/debt';
+import { simulateDebtPayoff } from '@/lib/calculations/debt';
 import type { Debt } from '@/lib/calculations/debt';
 import { XLS } from '../styles';
 import {

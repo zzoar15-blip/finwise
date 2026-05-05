@@ -205,8 +205,12 @@ function DashboardPageContent() {
   const setDebts = useFinWiseStore((s) => s.setDebts);
   const setGoals = useFinWiseStore((s) => s.setGoals);
 
-  const [showWizard, setShowWizard] = useState(false);
-  const [showDisclosure, setShowDisclosure] = useState(false);
+  const [showWizard, setShowWizard] = useState(
+    wizardOpen && settings.acceptedInstitutionalDisclosure,
+  );
+  const [showDisclosure, setShowDisclosure] = useState(
+    wizardOpen && !settings.acceptedInstitutionalDisclosure,
+  );
 
   const metrics = useMemo(
     () => (plan ? computePlanMetrics(plan.inputs) : null),
@@ -225,10 +229,8 @@ function DashboardPageContent() {
 
   useEffect(() => {
     if (!wizardOpen) return;
-    if (settings.acceptedInstitutionalDisclosure) setShowWizard(true);
-    else setShowDisclosure(true);
     router.replace('/', { scroll: false });
-  }, [wizardOpen, settings.acceptedInstitutionalDisclosure, router]);
+  }, [wizardOpen, router]);
 
   const handleAcceptDisclosure = useCallback(() => {
     updateSettings({ acceptedInstitutionalDisclosure: true });
