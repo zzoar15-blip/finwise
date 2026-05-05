@@ -106,10 +106,11 @@ const FEATURE_CARDS = [
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { plan, settings, setPlan } = usePlanStore();
+  const { plan, settings, setPlan, updateSettings } = usePlanStore();
   const transactions = useFinanceStore((s) => s.transactions);
 
   const [showWizard, setShowWizard] = useState(false);
+  const [showDisclosure, setShowDisclosure] = useState(false);
 
   const metrics = useMemo(
     () => (plan ? computePlanMetrics(plan.inputs) : null),
@@ -123,6 +124,20 @@ export default function DashboardPage() {
     setShowWizard(false);
   }
 
+  function handleStartPlanning() {
+    if (settings.acceptedInstitutionalDisclosure) {
+      setShowWizard(true);
+      return;
+    }
+    setShowDisclosure(true);
+  }
+
+  function handleAcceptDisclosure() {
+    updateSettings({ acceptedInstitutionalDisclosure: true });
+    setShowDisclosure(false);
+    setShowWizard(true);
+  }
+
   // ── State A: no plan ─────────────────────────────────────────────────────
   if (!plan) {
     return (
@@ -130,6 +145,57 @@ export default function DashboardPage() {
         {showWizard && (
           <div className="fixed inset-0 z-50 overflow-auto bg-white">
             <OnboardingWizard onComplete={handleUpdatePlan} />
+          </div>
+        )}
+
+        {showDisclosure && (
+          <div className="fixed inset-0 z-50 bg-black/50 p-4 sm:p-8">
+            <div className="mx-auto max-h-[85vh] w-full max-w-4xl overflow-auto rounded-xl bg-white shadow-xl">
+              <div className="sticky top-0 border-b bg-white px-6 py-4">
+                <h2 className="text-xl font-bold text-gray-900">The &quot;Institutional Grade&quot; Disclosure</h2>
+                <p className="mt-1 text-sm font-semibold text-gray-700">DISCLOSURES AND TERMS OF USE</p>
+              </div>
+              <div className="space-y-4 px-6 py-5 text-sm leading-relaxed text-gray-700">
+                <p>
+                  <span className="font-semibold">Educational Purpose Only:</span> This wealth comparison model (the
+                  &quot;Tool&quot;) is provided by FinWise for informational and illustrative purposes only. The output is
+                  generated based on user-provided assumptions and is not intended to serve as, and should not be
+                  relied upon as, investment, tax, legal, or financial advice.
+                </p>
+                <p>
+                  <span className="font-semibold">Model Assumptions &amp; Projections:</span> All calculations are
+                  hypothetical and based on mathematical models. Projections regarding home appreciation, investment
+                  returns, and tax implications are based on historical averages and current statutory rates which are
+                  subject to change. Past performance is not indicative of future results. Actual market conditions and
+                  financial outcomes may differ significantly from the estimates provided by this Tool.
+                </p>
+                <p>
+                  <span className="font-semibold">No Fiduciary Relationship:</span> Use of this Tool does not create a
+                  fiduciary, advisory, or professional relationship. FinWise is not a registered investment advisor,
+                  broker-dealer, or tax professional.
+                </p>
+                <p>
+                  <span className="font-semibold">Risk Disclosure:</span> All financial decisions involve risk,
+                  including the possible loss of principal. Real estate and equity markets are volatile; home ownership
+                  involves significant non-recoverable costs (maintenance, taxes, interest, and transaction fees) that
+                  may outweigh potential gains.
+                </p>
+                <p>
+                  <span className="font-semibold">Tax &amp; Legal Consultation:</span> Tax benefits, including mortgage
+                  interest deductions, are subject to individual eligibility and complex IRS regulations. Users are
+                  strongly encouraged to consult with a qualified tax professional or financial advisor before making
+                  any significant financial commitments.
+                </p>
+              </div>
+              <div className="flex items-center justify-end gap-2 border-t bg-gray-50 px-6 py-4">
+                <Button variant="outline" onClick={() => setShowDisclosure(false)}>
+                  Not now
+                </Button>
+                <Button onClick={handleAcceptDisclosure} className="bg-[#3b82f6] hover:bg-[#2563eb]">
+                  I Understand &amp; Agree
+                </Button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -151,7 +217,7 @@ export default function DashboardPage() {
             <Button
               size="lg"
               className="mt-8 gap-2 px-8 text-base"
-              onClick={() => setShowWizard(true)}
+              onClick={handleStartPlanning}
             >
               Build My Financial Plan
               <ArrowRight className="h-4 w-4" />

@@ -83,6 +83,7 @@ export interface PlanAIInsights {
 export interface AppSettings {
   displayName: string;
   defaultState: string;
+  acceptedInstitutionalDisclosure?: boolean;
 }
 
 export interface FinancialPlan {

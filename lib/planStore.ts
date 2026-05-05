@@ -7,6 +7,7 @@ import type { PlanStore, PlanInputs, PlanAIInsights, AppSettings, PaycheckProfil
 const DEFAULT_SETTINGS: AppSettings = {
   displayName: '',
   defaultState: 'CA',
+  acceptedInstitutionalDisclosure: false,
 };
 
 export const usePlanStore = create<PlanStore>()(
