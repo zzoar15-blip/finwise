@@ -54,8 +54,10 @@ function yAxisFormatter(v: number): string {
 }
 
 function monthTickFormatter(month: number): string {
-  if (month <= 0) return '0';
+  if (month <= 0) return '';
+  if (month === 1) return 'M1';
   if (month % 12 === 0) return `Y${month / 12}`;
+  if (month % 6 === 0) return `M${month}`;
   return '';
 }
 
@@ -348,8 +350,8 @@ function ForecastPageContent() {
             <ResponsiveContainer width="100%" height={340}>
               <LineChart data={homeForecast.points} margin={CHART_MARGIN}>
                 <CartesianGrid strokeDasharray={CHART_GRID} className="stroke-border/80" />
-                <XAxis dataKey="month" tickFormatter={monthTickFormatter} interval={5} tick={{ fontSize: 12 }} />
-                <YAxis tickFormatter={yAxisFormatter} width={84} />
+                <XAxis dataKey="month" tickFormatter={monthTickFormatter} interval={5} tick={{ fontSize: 12 }} label={{ value: 'Timeline', position: 'insideBottom', offset: -2, fontSize: 12 }} />
+                <YAxis tickFormatter={yAxisFormatter} width={84} label={{ value: 'Balance', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle' }, fontSize: 12 }} />
                 <Tooltip content={<ForecastTooltip labelPrefix="Month" />} />
                 <ReferenceLine y={homeForecast.target} stroke="#ef4444" strokeDasharray="4 4" />
                 <Line type="monotone" dataKey="balance" stroke="#3b82f6" strokeWidth={2.75} dot={false} activeDot={{ r: 4 }} strokeLinecap="round" />
@@ -392,8 +394,8 @@ function ForecastPageContent() {
             <ResponsiveContainer width="100%" height={340}>
               <LineChart data={emergencyForecast.points} margin={CHART_MARGIN}>
                 <CartesianGrid strokeDasharray={CHART_GRID} className="stroke-border/80" />
-                <XAxis dataKey="month" tickFormatter={monthTickFormatter} interval={5} tick={{ fontSize: 12 }} />
-                <YAxis tickFormatter={yAxisFormatter} width={84} />
+                <XAxis dataKey="month" tickFormatter={monthTickFormatter} interval={5} tick={{ fontSize: 12 }} label={{ value: 'Timeline', position: 'insideBottom', offset: -2, fontSize: 12 }} />
+                <YAxis tickFormatter={yAxisFormatter} width={84} label={{ value: 'Balance', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle' }, fontSize: 12 }} />
                 <Tooltip content={<ForecastTooltip labelPrefix="Month" />} />
                 <ReferenceLine y={emergencyForecast.target} stroke="#ef4444" strokeDasharray="4 4" />
                 <Line type="monotone" dataKey="balance" stroke="#22c55e" strokeWidth={2.75} dot={false} activeDot={{ r: 4 }} strokeLinecap="round" />
@@ -436,8 +438,8 @@ function ForecastPageContent() {
             <ResponsiveContainer width="100%" height={340}>
               <LineChart data={investForecast.points} margin={CHART_MARGIN}>
                 <CartesianGrid strokeDasharray={CHART_GRID} className="stroke-border/80" />
-                <XAxis dataKey="month" tickFormatter={monthTickFormatter} interval={5} tick={{ fontSize: 12 }} />
-                <YAxis tickFormatter={yAxisFormatter} width={84} />
+                <XAxis dataKey="month" tickFormatter={monthTickFormatter} interval={5} tick={{ fontSize: 12 }} label={{ value: 'Timeline', position: 'insideBottom', offset: -2, fontSize: 12 }} />
+                <YAxis tickFormatter={yAxisFormatter} width={84} label={{ value: 'Portfolio Value', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle' }, fontSize: 12 }} />
                 <Tooltip content={<ForecastTooltip labelPrefix="Month" />} />
                 <Line type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={2.75} dot={false} activeDot={{ r: 4 }} strokeLinecap="round" />
               </LineChart>
@@ -479,8 +481,8 @@ function ForecastPageContent() {
             <ResponsiveContainer width="100%" height={340}>
               <LineChart data={retireForecast.points} margin={CHART_MARGIN}>
                 <CartesianGrid strokeDasharray={CHART_GRID} className="stroke-border/80" />
-                <XAxis dataKey="month" tickFormatter={monthTickFormatter} interval={11} tick={{ fontSize: 12 }} />
-                <YAxis tickFormatter={yAxisFormatter} width={84} />
+                <XAxis dataKey="month" tickFormatter={monthTickFormatter} interval={11} tick={{ fontSize: 12 }} label={{ value: 'Timeline', position: 'insideBottom', offset: -2, fontSize: 12 }} />
+                <YAxis tickFormatter={yAxisFormatter} width={84} label={{ value: 'Portfolio Value', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle' }, fontSize: 12 }} />
                 <Tooltip content={<ForecastTooltip labelPrefix="Month" />} />
                 <ReferenceLine y={retireTarget} stroke="#ef4444" strokeDasharray="4 4" />
                 <Line type="monotone" dataKey="value" stroke="#22c55e" strokeWidth={2.75} dot={false} activeDot={{ r: 4 }} strokeLinecap="round" />
@@ -696,6 +698,7 @@ function ForecastPageContent() {
                 tickFormatter={yAxisFormatter}
                 tick={{ fontSize: 12 }}
                 width={72}
+                label={{ value: 'Net Worth', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle' }, fontSize: 12 }}
               />
               <Tooltip content={<ForecastTooltip />} />
               <Legend iconType="circle" wrapperStyle={{ paddingTop: 8 }} />
@@ -725,8 +728,8 @@ function ForecastPageContent() {
             <ResponsiveContainer width="100%" height={320}>
               <LineChart data={confidenceBands} margin={CHART_MARGIN}>
                 <CartesianGrid strokeDasharray={CHART_GRID} className="stroke-border/80" />
-                <XAxis dataKey="year" tick={{ fontSize: 12 }} />
-                <YAxis tickFormatter={yAxisFormatter} tick={{ fontSize: 12 }} width={72} />
+                <XAxis dataKey="year" tick={{ fontSize: 12 }} label={{ value: 'Year', position: 'insideBottom', offset: -2, fontSize: 12 }} />
+                <YAxis tickFormatter={yAxisFormatter} tick={{ fontSize: 12 }} width={72} label={{ value: 'Net Worth', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle' }, fontSize: 12 }} />
                 <Tooltip content={<ForecastTooltip />} />
                 <Legend iconType="circle" wrapperStyle={{ paddingTop: 8 }} />
                 <Line type="monotone" dataKey="p10" stroke="#ef4444" strokeWidth={2.5} dot={false} name="P10 (Downside)" strokeLinecap="round" />
