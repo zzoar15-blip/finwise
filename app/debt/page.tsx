@@ -202,7 +202,14 @@ export default function DebtPage() {
               size="sm"
               className="flex-1 sm:flex-none"
               onClick={() =>
-                exportDomToPdf({ elementId: 'tool-debt-export', filenamePrefix: `finwise-debt-${strategy}` })
+                exportDomToPdf({
+                  elementId: 'tool-debt-export',
+                  filenamePrefix: `finwise-debt-${strategy}`,
+                  onFallbackExcel: async () => {
+                    const { exportDebtWorkbook } = await import('@/lib/excel/exports/debt');
+                    exportDebtWorkbook(debts, monthlyOverpayment, annualBonus, bonusMonth, strategy);
+                  },
+                })
               }
             >
               Export PDF

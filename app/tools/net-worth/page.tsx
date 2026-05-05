@@ -126,7 +126,14 @@ export default function NetWorthPage() {
               variant="outline"
               size="sm"
               className="flex-1 border-white/30 bg-white/10 text-white hover:bg-white/20 sm:flex-none"
-              onClick={() => exportDomToPdf({ elementId: 'net-worth-content', filenamePrefix: 'finwise-net-worth' })}
+              onClick={() =>
+                exportDomToPdf({
+                  elementId: 'net-worth-content',
+                  filenamePrefix: 'finwise-net-worth',
+                  onFallbackExcel: () =>
+                    downloadXlsxFromAoa('Net Worth', rows, [12, 14, 14, 14], 'finwise-net-worth-history'),
+                })
+              }
             >
               Export PDF
             </Button>

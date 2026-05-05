@@ -278,7 +278,15 @@ export default function PaycheckPage() {
               size="sm"
               className="flex-1 sm:flex-none"
               onClick={() =>
-                exportDomToPdf({ elementId: 'tool-paycheck-export', filenamePrefix: 'finwise-paycheck' })
+                exportDomToPdf({
+                  elementId: 'tool-paycheck-export',
+                  filenamePrefix: 'finwise-paycheck',
+                  onFallbackExcel: async () => {
+                    if (!pr.isComplete) return;
+                    const { exportBudgetWorkbook } = await import('@/lib/excel/exports/budget');
+                    exportBudgetWorkbook(localInputs, pr, budgetInputs, debts);
+                  },
+                })
               }
             >
               Export PDF

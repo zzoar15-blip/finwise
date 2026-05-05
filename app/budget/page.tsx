@@ -275,7 +275,14 @@ export default function BudgetPage() {
             size="sm"
             className="flex-1 sm:flex-none"
             onClick={() =>
-              exportDomToPdf({ elementId: 'tool-budget-export', filenamePrefix: 'finwise-budget' })
+              exportDomToPdf({
+                elementId: 'tool-budget-export',
+                filenamePrefix: 'finwise-budget',
+                onFallbackExcel: async () => {
+                  const { exportBudgetWorkbook } = await import('@/lib/excel/exports/budget');
+                  exportBudgetWorkbook(pi, pr, bi, debts);
+                },
+              })
             }
           >
             Export PDF

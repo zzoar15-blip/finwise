@@ -147,7 +147,19 @@ export default function SinkingFundPage() {
               variant="outline"
               size="sm"
               className="flex-1 border-white/30 bg-white/10 text-white hover:bg-white/20 sm:flex-none"
-              onClick={() => exportDomToPdf({ elementId: 'sinking-fund-content', filenamePrefix: 'finwise-sinking-fund' })}
+              onClick={() =>
+                exportDomToPdf({
+                  elementId: 'sinking-fund-content',
+                  filenamePrefix: 'finwise-sinking-fund',
+                  onFallbackExcel: () =>
+                    downloadXlsxFromAoa(
+                      'Sinking Fund',
+                      rows,
+                      [8, 10, 14, 12, 14, 10],
+                      'finwise-sinking-fund',
+                    ),
+                })
+              }
             >
               Export PDF
             </Button>

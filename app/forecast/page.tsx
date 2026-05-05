@@ -562,7 +562,19 @@ function ForecastPageContent() {
             size="sm"
             className="flex-1 sm:flex-none"
             onClick={() =>
-              exportDomToPdf({ elementId: 'tool-forecast-export', filenamePrefix: 'finwise-forecast' })
+              exportDomToPdf({
+                elementId: 'tool-forecast-export',
+                filenamePrefix: 'finwise-forecast',
+                onFallbackExcel: async () => {
+                  const rows = buildExportRows();
+                  downloadXlsxFromAoa(
+                    'Forecast',
+                    rows,
+                    rows[0].map((_, i) => (i === 0 ? 8 : 24)),
+                    'finwise-forecast',
+                  );
+                },
+              })
             }
           >
             Export PDF

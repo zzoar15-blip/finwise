@@ -1,86 +1,107 @@
-/**
- * Client-side PDF export via html snapshot + jsPDF multipage tiling.
- */
+import React from 'react';
+import { pdf } from '@react-pdf/renderer';
+import { PDFDomReport, type PdfReportSection } from '@/components/pdf/PDFDomReport';
+
+function sanitizeLine(text: string): string {
+  return text.replace(/\s+/g, ' ').trim();
+}
+
+function extractSectionsFromElement(el: HTMLElement): PdfReportSection[] {
+  const sectionNodes = Array.from(el.querySelectorAll('section, [data-slot="card"], .fw-card'));
+  const sections: PdfReportSection[] = [];
+
+  if (sectionNodes.length > 0) {
+    for (const node of sectionNodes) {
+      const heading =
+        sanitizeLine(
+          node.querySelector('h1,h2,h3,[data-slot="card-title"]')?.textContent ?? 'Section',
+        ) || 'Section';
+      const lines = Array.from(node.querySelectorAll('p,li,tr,dt,dd'))
+        .map((n) => sanitizeLine(n.textContent ?? ''))
+        .filter(Boolean)
+        .slice(0, 35);
+      if (lines.length === 0) continue;
+      sections.push({ heading, lines });
+    }
+  }
+
+  if (sections.length === 0) {
+    const lines = Array.from(el.querySelectorAll('h1,h2,h3,p,li,tr,dt,dd,span'))
+      .map((n) => sanitizeLine(n.textContent ?? ''))
+      .filter((line) => line.length > 0)
+      .slice(0, 140);
+    sections.push({ heading: 'Summary', lines });
+  }
+
+  return sections.slice(0, 20);
+}
+
+function downloadBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function exportSectionsToExcel(sections: PdfReportSection[], filenamePrefix: string): Promise<void> {
+  const XLSX = await import('xlsx-js-style');
+  const rows: Array<Array<string>> = [['Section', 'Detail']];
+  for (const section of sections) {
+    for (const line of section.lines) rows.push([section.heading, line]);
+  }
+  const sheet = XLSX.utils.aoa_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, sheet, 'Report');
+  XLSX.writeFile(wb, `${filenamePrefix}-${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
 export async function exportDomToPdf(options: {
   elementId: string;
   filenamePrefix: string;
-  scale?: number;
+  onFallbackExcel?: () => Promise<void> | void;
 }): Promise<boolean> {
   if (typeof window === 'undefined' || typeof document === 'undefined') return false;
 
   const el = document.getElementById(options.elementId);
   if (!el) {
     window.alert(
-      'Could not find this page\'s export area. Refresh the page and try again, or contact support if the problem continues.',
+      'Could not find this page\'s export area. Refresh and try again.',
     );
     return false;
   }
 
-  const rootEl = document.documentElement;
-  rootEl.classList.add('pdf-export-mode');
-  el.classList.add('pdf-export-target');
-
   try {
-    const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
-      import('html2canvas'),
-      import('jspdf'),
-    ]);
-
-    const scale = options.scale ?? 1.5;
-
-    await new Promise<void>((resolve) => {
-      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    const title = sanitizeLine(el.querySelector('h1')?.textContent ?? options.filenamePrefix);
+    const sections = extractSectionsFromElement(el);
+    const doc = React.createElement(PDFDomReport, {
+      title: title || 'FinWise Report',
+      subtitle: `Generated ${new Date().toLocaleString()}`,
+      sections,
     });
-    await new Promise<void>((resolve) => {
-      window.setTimeout(() => resolve(), 50);
-    });
-
-    const doc = el.ownerDocument;
-    const canvas = await html2canvas(el, {
-      scale,
-      useCORS: true,
-      allowTaint: true,
-      logging: false,
-      backgroundColor: '#ffffff',
-      foreignObjectRendering: false,
-      scrollX: 0,
-      scrollY: -window.scrollY,
-      windowWidth: doc.documentElement.scrollWidth,
-      windowHeight: doc.documentElement.scrollHeight,
-    });
-
-    if (!canvas.width || !canvas.height) {
-      window.alert('PDF capture produced an empty image. Try collapsing charts or exporting from a narrower view.');
-      return false;
-    }
-
-    const imgData = canvas.toDataURL('image/png', 1.0);
-
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    const pageW = pdf.internal.pageSize.getWidth();
-    const pageH = pdf.internal.pageSize.getHeight();
-    const ratio = canvas.width / canvas.height;
-    const imgH = pageW / ratio;
-
-    let y = 0;
-    while (y < imgH) {
-      if (y > 0) pdf.addPage();
-      pdf.addImage(imgData, 'PNG', 0, -y, pageW, imgH);
-      y += pageH;
-    }
-
+    const blob = await pdf(doc).toBlob();
     const date = new Date().toISOString().slice(0, 10);
-    pdf.save(`${options.filenamePrefix}-${date}.pdf`);
+    downloadBlob(blob, `${options.filenamePrefix}-${date}.pdf`);
     return true;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('[exportDomToPdf]', err);
-    window.alert(
-      `PDF export failed (${msg}). If this page has live charts, try again after scrolling the full report into view, or use CSV / Excel export instead.`,
-    );
+
+    const isColorError =
+      msg.toLowerCase().includes('lab') ||
+      msg.toLowerCase().includes('oklch') ||
+      msg.toLowerCase().includes('color(');
+
+    if (isColorError) {
+      window.alert('PDF export failed due to color parsing. Downloading Excel instead.');
+      const sections = extractSectionsFromElement(el);
+      if (options.onFallbackExcel) await options.onFallbackExcel();
+      else await exportSectionsToExcel(sections, options.filenamePrefix);
+      return false;
+    }
+
+    window.alert(`PDF export failed (${msg}). Try Excel/CSV export.`);
     return false;
-  } finally {
-    rootEl.classList.remove('pdf-export-mode');
-    el.classList.remove('pdf-export-target');
   }
 }

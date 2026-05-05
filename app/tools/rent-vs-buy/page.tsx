@@ -188,7 +188,14 @@ export default function RentVsBuyPage() {
             variant="outline"
             className="border-white/30 bg-white/10 text-white hover:bg-white/20"
             onClick={() =>
-              exportDomToPdf({ elementId: 'rent-vs-buy-content', filenamePrefix: 'finwise-rent-vs-buy' })
+              exportDomToPdf({
+                elementId: 'rent-vs-buy-content',
+                filenamePrefix: 'finwise-rent-vs-buy',
+                onFallbackExcel: async () => {
+                  const { exportRentVsBuyWorkbook } = await import('@/lib/excel/exports/rentVsBuy');
+                  exportRentVsBuyWorkbook(inputs, results);
+                },
+              })
             }
           >
             Export PDF

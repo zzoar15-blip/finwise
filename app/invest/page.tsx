@@ -333,7 +333,14 @@ export default function InvestPage() {
               size="sm"
               className="flex-1 sm:flex-none"
               onClick={() =>
-                exportDomToPdf({ elementId: 'tool-invest-export', filenamePrefix: 'finwise-invest' })
+                exportDomToPdf({
+                  elementId: 'tool-invest-export',
+                  filenamePrefix: 'finwise-invest',
+                  onFallbackExcel: async () => {
+                    const { exportInvestmentWorkbook } = await import('@/lib/excel/exports/investment');
+                    exportInvestmentWorkbook(investmentInputs, flow.paycheck);
+                  },
+                })
               }
             >
               Export PDF
