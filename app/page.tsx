@@ -144,6 +144,12 @@ const QUICK_LINKS = [
     description: 'Compare the true financial cost of buying vs renting over any time horizon. Includes break-even analysis, opportunity cost, and sensitivity modeling.',
   },
   {
+    href: '/tools/net-worth',
+    icon: Wallet,
+    title: 'Net Worth',
+    description: 'Track assets and liabilities over time with monthly snapshots and trend view.',
+  },
+  {
     href: '/tools/sinking-fund',
     icon: PiggyBank,
     title: 'Sinking Fund',
@@ -453,7 +459,7 @@ function DashboardPageContent() {
 
         <div>
           <h2 className="mb-4 text-lg font-semibold text-gray-800">Tools</h2>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-7">
             {QUICK_LINKS.map(({ href, icon: Icon, title, description }) => (
               <Link key={href} href={href} className="group block">
                 <div className="flex h-full flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-all group-hover:-translate-y-0.5 group-hover:border-[#3b82f6] group-hover:shadow-md">

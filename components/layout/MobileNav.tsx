@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, FileText, Calculator, CreditCard, Sparkles,
-  Home, PiggyBank,
+  Home, PiggyBank, Wallet,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -13,6 +13,7 @@ const MOBILE_NAV = [
   { href: '/plan', label: 'My Plan', icon: FileText },
   { href: '/paycheck', label: 'Paycheck', icon: Calculator },
   { href: '/debt', label: 'Debt', icon: CreditCard },
+  { href: '/tools/net-worth', label: 'Net Worth', icon: Wallet },
   { href: '/tools/rent-vs-buy', label: 'Rent/Buy', icon: Home },
   { href: '/tools/sinking-fund', label: 'Fund', icon: PiggyBank },
   { href: '/advisor', label: 'Advisor', icon: Sparkles },

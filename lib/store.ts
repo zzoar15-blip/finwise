@@ -26,6 +26,12 @@ import {
   type SinkingFundInputs,
   type SinkingFundResults,
 } from '@/lib/calculations/sinkingFund';
+import {
+  computeNetWorthTotals,
+  currentYearMonth,
+  type NetWorthItem,
+  type NetWorthSnapshot,
+} from '@/lib/calculations/netWorth';
 
 interface FinWiseStore {
   paycheckInputs: StorePaycheckInputs;
@@ -39,6 +45,9 @@ interface FinWiseStore {
   rentVsBuyResults: RentVsBuyResults | null;
   sinkingFundInputs: SinkingFundInputs;
   sinkingFundResults: SinkingFundResults;
+  netWorthAssets: NetWorthItem[];
+  netWorthLiabilities: NetWorthItem[];
+  netWorthHistory: NetWorthSnapshot[];
 
   setPaycheckInputs: (inputs: Partial<StorePaycheckInputs>) => void;
   setBudgetInputs: (inputs: Partial<StoreBudgetInputs>) => void;
@@ -47,6 +56,9 @@ interface FinWiseStore {
   setInvestmentInputs: (inputs: Partial<StoreInvestmentInputs>) => void;
   setRentVsBuyInputs: (inputs: Partial<RentVsBuyInputs>) => void;
   setSinkingFundInputs: (inputs: Partial<SinkingFundInputs>) => void;
+  setNetWorthAssets: (items: NetWorthItem[]) => void;
+  setNetWorthLiabilities: (items: NetWorthItem[]) => void;
+  addNetWorthSnapshot: () => void;
 }
 
 export const useFinWiseStore = create<FinWiseStore>()(
@@ -63,6 +75,11 @@ export const useFinWiseStore = create<FinWiseStore>()(
       rentVsBuyResults: null,
       sinkingFundInputs: DEFAULT_SINKING_FUND_INPUTS,
       sinkingFundResults: computeSinkingFund(DEFAULT_SINKING_FUND_INPUTS),
+      netWorthAssets: [
+        { id: 'asset-cash', name: 'Cash / Checking', amount: 0, category: 'Cash' },
+      ],
+      netWorthLiabilities: [],
+      netWorthHistory: [],
 
       setPaycheckInputs: (inputs) =>
         set((state) => {
@@ -130,6 +147,36 @@ export const useFinWiseStore = create<FinWiseStore>()(
           return {
             sinkingFundInputs: merged,
             sinkingFundResults: computeSinkingFund(merged),
+            planLastUpdated: new Date().toISOString(),
+          };
+        }),
+
+      setNetWorthAssets: (items) =>
+        set({
+          netWorthAssets: items,
+          planLastUpdated: new Date().toISOString(),
+        }),
+
+      setNetWorthLiabilities: (items) =>
+        set({
+          netWorthLiabilities: items,
+          planLastUpdated: new Date().toISOString(),
+        }),
+
+      addNetWorthSnapshot: () =>
+        set((state) => {
+          const totals = computeNetWorthTotals(state.netWorthAssets, state.netWorthLiabilities);
+          const date = currentYearMonth();
+          const next = state.netWorthHistory.filter((h) => h.date !== date);
+          next.push({
+            date,
+            assets: totals.assets,
+            liabilities: totals.liabilities,
+            netWorth: totals.netWorth,
+          });
+          next.sort((a, b) => a.date.localeCompare(b.date));
+          return {
+            netWorthHistory: next,
             planLastUpdated: new Date().toISOString(),
           };
         }),
