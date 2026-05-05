@@ -63,6 +63,16 @@ export default function SinkingFundPage() {
   const setBudgetInputs = useFinWiseStore((s) => s.setBudgetInputs);
   const planLastUpdated = useFinWiseStore((s) => s.planLastUpdated);
   const plan = usePlanStore((s) => s.plan);
+  const planDownPaymentTarget = plan?.inputs.homeTarget ?? 0;
+  const planHasHomeGoal = plan?.inputs.goals?.includes('save-home') ?? false;
+  const planTimelineMonths = Math.max(1, plan?.inputs.homeTimelineMonths || 36);
+  const suggestedPlanTargetDate = addMonths(currentYm(), planTimelineMonths);
+  const hasPlanDownPaymentSuggestion =
+    inputs.goalType === 'down-payment' && planHasHomeGoal && planDownPaymentTarget > 0;
+  const planSuggestionAlreadyApplied =
+    hasPlanDownPaymentSuggestion &&
+    inputs.targetAmount === planDownPaymentTarget &&
+    inputs.targetDate === suggestedPlanTargetDate;
 
   const budgetDrivenMonthly = useMemo(() => {
     if (inputs.goalType !== 'down-payment') return null;
@@ -72,19 +82,6 @@ export default function SinkingFundPage() {
         : inputs.monthlyContribution;
     return Math.max(0, Math.round(monthly));
   }, [inputs.goalType, inputs.mode, inputs.monthlyContribution, results.requiredMonthlyContribution]);
-
-  useEffect(() => {
-    if (inputs.goalType !== 'down-payment') return;
-    if (!plan?.inputs.homeTarget || plan.inputs.homeTarget <= 0) return;
-    const timelineMonths = Math.max(1, plan.inputs.homeTimelineMonths || 36);
-    const syncedTargetDate = addMonths(currentYm(), timelineMonths);
-    if (inputs.targetAmount === plan.inputs.homeTarget && inputs.targetDate === syncedTargetDate) return;
-    setInputs({
-      targetAmount: plan.inputs.homeTarget,
-      targetDate: syncedTargetDate,
-      goalName: 'House Down Payment',
-    });
-  }, [inputs.goalType, inputs.targetAmount, inputs.targetDate, plan?.inputs.homeTarget, plan?.inputs.homeTimelineMonths, setInputs]);
 
   useEffect(() => {
     if (budgetDrivenMonthly === null) return;
@@ -241,6 +238,31 @@ export default function SinkingFundPage() {
         </div>
 
         <div className="space-y-4">
+          {hasPlanDownPaymentSuggestion && !planSuggestionAlreadyApplied && (
+            <div className="flex items-start justify-between gap-3 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
+              <div>
+                <p className="font-medium">Plan home goal suggestion available</p>
+                <p className="text-blue-800 mt-0.5">
+                  {formatCurrency(planDownPaymentTarget)} target by {suggestedPlanTargetDate}.
+                  Apply it, or keep editing this scenario manually.
+                </p>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-blue-300 bg-white text-blue-800 hover:bg-blue-100"
+                onClick={() =>
+                  setInputs({
+                    targetAmount: planDownPaymentTarget,
+                    targetDate: suggestedPlanTargetDate,
+                    goalName: 'House Down Payment',
+                  })
+                }
+              >
+                Apply
+              </Button>
+            </div>
+          )}
           {budgetDrivenMonthly !== null && (
             <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
               Down payment flex sync is active: <span className="font-semibold">{formatCurrency(budgetDrivenMonthly)}/mo</span> is now driving your Budget home down payment fund.
