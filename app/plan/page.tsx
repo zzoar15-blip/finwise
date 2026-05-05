@@ -3,7 +3,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import {
   BarChart,
   Bar,
@@ -28,7 +28,6 @@ import {
   Shield,
   Target,
   Zap,
-  FileDown,
   RefreshCw,
   Share2,
   ChevronRight,
@@ -43,9 +42,10 @@ import { simulateInvestment } from '@/lib/calculations/invest';
 import type { WaterfallEntry, TaxSuggestion, PriorityCard } from '@/lib/planCalculations';
 import type { AIInsight, PlanInputs, PlanExpenses } from '@/types/plan';
 import { formatCurrency } from '@/lib/format';
-import { exportDomToPdf } from '@/lib/exportPdf';
 import { useFinWiseStore } from '@/lib/store';
 import { getEffectivePaycheckResults } from '@/lib/calculations';
+import { PDFDownloadButton } from '@/components/pdf/PDFDownloadButton';
+import { PlanPDF } from '@/lib/pdf/PlanPDF';
 import {
   Card,
   CardContent,
@@ -415,17 +415,6 @@ function TaxSuggestionRow({ s }: { s: TaxSuggestion }) {
   );
 }
 
-// ─── PDF export ───────────────────────────────────────────────────────────────
-
-async function exportPDF(setExporting: (v: boolean) => void) {
-  setExporting(true);
-  try {
-    await exportDomToPdf({ elementId: 'financial-plan-content', filenamePrefix: 'finwise-plan' });
-  } finally {
-    setExporting(false);
-  }
-}
-
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function PlanPage() {
@@ -446,7 +435,6 @@ export default function PlanPage() {
   const finWiseDebts = useFinWiseStore((s) => s.debts);
 
   const [loading, setLoading] = useState(true);
-  const [exporting, setExporting] = useState(false);
   const [insightsLoading, setInsightsLoading] = useState(false);
   const [insightsError, setInsightsError] = useState<string | null>(null);
 
@@ -644,6 +632,7 @@ export default function PlanPage() {
     debtResult,
     totalDebtBalance,
     monthlyInvestCapacity,
+    effectiveTotalRate,
     taxEfficiencyScore,
     taxSuggestions,
     emergencyFundMonthsCovered,
@@ -715,16 +704,48 @@ export default function PlanPage() {
                 )}
               </div>
               <div className="flex w-full items-center gap-2 print:hidden sm:w-auto">
-                <Button
-                  variant="outline"
-                  size="sm"
+                <PDFDownloadButton
                   className="flex-1 border-white/30 bg-white/10 text-white hover:bg-white/20 sm:flex-none"
-                  onClick={() => exportPDF(setExporting)}
-                  disabled={exporting}
-                >
-                  <FileDown className="size-3.5" />
-                  {exporting ? 'Exporting…' : 'Export PDF'}
-                </Button>
+                  label="Export PDF"
+                  loadingLabel="Generating PDF..."
+                  document={
+                    <PlanPDF
+                      data={{
+                        name: plan?.inputs.name,
+                        annualSalary: plan?.inputs.annualSalary ?? 0,
+                        monthlyTakeHome,
+                        effectiveTaxRate: effectiveTotalRate,
+                        monthlySurplus,
+                        savingsRate,
+                        totalDebt: totalDebtBalance,
+                        debtFreeDate: debtFreeDate ? formatMonthYear(debtFreeDate) : null,
+                        monthlyInvestment: monthlyInvestCapacity,
+                        goals: goals.map((g) => String(g)),
+                        priorities: priorities.map((p) => ({
+                          title: p.headline,
+                          description: p.body,
+                          impact: p.action,
+                        })),
+                        debtRows: (plan?.inputs.debts ?? []).map((d) => ({
+                          name: d.name,
+                          balance: d.balance,
+                          rate: d.apr,
+                          minPayment: d.minPayment,
+                        })),
+                        taxEfficiencyScore,
+                        taxRows: taxSuggestions.map((t) => ({
+                          benefit: t.label,
+                          yourContribution: t.currentAnnual,
+                          max: t.maxAnnual,
+                          gap: Math.max(0, t.maxAnnual - t.currentAnnual),
+                          savings: t.additionalSavings,
+                        })),
+                        insights: insightItems.map((i) => i.text),
+                      }}
+                    />
+                  }
+                  fileName={`finwise-plan-${new Date().toISOString().slice(0, 10)}.pdf`}
+                />
                 <Button
                   size="sm"
                   className="flex-1 bg-white text-slate-900 hover:bg-slate-100 sm:flex-none"
@@ -1550,14 +1571,47 @@ export default function PlanPage() {
             <RefreshCw className="size-3.5" />
             Update My Plan
           </Button>
-          <Button
-            variant="outline"
-            onClick={() => exportPDF(setExporting)}
-            disabled={exporting}
-          >
-            <FileDown className="size-3.5" />
-            {exporting ? 'Exporting…' : 'Export Plan'}
-          </Button>
+          <PDFDownloadButton
+            label="Export Plan"
+            loadingLabel="Generating PDF..."
+            document={
+              <PlanPDF
+                data={{
+                  name: plan?.inputs.name,
+                  annualSalary: plan?.inputs.annualSalary ?? 0,
+                  monthlyTakeHome,
+                  effectiveTaxRate: effectiveTotalRate,
+                  monthlySurplus,
+                  savingsRate,
+                  totalDebt: totalDebtBalance,
+                  debtFreeDate: debtFreeDate ? formatMonthYear(debtFreeDate) : null,
+                  monthlyInvestment: monthlyInvestCapacity,
+                  goals: goals.map((g) => String(g)),
+                  priorities: priorities.map((p) => ({
+                    title: p.headline,
+                    description: p.body,
+                    impact: p.action,
+                  })),
+                  debtRows: (plan?.inputs.debts ?? []).map((d) => ({
+                    name: d.name,
+                    balance: d.balance,
+                    rate: d.apr,
+                    minPayment: d.minPayment,
+                  })),
+                  taxEfficiencyScore,
+                  taxRows: taxSuggestions.map((t) => ({
+                    benefit: t.label,
+                    yourContribution: t.currentAnnual,
+                    max: t.maxAnnual,
+                    gap: Math.max(0, t.maxAnnual - t.currentAnnual),
+                    savings: t.additionalSavings,
+                  })),
+                  insights: insightItems.map((i) => i.text),
+                }}
+              />
+            }
+            fileName={`finwise-plan-${new Date().toISOString().slice(0, 10)}.pdf`}
+          />
           <div className="group relative">
             <Button variant="outline" disabled>
               <Share2 className="size-3.5" />

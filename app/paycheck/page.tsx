@@ -22,10 +22,10 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ExportButton } from '@/components/ExportButton';
 import { downloadCsv } from '@/lib/export';
-import { exportDomToPdf } from '@/lib/exportPdf';
-import { Button } from '@/components/ui/button';
+import { PDFDownloadButton } from '@/components/pdf/PDFDownloadButton';
 import { SyncMeta } from '@/components/SyncMeta';
 import type { StorePaycheckInputs } from '@/lib/calculations';
+import { PaycheckPDF } from '@/lib/pdf/PaycheckPDF';
 
 const PAY_PERIOD_LABELS: Record<PayPeriod, string> = {
   weekly: 'Weekly',
@@ -273,24 +273,40 @@ export default function PaycheckPage() {
             <div className="mt-2"><SyncMeta updatedAt={planLastUpdated} badges={['Source of Truth']} /></div>
           </div>
           <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto">
-            <Button
-              variant="outline"
-              size="sm"
+            <PDFDownloadButton
               className="flex-1 sm:flex-none"
-              onClick={() =>
-                exportDomToPdf({
-                  elementId: 'tool-paycheck-export',
-                  filenamePrefix: 'finwise-paycheck',
-                  onFallbackExcel: async () => {
-                    if (!pr.isComplete) return;
-                    const { exportBudgetWorkbook } = await import('@/lib/excel/exports/budget');
-                    exportBudgetWorkbook(localInputs, pr, budgetInputs, debts);
-                  },
-                })
+              label="Export PDF"
+              document={
+                <PaycheckPDF
+                  data={{
+                    periodLabel: PAY_PERIOD_LABELS[localInputs.payPeriod],
+                    grossPerPaycheck: pr.grossPerPaycheck,
+                    netPayPerPaycheck: pr.netPayPerPaycheck,
+                    effectiveTaxRate: pr.effectiveTaxRate,
+                    netPayAnnual: pr.netPayAnnual,
+                    annualSalary: localInputs.annualSalary,
+                    preTaxRows: [
+                      { label: 'Traditional 401(k)', value: pr.k401TraditionalAnnual / currentPeriods },
+                      { label: 'HSA', value: localInputs.hsaAnnual / currentPeriods },
+                      { label: 'FSA', value: localInputs.fsaAnnual / currentPeriods },
+                      { label: 'Health insurance', value: localInputs.healthInsuranceAnnual / currentPeriods },
+                    ],
+                    taxRows: [
+                      { label: 'Federal income tax', value: pr.federalTaxAnnual / currentPeriods },
+                      { label: 'Social Security', value: pr.ssAnnual / currentPeriods },
+                      { label: 'Medicare', value: pr.medicareAnnual / currentPeriods },
+                      { label: 'State income tax', value: pr.stateTaxAnnual / currentPeriods },
+                    ],
+                    postTaxRows: localInputs.otherPostTaxAnnual > 0
+                      ? [{ label: 'Other post-tax deductions', value: localInputs.otherPostTaxAnnual / currentPeriods }]
+                      : [],
+                    annualTaxSavingsFromBenefits: pr.annualTaxSavingsFromBenefits,
+                    marginalCombinedRate: pr.marginalCombinedRate,
+                  }}
+                />
               }
-            >
-              Export PDF
-            </Button>
+              fileName={`finwise-paycheck-${new Date().toISOString().slice(0, 10)}.pdf`}
+            />
             <ExportButton
               label="Export"
               onExportXlsx={async () => {

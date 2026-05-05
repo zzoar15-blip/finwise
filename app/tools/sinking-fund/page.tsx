@@ -20,7 +20,8 @@ import { formatCurrency } from '@/lib/format';
 import { Button } from '@/components/ui/button';
 import { ExportButton } from '@/components/ExportButton';
 import { downloadCsv, downloadXlsxFromAoa } from '@/lib/export';
-import { exportDomToPdf } from '@/lib/exportPdf';
+import { PDFDownloadButton } from '@/components/pdf/PDFDownloadButton';
+import { SimpleRowsPDF } from '@/lib/pdf/SimpleRowsPDF';
 import { SyncMeta } from '@/components/SyncMeta';
 
 const PRESETS: Array<{
@@ -143,26 +144,12 @@ export default function SinkingFundPage() {
             </div>
           </div>
           <div className="flex w-full items-center gap-2 sm:w-auto">
-            <Button
-              variant="outline"
-              size="sm"
+            <PDFDownloadButton
               className="flex-1 border-white/30 bg-white/10 text-white hover:bg-white/20 sm:flex-none"
-              onClick={() =>
-                exportDomToPdf({
-                  elementId: 'sinking-fund-content',
-                  filenamePrefix: 'finwise-sinking-fund',
-                  onFallbackExcel: () =>
-                    downloadXlsxFromAoa(
-                      'Sinking Fund',
-                      rows,
-                      [8, 10, 14, 12, 14, 10],
-                      'finwise-sinking-fund',
-                    ),
-                })
-              }
-            >
-              Export PDF
-            </Button>
+              label="Export PDF"
+              document={<SimpleRowsPDF title="Sinking Fund Planner" rows={rows} />}
+              fileName={`finwise-sinking-fund-${new Date().toISOString().slice(0, 10)}.pdf`}
+            />
             <ExportButton
               onExportCsv={() => downloadCsv(rows, 'finwise-sinking-fund')}
               onExportXlsx={() =>

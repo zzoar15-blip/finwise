@@ -6,7 +6,8 @@ import { simulateDebtPayoff, buildSensitivityTable } from '@/lib/calculations/de
 import type { Debt, DebtResult, SensitivityRow } from '@/lib/calculations/debt';
 import { ExportButton } from '@/components/ExportButton';
 import { downloadCsv } from '@/lib/export';
-import { exportDomToPdf } from '@/lib/exportPdf';
+import { PDFDownloadButton } from '@/components/pdf/PDFDownloadButton';
+import { SimpleRowsPDF } from '@/lib/pdf/SimpleRowsPDF';
 import { formatCurrency } from '@/lib/format';
 import { useFinWiseStore } from '@/lib/store';
 import { usePlanStore } from '@/lib/planStore';
@@ -197,23 +198,12 @@ export default function DebtPage() {
             <div className="mt-2"><SyncMeta updatedAt={planLastUpdated} badges={['Unified Flow']} /></div>
           </div>
           <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto">
-            <Button
-              variant="outline"
-              size="sm"
+            <PDFDownloadButton
               className="flex-1 sm:flex-none"
-              onClick={() =>
-                exportDomToPdf({
-                  elementId: 'tool-debt-export',
-                  filenamePrefix: `finwise-debt-${strategy}`,
-                  onFallbackExcel: async () => {
-                    const { exportDebtWorkbook } = await import('@/lib/excel/exports/debt');
-                    exportDebtWorkbook(debts, monthlyOverpayment, annualBonus, bonusMonth, strategy);
-                  },
-                })
-              }
-            >
-              Export PDF
-            </Button>
+              label="Export PDF"
+              document={<SimpleRowsPDF title="Debt Simulator" rows={buildExportRows()} />}
+              fileName={`finwise-debt-${strategy}-${new Date().toISOString().slice(0, 10)}.pdf`}
+            />
             {hasDebts && (
               <ExportButton
                 onExportXlsx={async () => {

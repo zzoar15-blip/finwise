@@ -29,8 +29,9 @@ import {
 import { Lock, AlertTriangle, CheckCircle } from 'lucide-react';
 import { ExportButton } from '@/components/ExportButton';
 import { downloadCsv } from '@/lib/export';
-import { exportDomToPdf } from '@/lib/exportPdf';
 import { Button } from '@/components/ui/button';
+import { PDFDownloadButton } from '@/components/pdf/PDFDownloadButton';
+import { SimpleRowsPDF } from '@/lib/pdf/SimpleRowsPDF';
 import {
   computeUnifiedMonthlyFlow,
   getEffectivePaycheckResults,
@@ -270,23 +271,12 @@ export default function BudgetPage() {
             </div>
           </div>
         <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto">
-          <Button
-            variant="outline"
-            size="sm"
+          <PDFDownloadButton
             className="flex-1 sm:flex-none"
-            onClick={() =>
-              exportDomToPdf({
-                elementId: 'tool-budget-export',
-                filenamePrefix: 'finwise-budget',
-                onFallbackExcel: async () => {
-                  const { exportBudgetWorkbook } = await import('@/lib/excel/exports/budget');
-                  exportBudgetWorkbook(pi, pr, bi, debts);
-                },
-              })
-            }
-          >
-            Export PDF
-          </Button>
+            label="Export PDF"
+            document={<SimpleRowsPDF title="Budget Planner" rows={exportRows()} />}
+            fileName={`finwise-budget-${new Date().toISOString().slice(0, 10)}.pdf`}
+          />
           <ExportButton
             onExportXlsx={async () => {
               const { exportBudgetWorkbook } = await import('@/lib/excel/exports/budget');

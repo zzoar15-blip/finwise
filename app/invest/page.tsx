@@ -6,8 +6,8 @@ import { simulateInvestment } from '@/lib/calculations/invest';
 import type { InvestInputs, InvestResult } from '@/lib/calculations/invest';
 import { ExportButton } from '@/components/ExportButton';
 import { downloadCsv } from '@/lib/export';
-import { exportDomToPdf } from '@/lib/exportPdf';
-import { Button } from '@/components/ui/button';
+import { PDFDownloadButton } from '@/components/pdf/PDFDownloadButton';
+import { SimpleRowsPDF } from '@/lib/pdf/SimpleRowsPDF';
 import { formatCurrency } from '@/lib/format';
 import { useFinWiseStore } from '@/lib/store';
 import { computeUnifiedMonthlyFlow } from '@/lib/calculations';
@@ -328,23 +328,12 @@ export default function InvestPage() {
             </div>
           </div>
           <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto">
-            <Button
-              variant="outline"
-              size="sm"
+            <PDFDownloadButton
               className="flex-1 sm:flex-none"
-              onClick={() =>
-                exportDomToPdf({
-                  elementId: 'tool-invest-export',
-                  filenamePrefix: 'finwise-invest',
-                  onFallbackExcel: async () => {
-                    const { exportInvestmentWorkbook } = await import('@/lib/excel/exports/investment');
-                    exportInvestmentWorkbook(investmentInputs, flow.paycheck);
-                  },
-                })
-              }
-            >
-              Export PDF
-            </Button>
+              label="Export PDF"
+              document={<SimpleRowsPDF title="Investment Simulator" rows={buildExportRows()} />}
+              fileName={`finwise-invest-${new Date().toISOString().slice(0, 10)}.pdf`}
+            />
             <ExportButton
               onExportXlsx={async () => {
                 const { exportInvestmentWorkbook } = await import('@/lib/excel/exports/investment');

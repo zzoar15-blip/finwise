@@ -21,7 +21,8 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ExportButton } from '@/components/ExportButton';
 import { downloadCsv, downloadXlsxFromAoa } from '@/lib/export';
-import { exportDomToPdf } from '@/lib/exportPdf';
+import { PDFDownloadButton } from '@/components/pdf/PDFDownloadButton';
+import { SimpleRowsPDF } from '@/lib/pdf/SimpleRowsPDF';
 
 export default function NetWorthPage() {
   const assets = useFinWiseStore((s) => s.netWorthAssets);
@@ -122,21 +123,12 @@ export default function NetWorthPage() {
             >
               Save Snapshot
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
+            <PDFDownloadButton
               className="flex-1 border-white/30 bg-white/10 text-white hover:bg-white/20 sm:flex-none"
-              onClick={() =>
-                exportDomToPdf({
-                  elementId: 'net-worth-content',
-                  filenamePrefix: 'finwise-net-worth',
-                  onFallbackExcel: () =>
-                    downloadXlsxFromAoa('Net Worth', rows, [12, 14, 14, 14], 'finwise-net-worth-history'),
-                })
-              }
-            >
-              Export PDF
-            </Button>
+              label="Export PDF"
+              document={<SimpleRowsPDF title="Net Worth Tracker" rows={rows} />}
+              fileName={`finwise-net-worth-${new Date().toISOString().slice(0, 10)}.pdf`}
+            />
             <ExportButton
               onExportCsv={() => downloadCsv(rows, 'finwise-net-worth-history')}
               onExportXlsx={() => downloadXlsxFromAoa('Net Worth', rows, [12, 14, 14, 14], 'finwise-net-worth-history')}

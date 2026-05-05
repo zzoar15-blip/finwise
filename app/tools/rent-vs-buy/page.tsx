@@ -19,9 +19,9 @@ import { getPropertyTaxRate } from '@/lib/stateTax';
 import { formatCurrency } from '@/lib/format';
 import { ExportButton } from '@/components/ExportButton';
 import { downloadCsv } from '@/lib/export';
-import { exportDomToPdf } from '@/lib/exportPdf';
-import { Button } from '@/components/ui/button';
+import { PDFDownloadButton } from '@/components/pdf/PDFDownloadButton';
 import { computeRentVsBuy } from '@/lib/calculations/rentVsBuy';
+import { RentVsBuyPDF } from '@/lib/pdf/RentVsBuyPDF';
 
 const SENTIMENT_STYLES = {
   'strong-buy': 'bg-[#0f172a] text-white',
@@ -143,7 +143,7 @@ export default function RentVsBuyPage() {
         renter: d.renterNetWorth,
         difference: d.netWorthDifference,
       })),
-    [results?.monthlyData],
+    [results.monthlyData],
   );
 
   const csvRows = useMemo<(string | number)[][]>(() => {
@@ -184,22 +184,42 @@ export default function RentVsBuyPage() {
             <p className="text-sm text-slate-300">30-year wealth comparison with break-even timing and sensitivity analysis.</p>
           </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
+          <PDFDownloadButton
             className="border-white/30 bg-white/10 text-white hover:bg-white/20"
-            onClick={() =>
-              exportDomToPdf({
-                elementId: 'rent-vs-buy-content',
-                filenamePrefix: 'finwise-rent-vs-buy',
-                onFallbackExcel: async () => {
-                  const { exportRentVsBuyWorkbook } = await import('@/lib/excel/exports/rentVsBuy');
-                  exportRentVsBuyWorkbook(inputs, results);
-                },
-              })
+            label="Export PDF"
+            document={
+              <RentVsBuyPDF
+                data={{
+                  verdictHeadline: results.verdictHeadline,
+                  verdictDetail: results.verdictDetail,
+                  breakEvenYear: results.breakEvenYear,
+                  trueMonthlyCostBuying: results.trueMonthlyCostBuying,
+                  trueMonthlyCostRenting: results.trueMonthlyCostRenting,
+                  priceToRentRatio: results.priceToRentRatio,
+                  downPayment: results.downPayment,
+                  closingCosts: results.closingCosts,
+                  totalUpfront: results.totalUpfront,
+                  scenarios: results.scenarios.map((s) => ({
+                    stayYears: s.stayYears,
+                    buyerNetWorth: s.buyerNetWorth,
+                    renterNetWorth: s.renterNetWorth,
+                    winner: s.winner,
+                    difference: s.difference,
+                  })),
+                  snapshots: results.monthlyData
+                    .filter((m) => m.month % 12 === 0)
+                    .slice(0, 30)
+                    .map((m) => ({
+                      year: m.month / 12,
+                      homeValue: m.homeValue,
+                      buyerNetWorth: m.buyerNetWorth,
+                      renterNetWorth: m.renterNetWorth,
+                    })),
+                }}
+              />
             }
-          >
-            Export PDF
-          </Button>
+            fileName={`finwise-rent-vs-buy-${new Date().toISOString().slice(0, 10)}.pdf`}
+          />
           <ExportButton
             onExportXlsx={async () => {
               const { exportRentVsBuyWorkbook } = await import('@/lib/excel/exports/rentVsBuy');

@@ -7,7 +7,8 @@ import { forecastScenario, findBreakeven, buildConfidenceBands } from '@/lib/cal
 import type { Scenario, ScenarioResult } from '@/lib/calculations/forecast';
 import { ExportButton } from '@/components/ExportButton';
 import { downloadCsv, downloadXlsxFromAoa } from '@/lib/export';
-import { exportDomToPdf } from '@/lib/exportPdf';
+import { PDFDownloadButton } from '@/components/pdf/PDFDownloadButton';
+import { SimpleRowsPDF } from '@/lib/pdf/SimpleRowsPDF';
 import { formatCurrency } from '@/lib/format';
 import {
   Card,
@@ -557,28 +558,12 @@ function ForecastPageContent() {
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex w-full items-center gap-2 sm:w-auto">
-          <Button
-            variant="outline"
-            size="sm"
+          <PDFDownloadButton
             className="flex-1 sm:flex-none"
-            onClick={() =>
-              exportDomToPdf({
-                elementId: 'tool-forecast-export',
-                filenamePrefix: 'finwise-forecast',
-                onFallbackExcel: async () => {
-                  const rows = buildExportRows();
-                  downloadXlsxFromAoa(
-                    'Forecast',
-                    rows,
-                    rows[0].map((_, i) => (i === 0 ? 8 : 24)),
-                    'finwise-forecast',
-                  );
-                },
-              })
-            }
-          >
-            Export PDF
-          </Button>
+            label="Export PDF"
+            document={<SimpleRowsPDF title="Scenario Forecast" rows={buildExportRows()} />}
+            fileName={`finwise-forecast-${new Date().toISOString().slice(0, 10)}.pdf`}
+          />
           <ExportButton
             onExportXlsx={() => {
               const rows = buildExportRows();
