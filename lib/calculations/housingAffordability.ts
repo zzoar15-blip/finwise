@@ -81,8 +81,9 @@ function estimatePriceFromHousingBudget(
   const months = Math.max(1, Math.round(years * 12));
   const safeDownPct = clamp(downPaymentPct, 0, 0.95);
   const safeCash = Math.max(0, availableCashToClose);
+  // `downPaymentCash` input represents down-payment cash, not total closing cash.
   const cashToClosePct = safeDownPct + Math.max(0, closingCostPct);
-  const maxPriceByCashToClose = cashToClosePct > 0 ? safeCash / cashToClosePct : 3_000_000;
+  const maxPriceByCashToClose = safeDownPct > 0 ? safeCash / safeDownPct : 3_000_000;
 
   const monthlyOwnershipCost = (price: number) => {
     const downPayment = price * safeDownPct;
@@ -135,7 +136,8 @@ function estimatePriceFromHousingBudget(
 
 export function computeHousingAffordability(inputs: HousingAffordabilityInputs): HousingAffordabilityResults {
   const partnerIncome = Math.max(0, safeNumber(inputs.partnerMonthlyIncome));
-  const partnerGross = Math.max(0, safeNumber(inputs.partnerMonthlyGrossIncome ?? partnerIncome / 0.72));
+  const partnerGrossInput = safeNumber(inputs.partnerMonthlyGrossIncome ?? 0);
+  const partnerGross = Math.max(0, partnerGrossInput > 0 ? partnerGrossInput : partnerIncome / 0.72);
   const partnerDebt = Math.max(0, safeNumber(inputs.partnerMonthlyDebt));
   const desiredSavings = Math.max(0, safeNumber(inputs.targetMonthlySavings));
   const maintenanceRate = Math.max(0, inputs.annualMaintenanceRate ?? 0.01);
