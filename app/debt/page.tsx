@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { simulateDebtPayoff, buildSensitivityTable } from '@/lib/calculations/debt';
 import type { Debt, DebtResult, SensitivityRow } from '@/lib/calculations/debt';
@@ -75,8 +75,9 @@ export default function DebtPage() {
   const budgetInputs = useFinWiseStore((s) => s.budgetInputs);
   const planLastUpdated = useFinWiseStore((s) => s.planLastUpdated);
   const setDebtProfile = usePlanStore((s) => s.setDebtProfile);
+  const debtProfile = usePlanStore((s) => s.debtProfile);
 
-  const [debts, setDebts] = useState<Debt[]>(storeDebts.length > 0 ? storeDebts : []);
+  const debts = storeDebts;
   const flow = useMemo(
     () => computeUnifiedMonthlyFlow(paycheckInputs, paycheckResults, budgetInputs, debts),
     [paycheckInputs, paycheckResults, budgetInputs, debts],
@@ -84,15 +85,29 @@ export default function DebtPage() {
   const surplus = flow.monthlySurplus;
   const surplusRounded = Math.max(0, Math.min(2000, Math.round(surplus / 100) * 100));
 
-  const [monthlyOverpayment, setMonthlyOverpayment] = useState(surplusRounded);
-  const [annualBonus, setAnnualBonus] = useState(0);
+  const [monthlyOverpayment, setMonthlyOverpayment] = useState(
+    debtProfile?.monthlyOverpayment ?? surplusRounded,
+  );
+  const [annualBonus, setAnnualBonus] = useState(debtProfile?.annualBonus ?? 0);
   const [bonusMonth, setBonusMonth] = useState(2);
   const [strategy, setStrategy] = useState<'avalanche' | 'snowball'>('avalanche');
+  const hydratedDebtProfileRef = useRef(false);
 
-  function syncDebts(newDebts: Debt[]) {
-    setDebts(newDebts);
-    setStoreDebts(newDebts);
-  }
+  useEffect(() => {
+    if (hydratedDebtProfileRef.current || !debtProfile) return;
+    hydratedDebtProfileRef.current = true;
+    setMonthlyOverpayment(Math.max(0, debtProfile.monthlyOverpayment ?? 0));
+    setAnnualBonus(Math.max(0, debtProfile.annualBonus ?? 0));
+    if (storeDebts.length === 0 && debtProfile.debts.length > 0) {
+      setStoreDebts(debtProfile.debts.map((d) => ({
+        id: d.id,
+        name: d.name,
+        balance: d.balance,
+        apr: d.apr,
+        minPayment: d.minPayment,
+      })));
+    }
+  }, [debtProfile, setStoreDebts, storeDebts.length]);
 
   useEffect(() => {
     setDebtProfile({
@@ -138,15 +153,15 @@ export default function DebtPage() {
       apr: 0,
       minPayment: 0,
     };
-    syncDebts([...debts, newDebt]);
+    setStoreDebts([...debts, newDebt]);
   }
 
   function removeDebt(id: string) {
-    syncDebts(debts.filter((d) => d.id !== id));
+    setStoreDebts(debts.filter((d) => d.id !== id));
   }
 
   function updateDebt(id: string, field: keyof Debt, value: string | number) {
-    syncDebts(debts.map((d) => (d.id === id ? { ...d, [field]: value } : d)));
+    setStoreDebts(debts.map((d) => (d.id === id ? { ...d, [field]: value } : d)));
   }
 
   const hasDebts = debts.length > 0 && debts.some((d) => d.balance > 0);

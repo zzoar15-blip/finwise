@@ -95,6 +95,11 @@ export interface PlanMetrics {
   emergencyMonthlyContribution: number;
 }
 
+interface PlanDebtSimulationOverrides {
+  monthlyOverpayment?: number;
+  annualBonus?: number;
+}
+
 function sumExpenses(e: PlanInputs['expenses']): number {
   return (
     e.housing + e.utilities + e.groceries + e.dining +
@@ -397,7 +402,10 @@ function build12MonthProjection(
   return months;
 }
 
-export function computePlanMetrics(inputs: PlanInputs): PlanMetrics {
+export function computePlanMetrics(
+  inputs: PlanInputs,
+  debtOverrides: PlanDebtSimulationOverrides = {},
+): PlanMetrics {
   const periods = PAY_PERIODS[inputs.payPeriod];
 
   // ── Paycheck ──
@@ -460,7 +468,13 @@ export function computePlanMetrics(inputs: PlanInputs): PlanMetrics {
   const totalDebtBalance = debts.reduce((s, d) => s + d.balance, 0);
 
   const debtResult = hasDebts
-    ? simulateDebtPayoff(debts, 0, 0, 2, 'avalanche')
+    ? simulateDebtPayoff(
+      debts,
+      Math.max(0, debtOverrides.monthlyOverpayment ?? 0),
+      Math.max(0, debtOverrides.annualBonus ?? 0),
+      2,
+      'avalanche',
+    )
     : null;
   const debtFreeDate = debtResult?.debtFreeDate ?? null;
 

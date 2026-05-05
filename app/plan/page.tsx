@@ -433,8 +433,12 @@ export default function PlanPage() {
   }, [plan, paycheckProfile, debtProfile]);
 
   const baseMetrics = useMemo(
-    () => computePlanMetrics(effectiveInputs),
-    [effectiveInputs],
+    () =>
+      computePlanMetrics(effectiveInputs, {
+        monthlyOverpayment: debtProfile?.monthlyOverpayment ?? 0,
+        annualBonus: debtProfile?.annualBonus ?? 0,
+      }),
+    [effectiveInputs, debtProfile?.monthlyOverpayment, debtProfile?.annualBonus],
   );
   const effectivePaycheckResults = useMemo(
     () => getEffectivePaycheckResults(paycheckInputs, paycheckResults),
