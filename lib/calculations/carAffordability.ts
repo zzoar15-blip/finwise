@@ -1,8 +1,10 @@
 import type { UnifiedMonthlyFlow } from '@/lib/calculations';
-import { binarySearchMax, clamp, pmt, toMonthlyRate } from '@/lib/calculations/shared';
+import { clamp, pmt, toMonthlyRate } from '@/lib/calculations/shared';
 
 export interface CarAffordabilityInputs {
   flow: UnifiedMonthlyFlow;
+  budgetSurplus: number;
+  hasBudgetData: boolean;
   ownershipType: 'new' | 'used';
   currentTransportBudget: number;
   partnerMonthlyIncome: number;
@@ -29,11 +31,13 @@ export interface CarAffordabilityInputs {
 }
 
 export interface CarAffordabilityResults {
-  monthlyIncomeHousehold: number;
-  nonTransportOutflows: number;
-  maxByCashflow: number;
+  monthlySurplusFromBudget: number;
+  existingTransportBudget: number;
+  availableForTransport: number;
+  cashflowMax: number;
   maxByIncomeRatio: number;
   recommendedTransportBudget: number;
+  usedIncomeOnlyFallback: boolean;
   conservativeTransportBudget: number;
   affordableLoanCarPrice: number;
   affordableLeaseCarPrice: number;
@@ -42,6 +46,9 @@ export interface CarAffordabilityResults {
   loanPaymentOnly: number;
   leasePaymentOnly: number;
   selectedDepreciationRate: number;
+  fixedCarCosts: number;
+  maxPaymentBudget: number;
+  newMonthlySurplusAfterRecommended: number;
   loanDepreciationLoss3Year: number;
   loanTotalCost3Year: number;
   leaseTotalCost3Year: number;
@@ -66,25 +73,40 @@ function leaseMonthlyAllIn(price: number, i: CarAffordabilityInputs): { payment:
   return { payment, total };
 }
 
-function solveAffordablePrice(
-  targetMonthly: number,
-  calc: (price: number) => { payment: number; total: number },
-): number {
-  if (targetMonthly <= 0) return 0;
-  return binarySearchMax(0, 200000, 40, (value) => calc(value).total <= targetMonthly);
+function principalFromPayment(payment: number, apr: number, termMonths: number): number {
+  const monthlyRate = toMonthlyRate(Math.max(0, apr));
+  const n = Math.max(1, termMonths);
+  if (payment <= 0) return 0;
+  if (monthlyRate === 0) return payment * n;
+  return payment * ((1 - Math.pow(1 + monthlyRate, -n)) / monthlyRate);
 }
 
 export function computeCarAffordability(inputs: CarAffordabilityInputs): CarAffordabilityResults {
-  const monthlyIncomeHousehold = inputs.flow.monthlyIncome + Math.max(0, inputs.partnerMonthlyIncome);
-  const nonTransportOutflows =
-    Math.max(0, inputs.flow.cashOutflows - inputs.currentTransportBudget) + Math.max(0, inputs.targetMonthlySavings);
-  const maxByCashflow = Math.max(0, monthlyIncomeHousehold - nonTransportOutflows);
-  const maxByIncomeRatio = Math.max(0, monthlyIncomeHousehold * clamp(inputs.transportIncomeRatio, 0.05, 0.5));
-  const recommendedTransportBudget = Math.max(0, Math.min(maxByCashflow, maxByIncomeRatio));
-  const conservativeTransportBudget = Math.max(0, Math.min(recommendedTransportBudget, monthlyIncomeHousehold * 0.12));
+  const monthlySurplusFromBudget = Math.max(0, inputs.budgetSurplus);
+  const existingTransportBudget = Math.max(0, inputs.currentTransportBudget);
+  const availableForTransport = monthlySurplusFromBudget + existingTransportBudget;
+  const cashflowMax = Math.max(0, availableForTransport * 0.8);
+  const maxByIncomeRatio = Math.max(
+    0,
+    (Math.max(0, inputs.flow.paycheck.grossAnnual) / 12) * clamp(inputs.transportIncomeRatio, 0.05, 0.5),
+  );
+  const usedIncomeOnlyFallback = !inputs.hasBudgetData;
+  const recommendedTransportBudget = usedIncomeOnlyFallback
+    ? maxByIncomeRatio
+    : Math.max(0, Math.min(cashflowMax, maxByIncomeRatio));
+  const conservativeTransportBudget = Math.max(0, Math.min(recommendedTransportBudget, (Math.max(0, inputs.flow.paycheck.grossAnnual) / 12) * 0.12));
+  const fixedCarCosts = inputs.annualInsurance / 12 + inputs.monthlyFuel + inputs.monthlyMaintenance;
+  const maxPaymentBudget = Math.max(0, recommendedTransportBudget - fixedCarCosts);
 
-  const affordableLoanCarPrice = solveAffordablePrice(recommendedTransportBudget, (price) => loanMonthlyAllIn(price, inputs));
-  const affordableLeaseCarPrice = solveAffordablePrice(recommendedTransportBudget, (price) => leaseMonthlyAllIn(price, inputs));
+  const financedPrincipal = principalFromPayment(maxPaymentBudget, inputs.loanApr, inputs.loanTermMonths);
+  const effectiveTaxAndFeesMultiplier = 1 + Math.max(0, inputs.salesTaxRate);
+  const affordableLoanCarPrice = Math.max(
+    0,
+    (financedPrincipal + inputs.loanDownPayment + inputs.tradeInValue - inputs.purchaseFees) /
+      Math.max(0.0001, effectiveTaxAndFeesMultiplier),
+  );
+
+  const affordableLeaseCarPrice = principalFromPayment(maxPaymentBudget, inputs.loanApr, inputs.leaseTermMonths);
   const loanAtAffordable = loanMonthlyAllIn(affordableLoanCarPrice, inputs);
   const leaseAtAffordable = leaseMonthlyAllIn(affordableLeaseCarPrice, inputs);
   const selectedDepreciationRate =
@@ -93,13 +115,16 @@ export function computeCarAffordability(inputs: CarAffordabilityInputs): CarAffo
   const loanDepreciationLoss3Year = Math.max(0, affordableLoanCarPrice - valueAfter3Years);
   const loanTotalCost3Year = loanAtAffordable.total * 36 + inputs.loanDownPayment + loanDepreciationLoss3Year;
   const leaseTotalCost3Year = leaseAtAffordable.total * 36 + inputs.leaseDownPayment + inputs.leaseFees;
+  const newMonthlySurplusAfterRecommended = monthlySurplusFromBudget - recommendedTransportBudget;
 
   return {
-    monthlyIncomeHousehold,
-    nonTransportOutflows,
-    maxByCashflow,
+    monthlySurplusFromBudget,
+    existingTransportBudget,
+    availableForTransport,
+    cashflowMax,
     maxByIncomeRatio,
     recommendedTransportBudget,
+    usedIncomeOnlyFallback,
     conservativeTransportBudget,
     affordableLoanCarPrice,
     affordableLeaseCarPrice,
@@ -108,6 +133,9 @@ export function computeCarAffordability(inputs: CarAffordabilityInputs): CarAffo
     loanPaymentOnly: loanAtAffordable.payment,
     leasePaymentOnly: leaseAtAffordable.payment,
     selectedDepreciationRate,
+    fixedCarCosts,
+    maxPaymentBudget,
+    newMonthlySurplusAfterRecommended,
     loanDepreciationLoss3Year,
     loanTotalCost3Year,
     leaseTotalCost3Year,

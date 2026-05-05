@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useFinWiseStore } from '@/lib/store';
-import { computeUnifiedMonthlyFlow } from '@/lib/calculations';
+import { computeBudgetSurplus, computeUnifiedMonthlyFlow } from '@/lib/calculations';
 import { computeCarAffordability } from '@/lib/calculations/carAffordability';
 import { formatCurrency } from '@/lib/format';
 import { SyncMeta } from '@/components/SyncMeta';
@@ -45,6 +45,8 @@ export default function CarAffordabilityPage() {
     () =>
       computeCarAffordability({
         flow,
+        budgetSurplus: computeBudgetSurplus(paycheckResults, budgetInputs),
+        hasBudgetData: Object.values(budgetInputs).some((v) => typeof v === 'number' && v > 0),
         ownershipType,
         currentTransportBudget: budgetInputs.transportation,
         partnerMonthlyIncome,
@@ -70,7 +72,6 @@ export default function CarAffordabilityPage() {
     [
       flow,
       ownershipType,
-      budgetInputs.transportation,
       partnerMonthlyIncome,
       targetMonthlySavings,
       transportIncomeRatio,
@@ -90,6 +91,8 @@ export default function CarAffordabilityPage() {
       leaseFees,
       annualDepreciationNew,
       annualDepreciationUsed,
+      paycheckResults,
+      budgetInputs,
     ]
   );
 
@@ -171,6 +174,12 @@ export default function CarAffordabilityPage() {
             <Metric title="Affordable Lease MSRP" value={formatCurrency(results.affordableLeaseCarPrice)} />
           </div>
 
+          {results.usedIncomeOnlyFallback ? (
+            <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              ⚠ Complete your budget planner for a personalized recommendation. Using income-ratio estimate only.
+            </div>
+          ) : null}
+
           <div className="grid gap-4 md:grid-cols-2">
             <div className="rounded-xl border bg-card p-4">
               <h3 className="mb-2 text-base font-semibold">Loan scenario</h3>
@@ -200,13 +209,41 @@ export default function CarAffordabilityPage() {
 
           <div className="rounded-xl border bg-card p-4">
             <h3 className="mb-2 text-base font-semibold">What drives this number</h3>
-            <Row label="Household monthly income" value={results.monthlyIncomeHousehold} />
-            <Row label="Non-transport outflows + savings buffer" value={results.nonTransportOutflows} />
-            <Row label="Cashflow-based max" value={results.maxByCashflow} />
-            <Row label="Income-ratio max" value={results.maxByIncomeRatio} />
-            <Row label="Selected depreciation rate" value={results.selectedDepreciationRate * 100} suffix="%" />
+            <Row label="Monthly surplus (from budget)" value={results.monthlySurplusFromBudget} />
+            <Row label="Existing transport budget" value={results.existingTransportBudget} />
+            <Row label="Available for all transport" value={results.availableForTransport} />
+            <Row label="Conservative buffer (80%)" value={80} suffix="%" />
+            <Row label="Cashflow-based max (all-in)" value={results.cashflowMax} />
+            <div className="my-1 border-t border-border" />
+            <Row label="Income-ratio max (15% of gross)" value={results.maxByIncomeRatio} />
+            <div className="my-1 border-t border-border" />
+            <Row label="BINDING MAX (lower of both)" value={results.recommendedTransportBudget} bold />
             <p className="mt-3 text-sm text-muted-foreground">
               This model is all-in by design: payment + insurance + fuel + maintenance. That keeps the recommendation realistic.
+            </p>
+          </div>
+
+          <div className="rounded-xl border bg-card p-4">
+            <h3 className="mb-2 text-base font-semibold">How this affects your budget</h3>
+            <Row label="Current monthly surplus" value={results.monthlySurplusFromBudget} />
+            <Row label="Estimated car all-in cost" value={-results.recommendedTransportBudget} />
+            <div className="flex items-center justify-between border-b py-2 text-sm last:border-b-0">
+              <span className="font-semibold">New monthly surplus</span>
+              <span
+                className={`tabular-nums font-semibold ${
+                  results.newMonthlySurplusAfterRecommended > 500
+                    ? 'text-green-600'
+                    : results.newMonthlySurplusAfterRecommended >= 200
+                    ? 'text-amber-600'
+                    : 'text-red-600'
+                }`}
+              >
+                {formatCurrency(results.newMonthlySurplusAfterRecommended)}
+              </span>
+            </div>
+            <p className="mt-2 text-sm text-muted-foreground">
+              This car would reduce your monthly surplus to {formatCurrency(results.newMonthlySurplusAfterRecommended)}.
+              Consider a less expensive option to maintain financial flexibility.
             </p>
           </div>
         </div>
