@@ -1,0 +1,501 @@
+'use client';
+
+import { useState, useMemo } from 'react';
+import { simulateDebtPayoff, buildSensitivityTable } from '@/lib/calculations/debt';
+import type { Debt, DebtResult, SensitivityRow } from '@/lib/calculations/debt';
+import { formatCurrency } from '@/lib/format';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from 'recharts';
+import { Plus, Trash2, Calendar, Clock, TrendingDown, Sparkles } from 'lucide-react';
+
+const DEBT_COLORS = ['#ef4444', '#f97316', '#eab308', '#8b5cf6', '#3b82f6'];
+
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+const INITIAL_DEBTS: Debt[] = [
+  { id: '1', name: 'Credit Card', balance: 8500, apr: 22.99, minPayment: 200 },
+  { id: '2', name: 'Car Loan', balance: 15000, apr: 6.5, minPayment: 350 },
+];
+
+function formatDebtFreeDate(dateStr: string): string {
+  if (!dateStr) return '—';
+  const [year, month] = dateStr.split('-');
+  const d = new Date(Number(year), Number(month) - 1, 1);
+  return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+}
+
+function formatChartDate(dateStr: string): string {
+  if (!dateStr) return '';
+  const [year, month] = dateStr.split('-');
+  const d = new Date(Number(year), Number(month) - 1, 1);
+  return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+}
+
+function shouldShowDate(dateStr: string, index: number): boolean {
+  // Show every 6 months
+  const [, month] = dateStr.split('-');
+  return Number(month) % 6 === 1 || index === 0;
+}
+
+export default function DebtPage() {
+  const [debts, setDebts] = useState<Debt[]>(INITIAL_DEBTS);
+  const [monthlyOverpayment, setMonthlyOverpayment] = useState(200);
+  const [annualBonus, setAnnualBonus] = useState(0);
+  const [bonusMonth, setBonusMonth] = useState(2);
+  const [strategy, setStrategy] = useState<'avalanche' | 'snowball'>('avalanche');
+
+  const result: DebtResult = useMemo(
+    () => simulateDebtPayoff(debts, monthlyOverpayment, annualBonus, bonusMonth, strategy),
+    [debts, monthlyOverpayment, annualBonus, bonusMonth, strategy],
+  );
+
+  const sensitivity: SensitivityRow[] = useMemo(
+    () =>
+      debts.length > 0 && debts.some((d) => d.balance > 0)
+        ? buildSensitivityTable(debts, monthlyOverpayment, annualBonus, bonusMonth, strategy)
+        : [],
+    [debts, monthlyOverpayment, annualBonus, bonusMonth, strategy],
+  );
+
+  // Build chart data from snapshots
+  const chartData = useMemo(() => {
+    // Sample every month but only label every 6 months on axis
+    return result.snapshots.map((s) => {
+      const row: Record<string, number | string> = { date: s.date };
+      for (const d of debts) row[d.name] = s.balances[d.id] ?? 0;
+      return row;
+    });
+  }, [result.snapshots, debts]);
+
+  function addDebt() {
+    if (debts.length >= 5) return;
+    const newDebt: Debt = {
+      id: Date.now().toString(),
+      name: 'New Debt',
+      balance: 0,
+      apr: 0,
+      minPayment: 0,
+    };
+    setDebts([...debts, newDebt]);
+  }
+
+  function removeDebt(id: string) {
+    setDebts(debts.filter((d) => d.id !== id));
+  }
+
+  function updateDebt(id: string, field: keyof Debt, value: string | number) {
+    setDebts(debts.map((d) => (d.id === id ? { ...d, [field]: value } : d)));
+  }
+
+  const hasDebts = debts.length > 0 && debts.some((d) => d.balance > 0);
+
+  return (
+    <div className="space-y-6 max-w-5xl">
+      <h1 className="text-2xl font-bold">Debt Payoff Simulator</h1>
+
+      {/* Debts Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Your Debts</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {debts.length === 0 && (
+            <p className="text-sm text-muted-foreground text-center py-4">
+              No debts added yet. Click &quot;+ Add Debt&quot; to get started.
+            </p>
+          )}
+
+          {debts.length > 0 && (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-left text-muted-foreground">
+                    <th className="pb-2 font-medium">Name</th>
+                    <th className="pb-2 font-medium text-right">Balance ($)</th>
+                    <th className="pb-2 font-medium text-right">APR (%)</th>
+                    <th className="pb-2 font-medium text-right">Min Payment ($)</th>
+                    <th className="pb-2 w-10" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/50">
+                  {debts.map((debt, i) => (
+                    <tr key={debt.id}>
+                      <td className="py-2 pr-2">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="size-2.5 rounded-full shrink-0"
+                            style={{ backgroundColor: DEBT_COLORS[i % DEBT_COLORS.length] }}
+                          />
+                          <Input
+                            value={debt.name}
+                            onChange={(e) => updateDebt(debt.id, 'name', e.target.value)}
+                            className="h-7 w-36 text-sm"
+                          />
+                        </div>
+                      </td>
+                      <td className="py-2 pr-2">
+                        <Input
+                          type="number"
+                          min={0}
+                          step={100}
+                          value={debt.balance || ''}
+                          placeholder="0"
+                          onChange={(e) =>
+                            updateDebt(debt.id, 'balance', parseFloat(e.target.value) || 0)
+                          }
+                          className="h-7 w-28 text-right text-sm"
+                        />
+                      </td>
+                      <td className="py-2 pr-2">
+                        <Input
+                          type="number"
+                          min={0}
+                          max={100}
+                          step={0.01}
+                          value={debt.apr || ''}
+                          placeholder="0"
+                          onChange={(e) =>
+                            updateDebt(debt.id, 'apr', parseFloat(e.target.value) || 0)
+                          }
+                          className="h-7 w-24 text-right text-sm"
+                        />
+                      </td>
+                      <td className="py-2 pr-2">
+                        <Input
+                          type="number"
+                          min={0}
+                          step={10}
+                          value={debt.minPayment || ''}
+                          placeholder="0"
+                          onChange={(e) =>
+                            updateDebt(debt.id, 'minPayment', parseFloat(e.target.value) || 0)
+                          }
+                          className="h-7 w-28 text-right text-sm"
+                        />
+                      </td>
+                      <td className="py-2">
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => removeDebt(debt.id)}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <Trash2 />
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {debts.length < 5 && (
+            <Button variant="outline" size="sm" onClick={addDebt}>
+              <Plus />
+              Add Debt
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Payment Strategy */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Payment Strategy</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          {/* Strategy toggle */}
+          <div className="space-y-2">
+            <Label>Payoff Strategy</Label>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setStrategy('avalanche')}
+                className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                  strategy === 'avalanche'
+                    ? 'border-[#1a56a8] bg-[#1a56a8] text-white'
+                    : 'border-border bg-transparent text-foreground hover:bg-muted'
+                }`}
+              >
+                Avalanche (Highest Rate First)
+              </button>
+              <button
+                type="button"
+                onClick={() => setStrategy('snowball')}
+                className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                  strategy === 'snowball'
+                    ? 'border-[#1a56a8] bg-[#1a56a8] text-white'
+                    : 'border-border bg-transparent text-foreground hover:bg-muted'
+                }`}
+              >
+                Snowball (Lowest Balance First)
+              </button>
+            </div>
+          </div>
+
+          {/* Monthly overpayment slider */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="overpayment">Monthly Overpayment</Label>
+              <span className="text-sm font-semibold tabular-nums">
+                {formatCurrency(monthlyOverpayment)}
+              </span>
+            </div>
+            <input
+              id="overpayment"
+              type="range"
+              min={0}
+              max={2000}
+              step={25}
+              value={monthlyOverpayment}
+              onChange={(e) => setMonthlyOverpayment(Number(e.target.value))}
+              className="w-full h-2 rounded-full bg-border accent-[#1a56a8] cursor-pointer"
+            />
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>$0</span>
+              <span>$2,000</span>
+            </div>
+          </div>
+
+          {/* Annual bonus and month */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="bonus">Annual Bonus Lump Sum</Label>
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm text-muted-foreground">$</span>
+                <Input
+                  id="bonus"
+                  type="number"
+                  min={0}
+                  step={100}
+                  value={annualBonus || ''}
+                  placeholder="0"
+                  onChange={(e) => setAnnualBonus(parseFloat(e.target.value) || 0)}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Bonus Month</Label>
+              <Select
+                value={String(bonusMonth)}
+                onValueChange={(v) => v && setBonusMonth(Number(v))}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue>{MONTH_NAMES[bonusMonth - 1]}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {MONTH_NAMES.map((name, i) => (
+                    <SelectItem key={i + 1} value={String(i + 1)}>
+                      {name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Results Summary Cards */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardContent className="pt-4">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-xs text-muted-foreground">Debt-Free Date</p>
+                <p className="mt-1 text-base font-semibold">
+                  {hasDebts ? formatDebtFreeDate(result.debtFreeDate) : '—'}
+                </p>
+              </div>
+              <Calendar className="size-4 text-muted-foreground shrink-0" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-4">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-xs text-muted-foreground">Months to Payoff</p>
+                <p className="mt-1 text-base font-semibold">
+                  {hasDebts ? `${result.monthsToPayoff} mo` : '—'}
+                </p>
+              </div>
+              <Clock className="size-4 text-muted-foreground shrink-0" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-4">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-xs text-muted-foreground">Total Interest Paid</p>
+                <p className="mt-1 text-base font-semibold text-red-600 dark:text-red-400">
+                  {hasDebts ? formatCurrency(result.totalInterestPaid) : '—'}
+                </p>
+              </div>
+              <TrendingDown className="size-4 text-red-400 shrink-0" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-4">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-xs text-muted-foreground">Interest Saved vs Minimums</p>
+                <p className="mt-1 text-base font-semibold text-green-600 dark:text-green-400">
+                  {hasDebts ? formatCurrency(result.interestSavedVsMinimum) : '—'}
+                </p>
+              </div>
+              <Sparkles className="size-4 text-green-400 shrink-0" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Payoff Progress Chart */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Payoff Progress</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {!hasDebts || chartData.length === 0 ? (
+            <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">
+              Add debts above to see the payoff chart.
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={280}>
+              <AreaChart data={chartData} margin={{ top: 4, right: 8, left: 8, bottom: 4 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fontSize: 11 }}
+                  tickFormatter={(val: string, index: number) =>
+                    shouldShowDate(val, index) ? formatChartDate(val) : ''
+                  }
+                  interval={0}
+                />
+                <YAxis
+                  tickFormatter={(v: number) =>
+                    v >= 1000 ? `$${(v / 1000).toFixed(0)}k` : `$${v}`
+                  }
+                  tick={{ fontSize: 11 }}
+                />
+                <Tooltip
+                  formatter={(v, n) => [typeof v === 'number' ? formatCurrency(v) : String(v), String(n)]}
+                  labelFormatter={(l) => String(l)}
+                />
+                <Legend iconSize={10} formatter={(v) => <span className="text-xs">{v}</span>} />
+                {debts.map((d, i) => (
+                  <Area
+                    key={d.id}
+                    type="monotone"
+                    dataKey={d.name}
+                    stackId="1"
+                    stroke={DEBT_COLORS[i % DEBT_COLORS.length]}
+                    fill={DEBT_COLORS[i % DEBT_COLORS.length]}
+                    fillOpacity={0.6}
+                  />
+                ))}
+              </AreaChart>
+            </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Sensitivity Analysis */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Sensitivity Analysis</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {sensitivity.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4 text-center">
+              Add debts above to see sensitivity analysis.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-left text-muted-foreground">
+                    <th className="pb-2 font-medium">Extra / Month</th>
+                    <th className="pb-2 font-medium text-right">Payoff Date</th>
+                    <th className="pb-2 font-medium text-right">Total Interest</th>
+                    <th className="pb-2 font-medium text-right">Interest Saved</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/50">
+                  {sensitivity.map((row, i) => {
+                    // The sensitivity table is built with extraPerMonth = baseOverpayment + increment.
+                    // The increments are [0,100,200,300,400,500], so row i corresponds to +i*100 extra.
+                    const incrementAmounts = [0, 100, 200, 300, 400, 500];
+                    const isCurrentRow = incrementAmounts[i] === 0;
+                    return (
+                      <tr
+                        key={i}
+                        className={isCurrentRow ? 'bg-blue-50/50 dark:bg-blue-950/20 font-medium' : ''}
+                      >
+                        <td className="py-2.5">
+                          <span className="flex items-center gap-2">
+                            {formatCurrency(row.extraPerMonth)}
+                            {isCurrentRow && (
+                              <Badge variant="secondary" className="text-xs">
+                                current
+                              </Badge>
+                            )}
+                          </span>
+                        </td>
+                        <td className="py-2.5 text-right tabular-nums">
+                          {row.monthsToPayoff > 0
+                            ? `${row.monthsToPayoff} mo`
+                            : '—'}
+                        </td>
+                        <td className="py-2.5 text-right tabular-nums text-red-600 dark:text-red-400">
+                          {formatCurrency(row.totalInterest)}
+                        </td>
+                        <td className="py-2.5 text-right tabular-nums text-green-600 dark:text-green-400">
+                          {formatCurrency(row.interestSaved)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
