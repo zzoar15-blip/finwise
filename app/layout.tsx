@@ -26,7 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Sidebar />
             <div className="flex flex-1 flex-col overflow-hidden">
               <Topbar />
-              <main className="flex-1 overflow-y-auto bg-gradient-to-b from-[#f8fbff] via-[#f2f6fd] to-[#edf3fb] p-5 pb-24 md:p-8 md:pb-8">
+              <main className="flex-1 overflow-y-auto bg-gradient-to-b from-[#f8fbff] via-[#f2f6fd] to-[#edf3fb] px-5 pt-8 pb-24 md:px-8 md:pt-8 md:pb-8">
                 {children}
               </main>
             </div>

@@ -55,6 +55,8 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { EmptyState } from '@/components/ui/empty-state';
+import { PageSkeleton } from '@/components/ui/page-skeleton';
 import {
   Dialog,
   DialogContent,
@@ -615,58 +617,20 @@ export default function PlanPage() {
   }, [effectiveInputs, metrics, hasPaycheckData, insightsLoading, setAIInsightsCache]);
 
   // ── Loading state ──
-  if (loading) {
-    return (
-      <AnimatePresence>
-        <motion.div
-          key="loading"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="flex min-h-[60vh] flex-col items-center justify-center gap-4"
-        >
-          <div className="relative size-14">
-            <div className="absolute inset-0 rounded-full border-4 border-muted" />
-            <div className="absolute inset-0 rounded-full border-4 border-[#3b82f6] border-t-transparent animate-spin" />
-          </div>
-          <p className="text-sm font-medium text-muted-foreground animate-pulse">
-            Loading your plan&hellip;
-          </p>
-        </motion.div>
-      </AnimatePresence>
-    );
+  if (loading && hasAnyData) {
+    return <PageSkeleton />;
   }
 
   // ── No data at all — empty state ──
   if (!hasAnyData) {
     return (
-      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 text-center">
-        <div className="rounded-full bg-muted p-4">
-          <Target className="size-8 text-muted-foreground" />
-        </div>
-        <div>
-          <h1 className="text-xl font-bold">Build your financial plan</h1>
-          <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-            Start with your paycheck to see your take-home pay, then add debts and goals to complete your plan.
-          </p>
-        </div>
-        <div className="flex gap-3">
-          <Link
-            href="/paycheck"
-            className="inline-flex items-center gap-1.5 rounded-md bg-[#3b82f6] px-4 py-2 text-sm font-medium text-white hover:bg-[#2563eb] transition-colors"
-          >
-            Set up paycheck <ChevronRight className="size-3.5" />
-          </Link>
-          {!plan && (
-            <button
-              onClick={() => router.push('/?wizard=true')}
-              className="inline-flex items-center gap-1.5 rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-muted transition-colors"
-            >
-              Use wizard
-            </button>
-          )}
-        </div>
-      </div>
+      <EmptyState
+        icon={Target}
+        title="No plan yet"
+        description="Start with your paycheck and goals so FinWise can build your personalized plan."
+        ctaLabel="Start onboarding"
+        ctaHref="/?wizard=true"
+      />
     );
   }
 

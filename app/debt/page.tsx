@@ -12,6 +12,7 @@ import { useFinWiseStore } from '@/lib/store';
 import { usePlanStore } from '@/lib/planStore';
 import { computeUnifiedMonthlyFlow } from '@/lib/calculations';
 import { SyncMeta } from '@/components/SyncMeta';
+import { EmptyState } from '@/components/ui/empty-state';
 import {
   Card,
   CardContent,
@@ -39,7 +40,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-import { Plus, Trash2, Calendar, Clock, TrendingDown, Sparkles, ChevronLeft, Lightbulb } from 'lucide-react';
+import { Plus, Trash2, Calendar, Clock, TrendingDown, Sparkles, ChevronLeft, Lightbulb, CreditCard } from 'lucide-react';
 
 const DEBT_COLORS = ['#ef4444', '#f97316', '#eab308', '#8b5cf6', '#3b82f6'];
 
@@ -226,9 +227,13 @@ export default function DebtPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           {debts.length === 0 && (
-            <p className="text-sm text-muted-foreground text-center py-4">
-              No debts added yet. Click &quot;+ Add Debt&quot; to get started.
-            </p>
+            <EmptyState
+              icon={CreditCard}
+              title="No debts added"
+              description="Add your balances so FinWise can calculate payoff timing and interest savings."
+              ctaLabel="Add your first debt"
+              ctaHref="/debt"
+            />
           )}
 
           {debts.length > 0 && (

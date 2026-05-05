@@ -29,6 +29,7 @@ import { PAY_PERIODS } from '@/lib/calculations/paycheck';
 import { formatCurrency, formatDate } from '@/lib/format';
 import { CATEGORY_ICONS } from '@/lib/constants';
 import type { PlanInputs } from '@/types/plan';
+import { EmptyState } from '@/components/ui/empty-state';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -616,16 +617,13 @@ function DashboardPageContent() {
           </CardHeader>
           <CardContent>
             {recentTransactions.length === 0 ? (
-              <div className="flex flex-col items-center gap-3 py-10 text-center">
-                <p className="text-sm text-gray-400">No transactions recorded yet.</p>
-                <Link
-                  href="/transactions"
-                  className="inline-flex items-center rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-                >
-                  <Plus className="mr-1 h-3.5 w-3.5" />
-                  Add your first transaction
-                </Link>
-              </div>
+              <EmptyState
+                icon={Wallet}
+                title="No transactions yet"
+                description="Add your first transaction to start tracking spending and income trends."
+                ctaLabel="Add transaction"
+                ctaHref="/transactions"
+              />
             ) : (
               <ul className="divide-y divide-gray-100">
                 {recentTransactions.map((t) => (

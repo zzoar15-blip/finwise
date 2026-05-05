@@ -222,6 +222,7 @@ function BenefitsSliderField({
   max,
   field,
   hint,
+  summary,
   onChange,
 }: {
   label: string;
@@ -229,6 +230,7 @@ function BenefitsSliderField({
   max: number;
   field: keyof PlanInputs;
   hint?: string;
+  summary?: string;
   onChange: (patch: Partial<PlanInputs>) => void;
 }) {
   return (
@@ -248,6 +250,7 @@ function BenefitsSliderField({
         onChange={(e) => onChange({ [field]: parseFloat(e.target.value) })}
         className="h-2 w-full cursor-pointer appearance-none rounded-full bg-gray-200 accent-[#3b82f6]"
       />
+      {summary && <p className="text-xs font-medium text-gray-600">{summary}</p>}
       {hint && <p className="text-xs text-gray-500">{hint}</p>}
     </div>
   );
@@ -617,6 +620,7 @@ function StepBenefits({
                 value={inputs.traditional401kPct}
                 max={30}
                 field="traditional401kPct"
+                summary={`Current: ${inputs.traditional401kPct}% | Max: $23,500`}
                 hint="Pre-tax — lowers your taxable income now"
                 onChange={onChange}
               />
@@ -625,6 +629,7 @@ function StepBenefits({
                 value={inputs.roth401kPct}
                 max={30}
                 field="roth401kPct"
+                summary={`Current: ${inputs.roth401kPct}% | Max: $23,500`}
                 hint="Post-tax — grows tax-free"
                 onChange={onChange}
               />
@@ -1054,7 +1059,10 @@ function StepDebts({
       )}
 
       {inputs.debts.length === 0 && !showForm && (
-        <p className="text-sm text-gray-400">No debts added yet. Add one above or skip this step.</p>
+        <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-center">
+          <p className="text-sm font-medium text-slate-800">No debts added yet</p>
+          <p className="mt-1 text-sm text-slate-500">Add a debt above or skip this step if you are debt-free.</p>
+        </div>
       )}
     </div>
   );

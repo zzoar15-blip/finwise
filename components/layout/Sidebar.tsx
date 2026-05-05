@@ -14,18 +14,37 @@ const PRIMARY_NAV = [
   { href: '/plan', label: 'My Plan', icon: FileText },
 ];
 
-const TOOLS_NAV = [
-  { href: '/paycheck', label: 'Paycheck Calculator', icon: Calculator },
-  { href: '/budget', label: 'Budget Planner', icon: PieChart },
-  { href: '/debt', label: 'Debt Simulator', icon: CreditCard },
-  { href: '/invest', label: 'Investment Simulator', icon: TrendingUp },
-  { href: '/forecast', label: 'Scenario Forecaster', icon: BarChart3 },
-  { href: '/tools/rent-vs-buy', label: 'Rent vs. Buy', icon: Home },
-  { href: '/tools/housing-affordability', label: 'Affordability', icon: HousePlus },
-  { href: '/tools/car-affordability', label: 'Car Affordability', icon: CarFront },
-  { href: '/tools/net-worth', label: 'Net Worth', icon: Wallet },
-  { href: '/tools/sinking-fund', label: 'Sinking Fund', icon: PiggyBank },
-];
+const TOOL_GROUPS = [
+  {
+    label: 'INCOME',
+    items: [{ href: '/paycheck', label: 'Paycheck Calculator', icon: Calculator }],
+  },
+  {
+    label: 'PLANNING',
+    items: [
+      { href: '/budget', label: 'Budget Planner', icon: PieChart },
+      { href: '/forecast', label: 'Scenario Forecaster', icon: BarChart3 },
+      { href: '/tools/net-worth', label: 'Net Worth', icon: Wallet },
+      { href: '/tools/sinking-fund', label: 'Sinking Fund', icon: PiggyBank },
+    ],
+  },
+  {
+    label: 'DEBT',
+    items: [{ href: '/debt', label: 'Debt Simulator', icon: CreditCard }],
+  },
+  {
+    label: 'INVESTING',
+    items: [{ href: '/invest', label: 'Investment Simulator', icon: TrendingUp }],
+  },
+  {
+    label: 'HOUSING',
+    items: [
+      { href: '/tools/rent-vs-buy', label: 'Rent vs. Buy', icon: Home },
+      { href: '/tools/housing-affordability', label: 'Affordability', icon: HousePlus },
+      { href: '/tools/car-affordability', label: 'Car Affordability', icon: CarFront },
+    ],
+  },
+] as const;
 
 function NavItem({
   href,
@@ -46,7 +65,7 @@ function NavItem({
       href={href}
       className={cn(
         'group flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors relative',
-        indent ? 'ml-2' : '',
+        indent ? 'pl-1' : '',
         active
           ? 'bg-[#1c2f4d] text-white before:absolute before:left-0 before:top-1 before:bottom-1 before:w-0.5 before:rounded-r before:bg-[#60a5fa]'
           : 'text-white/70 hover:bg-[#17253e] hover:text-white'
@@ -78,12 +97,15 @@ export function Sidebar() {
         {/* Divider */}
         <div className="my-3 border-t border-white/10" />
 
-        {/* Tools section */}
-        <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest text-white/35">
-          Tools
-        </p>
-        {TOOLS_NAV.map((item) => (
-          <NavItem key={item.href} {...item} indent />
+        {TOOL_GROUPS.map((group) => (
+          <div key={group.label} className="mb-1">
+            <p className="px-4 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#64748b]">
+              {group.label}
+            </p>
+            {group.items.map((item) => (
+              <NavItem key={item.href} {...item} indent />
+            ))}
+          </div>
         ))}
 
         <div className="flex-1" />

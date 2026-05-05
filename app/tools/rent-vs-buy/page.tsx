@@ -21,6 +21,7 @@ import { ExportButton } from '@/components/ExportButton';
 import { downloadCsv } from '@/lib/export';
 import { exportDomToPdf } from '@/lib/exportPdf';
 import { Button } from '@/components/ui/button';
+import { computeRentVsBuy } from '@/lib/calculations/rentVsBuy';
 
 const SENTIMENT_STYLES = {
   'strong-buy': 'bg-[#0f172a] text-white',
@@ -117,8 +118,22 @@ export default function RentVsBuyPage() {
     setRentVsBuyInputs({ purchasePrice: homeTarget / 0.2 });
   }, [plan?.inputs?.homeTarget, rentVsBuyInputs, setRentVsBuyInputs]);
 
-  const inputs = rentVsBuyInputs;
-  const results = rentVsBuyResults;
+  const fallbackInputs = useMemo(
+    () =>
+      buildProfileDefaults({
+        paycheckState: paycheckInputs?.state,
+        paycheckFiling: paycheckInputs?.filingStatus,
+        paycheckMarginal: paycheckResults?.marginalCombinedRate,
+        budgetHousing: budgetInputs?.housing,
+        homeTarget: plan?.inputs?.homeTarget,
+      }),
+    [budgetInputs?.housing, paycheckInputs?.filingStatus, paycheckInputs?.state, paycheckResults?.marginalCombinedRate, plan?.inputs?.homeTarget],
+  );
+  const inputs = rentVsBuyInputs ?? fallbackInputs;
+  const results = useMemo(
+    () => rentVsBuyResults ?? computeRentVsBuy(inputs),
+    [rentVsBuyResults, inputs],
+  );
 
   const chartData = useMemo(
     () =>
@@ -151,10 +166,6 @@ export default function RentVsBuyPage() {
       ]),
     ];
   }, [results]);
-
-  if (!inputs || !results) {
-    return <div className="text-sm text-muted-foreground">Loading Rent vs. Buy model...</div>;
-  }
 
   const plannedDiff = results.plannedStayResult.buyerNetWorth - results.plannedStayResult.renterNetWorth;
 
