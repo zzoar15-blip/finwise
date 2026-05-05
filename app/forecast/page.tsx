@@ -44,11 +44,19 @@ import { useFinWiseStore } from '@/lib/store';
 import { computeUnifiedMonthlyFlow } from '@/lib/calculations';
 
 const SCENARIO_COLORS = ['#3b82f6', '#22c55e', '#f97316'] as const;
+const CHART_MARGIN = { top: 8, right: 12, left: 4, bottom: 4 } as const;
+const CHART_GRID = '3 3';
 
 function yAxisFormatter(v: number): string {
   if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
   if (v >= 1_000) return `$${(v / 1_000).toFixed(0)}k`;
   return `$${v}`;
+}
+
+function monthTickFormatter(month: number): string {
+  if (month <= 0) return '0';
+  if (month % 12 === 0) return `Y${month / 12}`;
+  return '';
 }
 
 // Light tint backgrounds for summary table cells
@@ -70,25 +78,28 @@ function ForecastTooltip({
   active,
   payload,
   label,
+  labelPrefix = 'Year',
 }: {
   active?: boolean;
   payload?: Array<{ name: string; value: number; color: string }>;
   label?: string | number;
+  labelPrefix?: string;
 }) {
   if (!active || !payload?.length) return null;
+  const sorted = [...payload].sort((a, b) => Number(b.value) - Number(a.value));
   return (
-    <div className="rounded-lg border border-border bg-popover p-3 shadow-md text-sm">
-      <p className="mb-2 font-semibold">Year {label}</p>
-      {payload.map((p) => (
+    <div className="rounded-lg border border-slate-200 bg-white/95 p-3 shadow-xl backdrop-blur-sm text-sm">
+      <p className="mb-2 font-semibold text-slate-900">{labelPrefix} {label}</p>
+      {sorted.map((p) => (
         <div key={p.name} className="flex items-center justify-between gap-4">
-          <span className="flex items-center gap-1.5">
+          <span className="flex items-center gap-1.5 text-slate-700">
             <span
               className="inline-block size-2.5 rounded-full"
               style={{ background: p.color }}
             />
             {p.name}
           </span>
-          <span className="font-medium tabular-nums">{formatCurrency(p.value)}</span>
+          <span className="font-semibold tabular-nums text-slate-900">{formatCurrency(p.value)}</span>
         </div>
       ))}
     </div>
@@ -334,14 +345,14 @@ function ForecastPageContent() {
         <Card className="shadow-sm">
           <CardHeader><CardTitle>Down Payment Trajectory</CardTitle></CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={320}>
-              <LineChart data={homeForecast.points}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                <XAxis dataKey="month" />
+            <ResponsiveContainer width="100%" height={340}>
+              <LineChart data={homeForecast.points} margin={CHART_MARGIN}>
+                <CartesianGrid strokeDasharray={CHART_GRID} className="stroke-border/80" />
+                <XAxis dataKey="month" tickFormatter={monthTickFormatter} interval={5} tick={{ fontSize: 12 }} />
                 <YAxis tickFormatter={yAxisFormatter} width={84} />
-                <Tooltip formatter={(v) => (typeof v === 'number' ? formatCurrency(v) : String(v))} />
+                <Tooltip content={<ForecastTooltip labelPrefix="Month" />} />
                 <ReferenceLine y={homeForecast.target} stroke="#ef4444" strokeDasharray="4 4" />
-                <Line type="monotone" dataKey="balance" stroke="#3b82f6" strokeWidth={2.5} dot={false} />
+                <Line type="monotone" dataKey="balance" stroke="#3b82f6" strokeWidth={2.75} dot={false} activeDot={{ r: 4 }} strokeLinecap="round" />
               </LineChart>
             </ResponsiveContainer>
           </CardContent>
@@ -378,14 +389,14 @@ function ForecastPageContent() {
         <Card className="shadow-sm">
           <CardHeader><CardTitle>Emergency Fund Trajectory</CardTitle></CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={320}>
-              <LineChart data={emergencyForecast.points}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                <XAxis dataKey="month" />
+            <ResponsiveContainer width="100%" height={340}>
+              <LineChart data={emergencyForecast.points} margin={CHART_MARGIN}>
+                <CartesianGrid strokeDasharray={CHART_GRID} className="stroke-border/80" />
+                <XAxis dataKey="month" tickFormatter={monthTickFormatter} interval={5} tick={{ fontSize: 12 }} />
                 <YAxis tickFormatter={yAxisFormatter} width={84} />
-                <Tooltip formatter={(v) => (typeof v === 'number' ? formatCurrency(v) : String(v))} />
+                <Tooltip content={<ForecastTooltip labelPrefix="Month" />} />
                 <ReferenceLine y={emergencyForecast.target} stroke="#ef4444" strokeDasharray="4 4" />
-                <Line type="monotone" dataKey="balance" stroke="#22c55e" strokeWidth={2.5} dot={false} />
+                <Line type="monotone" dataKey="balance" stroke="#22c55e" strokeWidth={2.75} dot={false} activeDot={{ r: 4 }} strokeLinecap="round" />
               </LineChart>
             </ResponsiveContainer>
           </CardContent>
@@ -422,13 +433,13 @@ function ForecastPageContent() {
         <Card className="shadow-sm">
           <CardHeader><CardTitle>Investment Trajectory</CardTitle></CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={320}>
-              <LineChart data={investForecast.points}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                <XAxis dataKey="month" />
+            <ResponsiveContainer width="100%" height={340}>
+              <LineChart data={investForecast.points} margin={CHART_MARGIN}>
+                <CartesianGrid strokeDasharray={CHART_GRID} className="stroke-border/80" />
+                <XAxis dataKey="month" tickFormatter={monthTickFormatter} interval={5} tick={{ fontSize: 12 }} />
                 <YAxis tickFormatter={yAxisFormatter} width={84} />
-                <Tooltip formatter={(v) => (typeof v === 'number' ? formatCurrency(v) : String(v))} />
-                <Line type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={2.5} dot={false} />
+                <Tooltip content={<ForecastTooltip labelPrefix="Month" />} />
+                <Line type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={2.75} dot={false} activeDot={{ r: 4 }} strokeLinecap="round" />
               </LineChart>
             </ResponsiveContainer>
           </CardContent>
@@ -465,14 +476,14 @@ function ForecastPageContent() {
         <Card className="shadow-sm">
           <CardHeader><CardTitle>Retirement Net Worth Path</CardTitle></CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={320}>
-              <LineChart data={retireForecast.points}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                <XAxis dataKey="month" />
+            <ResponsiveContainer width="100%" height={340}>
+              <LineChart data={retireForecast.points} margin={CHART_MARGIN}>
+                <CartesianGrid strokeDasharray={CHART_GRID} className="stroke-border/80" />
+                <XAxis dataKey="month" tickFormatter={monthTickFormatter} interval={11} tick={{ fontSize: 12 }} />
                 <YAxis tickFormatter={yAxisFormatter} width={84} />
-                <Tooltip formatter={(v) => (typeof v === 'number' ? formatCurrency(v) : String(v))} />
+                <Tooltip content={<ForecastTooltip labelPrefix="Month" />} />
                 <ReferenceLine y={retireTarget} stroke="#ef4444" strokeDasharray="4 4" />
-                <Line type="monotone" dataKey="value" stroke="#22c55e" strokeWidth={2.5} dot={false} />
+                <Line type="monotone" dataKey="value" stroke="#22c55e" strokeWidth={2.75} dot={false} activeDot={{ r: 4 }} strokeLinecap="round" />
               </LineChart>
             </ResponsiveContainer>
           </CardContent>
@@ -673,9 +684,9 @@ function ForecastPageContent() {
           <CardTitle>10-Year Net Worth Projection</CardTitle>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={340}>
-            <LineChart data={chartData} margin={{ top: 4, right: 16, left: 8, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+          <ResponsiveContainer width="100%" height={360}>
+            <LineChart data={chartData} margin={CHART_MARGIN}>
+              <CartesianGrid strokeDasharray={CHART_GRID} className="stroke-border/80" />
               <XAxis
                 dataKey="year"
                 label={{ value: 'Year', position: 'insideBottom', offset: -2, fontSize: 12 }}
@@ -687,16 +698,17 @@ function ForecastPageContent() {
                 width={72}
               />
               <Tooltip content={<ForecastTooltip />} />
-              <Legend />
+              <Legend iconType="circle" wrapperStyle={{ paddingTop: 8 }} />
               {scenarios.map((s) => (
                 <Line
                   key={s.id}
                   type="monotone"
                   dataKey={s.name}
                   stroke={s.color}
-                  strokeWidth={2.5}
-                  dot={{ r: 3, strokeWidth: 2 }}
-                  activeDot={{ r: 5 }}
+                  strokeWidth={2.75}
+                  dot={false}
+                  activeDot={{ r: 4 }}
+                  strokeLinecap="round"
                 />
               ))}
             </LineChart>
@@ -710,16 +722,16 @@ function ForecastPageContent() {
             <CardTitle>Confidence Bands ({baselineScenario?.name ?? 'Baseline'})</CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={confidenceBands} margin={{ top: 4, right: 16, left: 8, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+            <ResponsiveContainer width="100%" height={320}>
+              <LineChart data={confidenceBands} margin={CHART_MARGIN}>
+                <CartesianGrid strokeDasharray={CHART_GRID} className="stroke-border/80" />
                 <XAxis dataKey="year" tick={{ fontSize: 12 }} />
                 <YAxis tickFormatter={yAxisFormatter} tick={{ fontSize: 12 }} width={72} />
-                <Tooltip formatter={(v) => (typeof v === 'number' ? formatCurrency(v) : String(v))} />
-                <Legend />
-                <Line type="monotone" dataKey="p10" stroke="#ef4444" strokeWidth={2} dot={false} name="P10 (Downside)" />
-                <Line type="monotone" dataKey="p50" stroke="#3b82f6" strokeWidth={2.5} dot={false} name="P50 (Base)" />
-                <Line type="monotone" dataKey="p90" stroke="#22c55e" strokeWidth={2} dot={false} name="P90 (Upside)" />
+                <Tooltip content={<ForecastTooltip />} />
+                <Legend iconType="circle" wrapperStyle={{ paddingTop: 8 }} />
+                <Line type="monotone" dataKey="p10" stroke="#ef4444" strokeWidth={2.5} dot={false} name="P10 (Downside)" strokeLinecap="round" />
+                <Line type="monotone" dataKey="p50" stroke="#3b82f6" strokeWidth={2.75} dot={false} name="P50 (Base)" strokeLinecap="round" />
+                <Line type="monotone" dataKey="p90" stroke="#22c55e" strokeWidth={2.5} dot={false} name="P90 (Upside)" strokeLinecap="round" />
               </LineChart>
             </ResponsiveContainer>
           </CardContent>
