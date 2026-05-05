@@ -24,6 +24,7 @@ import { ExportButton } from '@/components/ExportButton';
 import { downloadCsv } from '@/lib/export';
 import { exportDomToPdf } from '@/lib/exportPdf';
 import { Button } from '@/components/ui/button';
+import { SyncMeta } from '@/components/SyncMeta';
 import type { StorePaycheckInputs } from '@/lib/calculations';
 
 const PAY_PERIOD_LABELS: Record<PayPeriod, string> = {
@@ -169,6 +170,7 @@ export default function PaycheckPage() {
   const storeInputs = useFinWiseStore((s) => s.paycheckInputs);
   const paycheckResults = useFinWiseStore((s) => s.paycheckResults);
   const setPaycheckInputs = useFinWiseStore((s) => s.setPaycheckInputs);
+  const planLastUpdated = useFinWiseStore((s) => s.planLastUpdated);
   const budgetInputs = useFinWiseStore((s) => s.budgetInputs);
   const debts = useFinWiseStore((s) => s.debts);
 
@@ -264,6 +266,7 @@ export default function PaycheckPage() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Paycheck Calculator</h1>
+            <SyncMeta updatedAt={planLastUpdated} badges={['Source of Truth']} />
             <p className="mt-1 text-sm text-gray-500">
               Estimate your take-home pay after federal and state taxes for 2025. Changes auto-save.
             </p>

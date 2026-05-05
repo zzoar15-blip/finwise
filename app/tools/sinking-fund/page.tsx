@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { ExportButton } from '@/components/ExportButton';
 import { downloadCsv, downloadXlsxFromAoa } from '@/lib/export';
 import { exportDomToPdf } from '@/lib/exportPdf';
+import { SyncMeta } from '@/components/SyncMeta';
 
 const PRESETS: Array<{
   type: SinkingFundGoalType;
@@ -58,6 +59,7 @@ export default function SinkingFundPage() {
   const inputs = useFinWiseStore((s) => s.sinkingFundInputs);
   const results = useFinWiseStore((s) => s.sinkingFundResults);
   const setInputs = useFinWiseStore((s) => s.setSinkingFundInputs);
+  const planLastUpdated = useFinWiseStore((s) => s.planLastUpdated);
   const plan = usePlanStore((s) => s.plan);
 
   useEffect(() => {
@@ -113,6 +115,7 @@ export default function SinkingFundPage() {
             <PiggyBank className="size-6 text-[#3b82f6] mt-0.5" />
             <div>
               <h1 className="text-2xl font-bold">Sinking Fund Planner</h1>
+              <SyncMeta updatedAt={planLastUpdated} badges={['Unified Flow']} />
               <p className="text-sm text-muted-foreground">
                 Plan purchases like vacations or a home down payment with a dedicated monthly funding path.
               </p>

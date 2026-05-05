@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/lib/format';
 import { useFinWiseStore } from '@/lib/store';
 import { computeUnifiedMonthlyFlow } from '@/lib/calculations';
+import { SyncMeta } from '@/components/SyncMeta';
 import {
   Card,
   CardContent,
@@ -112,6 +113,7 @@ export default function InvestPage() {
   const paycheckInputs = useFinWiseStore((s) => s.paycheckInputs);
   const budgetInputs = useFinWiseStore((s) => s.budgetInputs);
   const debts = useFinWiseStore((s) => s.debts);
+  const planLastUpdated = useFinWiseStore((s) => s.planLastUpdated);
 
   const flow = useMemo(
     () => computeUnifiedMonthlyFlow(paycheckInputs, paycheckResults, budgetInputs, debts),
@@ -204,6 +206,7 @@ export default function InvestPage() {
             <TrendingUp className="size-6 text-[#3b82f6]" />
             <div>
               <h1 className="text-2xl font-bold">Investment Income Simulator</h1>
+              <SyncMeta updatedAt={planLastUpdated} badges={['Unified Flow']} />
               <p className="text-sm text-muted-foreground">
                 Model dividend income growth over time with custom buy schedules
               </p>

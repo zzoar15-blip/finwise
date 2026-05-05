@@ -10,6 +10,7 @@ import { exportDomToPdf } from '@/lib/exportPdf';
 import { formatCurrency } from '@/lib/format';
 import { useFinWiseStore } from '@/lib/store';
 import { computeUnifiedMonthlyFlow } from '@/lib/calculations';
+import { SyncMeta } from '@/components/SyncMeta';
 import {
   Card,
   CardContent,
@@ -71,6 +72,7 @@ export default function DebtPage() {
   const paycheckResults = useFinWiseStore((s) => s.paycheckResults);
   const paycheckInputs = useFinWiseStore((s) => s.paycheckInputs);
   const budgetInputs = useFinWiseStore((s) => s.budgetInputs);
+  const planLastUpdated = useFinWiseStore((s) => s.planLastUpdated);
 
   const [debts, setDebts] = useState<Debt[]>(storeDebts.length > 0 ? storeDebts : []);
   const flow = useMemo(
@@ -152,7 +154,10 @@ export default function DebtPage() {
           <ChevronLeft className="size-3" /> My Plan
         </Link>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <h1 className="text-2xl font-bold">Debt Payoff Simulator</h1>
+          <div>
+            <h1 className="text-2xl font-bold">Debt Payoff Simulator</h1>
+            <SyncMeta updatedAt={planLastUpdated} badges={['Unified Flow']} />
+          </div>
           <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto">
             <Button
               variant="outline"

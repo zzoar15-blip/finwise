@@ -35,6 +35,7 @@ import {
   computeUnifiedMonthlyFlow,
   getEffectivePaycheckResults,
 } from '@/lib/calculations';
+import { SyncMeta } from '@/components/SyncMeta';
 
 const CHART_COLORS = {
   Housing: '#f97316',
@@ -135,6 +136,7 @@ export default function BudgetPage() {
   const budgetInputs = useFinWiseStore((s) => s.budgetInputs);
   const setBudgetInputs = useFinWiseStore((s) => s.setBudgetInputs);
   const debts = useFinWiseStore((s) => s.debts);
+  const planLastUpdated = useFinWiseStore((s) => s.planLastUpdated);
 
   const pr = getEffectivePaycheckResults(paycheckInputs, paycheckResults);
   const pi = paycheckInputs;
@@ -214,6 +216,7 @@ export default function BudgetPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold">Budget Planner</h1>
+          <SyncMeta updatedAt={planLastUpdated} badges={['Unified Flow']} />
           <Link href="/tools/rent-vs-buy" className="text-sm text-blue-600 hover:underline">
             Wondering if you can afford to buy? →
           </Link>
