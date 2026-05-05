@@ -59,8 +59,19 @@ export default function SinkingFundPage() {
   const inputs = useFinWiseStore((s) => s.sinkingFundInputs);
   const results = useFinWiseStore((s) => s.sinkingFundResults);
   const setInputs = useFinWiseStore((s) => s.setSinkingFundInputs);
+  const budgetInputs = useFinWiseStore((s) => s.budgetInputs);
+  const setBudgetInputs = useFinWiseStore((s) => s.setBudgetInputs);
   const planLastUpdated = useFinWiseStore((s) => s.planLastUpdated);
   const plan = usePlanStore((s) => s.plan);
+
+  const budgetDrivenMonthly = useMemo(() => {
+    if (inputs.goalType !== 'down-payment') return null;
+    const monthly =
+      inputs.mode === 'target-date'
+        ? results.requiredMonthlyContribution
+        : inputs.monthlyContribution;
+    return Math.max(0, Math.round(monthly));
+  }, [inputs.goalType, inputs.mode, inputs.monthlyContribution, results.requiredMonthlyContribution]);
 
   useEffect(() => {
     if (inputs.goalType !== 'down-payment') return;
@@ -74,6 +85,12 @@ export default function SinkingFundPage() {
       goalName: 'House Down Payment',
     });
   }, [inputs.goalType, inputs.targetAmount, inputs.targetDate, plan?.inputs.homeTarget, plan?.inputs.homeTimelineMonths, setInputs]);
+
+  useEffect(() => {
+    if (budgetDrivenMonthly === null) return;
+    if (budgetInputs.homeDownPaymentMonthly === budgetDrivenMonthly) return;
+    setBudgetInputs({ homeDownPaymentMonthly: budgetDrivenMonthly });
+  }, [budgetDrivenMonthly, budgetInputs.homeDownPaymentMonthly, setBudgetInputs]);
 
   const chartData = useMemo(
     () =>
@@ -224,6 +241,12 @@ export default function SinkingFundPage() {
         </div>
 
         <div className="space-y-4">
+          {budgetDrivenMonthly !== null && (
+            <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
+              Down payment flex sync is active: <span className="font-semibold">{formatCurrency(budgetDrivenMonthly)}/mo</span> is now driving your Budget's
+              `Home Down Payment Fund`.
+            </div>
+          )}
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard icon={<Target className="size-4 text-blue-600" />} label="Target Amount" value={formatCurrency(inputs.targetAmount)} />
             <StatCard icon={<Wallet className="size-4 text-green-600" />} label="Current Saved" value={formatCurrency(inputs.currentSavings)} />

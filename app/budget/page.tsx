@@ -138,6 +138,8 @@ export default function BudgetPage() {
   const setBudgetInputs = useFinWiseStore((s) => s.setBudgetInputs);
   const debts = useFinWiseStore((s) => s.debts);
   const planLastUpdated = useFinWiseStore((s) => s.planLastUpdated);
+  const sinkingFundInputs = useFinWiseStore((s) => s.sinkingFundInputs);
+  const sinkingFundResults = useFinWiseStore((s) => s.sinkingFundResults);
   const plan = usePlanStore((s) => s.plan);
 
   const pr = getEffectivePaycheckResults(paycheckInputs, paycheckResults);
@@ -155,12 +157,21 @@ export default function BudgetPage() {
   const cashOutflows = flow.cashOutflows;
   const monthlySurplus = flow.monthlySurplus;
   const savingsRate = flow.savingsRate;
+  const sinkingFundDrivenHomeMonthly = useMemo(() => {
+    if (sinkingFundInputs.goalType !== 'down-payment') return null;
+    const monthly =
+      sinkingFundInputs.mode === 'target-date'
+        ? sinkingFundResults.requiredMonthlyContribution
+        : sinkingFundInputs.monthlyContribution;
+    return Math.max(0, Math.round(monthly));
+  }, [sinkingFundInputs.goalType, sinkingFundInputs.mode, sinkingFundInputs.monthlyContribution, sinkingFundResults.requiredMonthlyContribution]);
   const syncedHomeGoalMonthly = useMemo(() => {
+    if (sinkingFundDrivenHomeMonthly !== null) return sinkingFundDrivenHomeMonthly;
     const target = plan?.inputs?.homeTarget ?? 0;
     const hasHomeGoal = plan?.inputs?.goals?.includes('save-home') ?? false;
     if (!hasHomeGoal || target <= 0) return 0;
     return Math.ceil(target / Math.max(1, plan?.inputs?.homeTimelineMonths || 36));
-  }, [plan?.inputs?.goals, plan?.inputs?.homeTarget, plan?.inputs?.homeTimelineMonths]);
+  }, [sinkingFundDrivenHomeMonthly, plan?.inputs?.goals, plan?.inputs?.homeTarget, plan?.inputs?.homeTimelineMonths]);
   const syncedEmergencyGoalMonthly = useMemo(() => {
     const target = plan?.inputs?.emergencyFundTarget ?? 0;
     const hasEmergencyGoal = plan?.inputs?.goals?.includes('emergency-fund') ?? false;
@@ -371,7 +382,14 @@ export default function BudgetPage() {
                 label="Home Down Payment Fund"
                 value={bi.homeDownPaymentMonthly}
                 onChange={(v) => setBudgetInputs({ homeDownPaymentMonthly: v })}
-                badge={syncedHomeGoalMonthly > 0 ? 'Synced from Plan Goal' : undefined}
+                badge={
+                  syncedHomeGoalMonthly > 0
+                    ? sinkingFundDrivenHomeMonthly !== null
+                      ? 'Synced from Sinking Fund'
+                      : 'Synced from Plan Goal'
+                    : undefined
+                }
+                linkTo={sinkingFundDrivenHomeMonthly !== null ? '/tools/sinking-fund' : undefined}
               />
 
               {/* EXPENSES */}
