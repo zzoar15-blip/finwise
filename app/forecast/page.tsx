@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { Suspense, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { forecastScenario, findBreakeven } from '@/lib/calculations/forecast';
@@ -139,7 +139,7 @@ function ScenarioField({ label, value, prefix, suffix, onChange }: ScenarioField
   );
 }
 
-export default function ForecastPage() {
+function ForecastPageContent() {
   const searchParams = useSearchParams();
   const focus = searchParams.get('focus');
   const plan = usePlanStore((s) => s.plan);
@@ -735,6 +735,14 @@ export default function ForecastPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function ForecastPage() {
+  return (
+    <Suspense fallback={null}>
+      <ForecastPageContent />
+    </Suspense>
   );
 }
 
