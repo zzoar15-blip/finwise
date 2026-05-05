@@ -47,6 +47,7 @@ import {
   getNextBonusDescription,
   monthName,
 } from '@/lib/bonusProfile';
+import { HealthScoreAdvisor } from '@/components/plan/HealthScoreAdvisor';
 import type { StoreBudgetInputs } from '@/lib/calculations';
 import {
   addMonthsToDate,
@@ -165,71 +166,6 @@ function getHealthBarFillColor(score: number): string {
   if (score >= 60) return '#3b82f6';
   if (score >= 40) return '#d97706';
   return '#dc2626';
-}
-
-function healthOverallMessage(score: number): string {
-  if (score <= 40) return 'Your finances need attention — focus on the priorities below.';
-  if (score <= 60) return 'Building a foundation — a few changes make a big difference.';
-  if (score <= 80) return "You're on solid ground — optimize to accelerate.";
-  return 'Excellent financial health — stay the course and keep growing.';
-}
-
-function OverallHealthRing({ score }: { score: number }) {
-  const color = getHealthBarFillColor(score);
-  const r = 56;
-  const c = 2 * Math.PI * r;
-  const progress = (Math.max(0, Math.min(100, score)) / 100) * c;
-  return (
-    <div className="relative mx-auto h-[140px] w-[140px] shrink-0">
-      <svg width="140" height="140" viewBox="0 0 140 140" className="absolute inset-0">
-        <circle cx="70" cy="70" r={r} stroke="#e2e8f0" strokeWidth={10} fill="none" />
-        <circle
-          cx="70"
-          cy="70"
-          r={r}
-          stroke={color}
-          strokeWidth={10}
-          fill="none"
-          strokeDasharray={`${progress} ${c - progress}`}
-          strokeLinecap="round"
-          transform="rotate(-90 70 70)"
-        />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center pt-1">
-        <span className="text-[32px] font-bold leading-none text-[#0f172a]">{score}</span>
-        <span className="mt-1 text-sm text-[#94a3b8]">/ 100</span>
-      </div>
-    </div>
-  );
-}
-
-function HealthScoreBar({ score }: { score: number }) {
-  const w = Math.max(0, Math.min(100, score));
-  const fill = getHealthBarFillColor(score);
-  return (
-    <div className="relative" style={{ marginTop: 8, marginBottom: 4 }}>
-      <div
-        style={{
-          height: 8,
-          borderRadius: 4,
-          backgroundColor: '#e2e8f0',
-          width: '100%',
-        }}
-      />
-      <div
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          height: 8,
-          borderRadius: 4,
-          width: `${w}%`,
-          backgroundColor: fill,
-          transition: 'width 0.6s ease',
-        }}
-      />
-    </div>
-  );
 }
 
 function savingsRateColor(rate: number): string {
@@ -1224,48 +1160,8 @@ export default function PlanPage() {
             />
           </div>
 
-          <div className="mt-4 rounded-xl border border-solid border-[#e2e8f0] bg-white p-6">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#94a3b8]">
-              Health score breakdown
-            </p>
-            <p className="mt-2 text-base font-semibold text-[#0f172a]">
-              {healthOverallMessage(financialHealthScore)}
-            </p>
-            <div className="mt-6 flex justify-center border-b border-[#e2e8f0] pb-6">
-              <OverallHealthRing score={Math.round(financialHealthScore)} />
-            </div>
-            <div>
-              {(
-                [
-                  { label: 'Cashflow', score: healthScoreBreakdown.cashflow, tip: healthScoreTips.cashflow },
-                  { label: 'Debt', score: healthScoreBreakdown.debt, tip: healthScoreTips.debt },
-                  { label: 'Emergency fund', score: healthScoreBreakdown.emergency, tip: healthScoreTips.emergency },
-                  { label: 'Savings rate', score: healthScoreBreakdown.savings, tip: healthScoreTips.savings },
-                  { label: 'Tax efficiency', score: healthScoreBreakdown.tax, tip: healthScoreTips.tax },
-                ] as const
-              ).map((item, idx) => {
-                const s = Math.max(0, Math.min(100, Math.round(item.score)));
-                const barColor = getHealthBarFillColor(s);
-                return (
-                  <div
-                    key={item.label}
-                    className={`border-[#e2e8f0] py-5 ${idx > 0 ? 'border-t border-solid' : ''}`}
-                  >
-                    <div className="flex items-baseline justify-between gap-4">
-                      <span className="text-sm font-medium text-[#0f172a]">{item.label}</span>
-                      <span className="shrink-0 tabular-nums">
-                        <span className="text-sm font-bold" style={{ color: barColor }}>
-                          {s}
-                        </span>
-                        <span className="text-sm font-semibold text-[#94a3b8]">/100</span>
-                      </span>
-                    </div>
-                    <HealthScoreBar score={s} />
-                    <p className="mt-1 text-xs italic leading-relaxed text-[#64748b]">{item.tip}</p>
-                  </div>
-                );
-              })}
-            </div>
+          <div className="mt-6">
+            <HealthScoreAdvisor />
           </div>
 
           <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">

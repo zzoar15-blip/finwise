@@ -351,3 +351,5 @@ export {
   normalizeBonusAllocations,
   splitBonusAllocations,
 } from '@/lib/bonusProfile';
+
+export { simulateDebtPayoff, simulateDebtPayoffDynamic } from '@/lib/calculations/debt';
