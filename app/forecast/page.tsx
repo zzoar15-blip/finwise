@@ -27,6 +27,7 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
+  ReferenceLine,
   ResponsiveContainer,
 } from 'recharts';
 import { Plus, Trash2, TrendingUp, Home, Shield, DollarSign, Timer } from 'lucide-react';

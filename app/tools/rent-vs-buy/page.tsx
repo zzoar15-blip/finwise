@@ -49,9 +49,15 @@ function buildProfileDefaults(params: {
   homeTarget?: number;
 }) {
   const state = params.paycheckState || 'Massachusetts';
+  const defaultDownPaymentPct = 0.2;
+  const derivedPurchasePrice =
+    params.homeTarget && params.homeTarget > 0
+      ? params.homeTarget / defaultDownPaymentPct
+      : 600000;
   return {
-    purchasePrice: params.homeTarget || 600000,
-    downPaymentPct: 0.2,
+    // `homeTarget` from onboarding is a down-payment goal, not full home price.
+    purchasePrice: derivedPurchasePrice,
+    downPaymentPct: defaultDownPaymentPct,
     mortgageRate: 0.065,
     loanTermYears: 30,
     annualPropertyTaxRate: getPropertyTaxRate(state),
