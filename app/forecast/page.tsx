@@ -53,12 +53,20 @@ function yAxisFormatter(v: number): string {
   return `$${v}`;
 }
 
-function monthTickFormatter(month: number): string {
+function buildYearTicks(maxMonth: number): number[] {
+  const ticks = [1];
+  for (let month = 12; month <= maxMonth; month += 12) {
+    ticks.push(month);
+  }
+  if (!ticks.includes(maxMonth)) ticks.push(maxMonth);
+  return ticks;
+}
+
+function monthToYearTickFormatter(month: number): string {
   if (month <= 0) return '';
-  if (month === 1) return 'M1';
-  if (month % 12 === 0) return `Y${month / 12}`;
-  if (month % 6 === 0) return `M${month}`;
-  return '';
+  const nowYear = new Date().getFullYear();
+  const yearOffset = Math.max(0, Math.floor((month - 1) / 12));
+  return String(nowYear + yearOffset);
 }
 
 // Light tint backgrounds for summary table cells
@@ -263,6 +271,7 @@ function ForecastPageContent() {
     }
     return { target, timeline, baseMonthly, points, reachedMonth };
   }, [plan?.inputs.homeTarget, plan?.inputs.homeTimelineMonths, budget.homeDownPaymentMonthly, homeExtraSavings, homeApy, homeMonthlyGrowth]);
+  const homeTicks = useMemo(() => buildYearTicks(homeForecast.points.length), [homeForecast.points.length]);
 
   const emergencyForecast = useMemo(() => {
     const target = plan?.inputs.emergencyFundTarget ?? 0;
@@ -278,6 +287,7 @@ function ForecastPageContent() {
     }
     return { target, monthly, points, reachedMonth };
   }, [plan?.inputs.emergencyFundTarget, budget.emergencyFundMonthly, emergencyApy]);
+  const emergencyTicks = useMemo(() => buildYearTicks(emergencyForecast.points.length), [emergencyForecast.points.length]);
 
   const investForecast = useMemo(() => {
     const baseMonthly =
@@ -294,6 +304,7 @@ function ForecastPageContent() {
     }
     return { baseMonthly, monthly, points };
   }, [flow.paycheck.k401TraditionalAnnual, flow.paycheck.k401RothAnnual, budget.rothIraMonthly, budget.brokerageMonthly, investMonthlyExtra, investReturn]);
+  const investTicks = useMemo(() => buildYearTicks(investForecast.points.length), [investForecast.points.length]);
 
   const retireForecast = useMemo(() => {
     const monthly = Math.max(
@@ -313,6 +324,7 @@ function ForecastPageContent() {
     }
     return { monthly, points, hitMonth };
   }, [flow.paycheck.k401TraditionalAnnual, flow.paycheck.k401RothAnnual, budget.rothIraMonthly, budget.brokerageMonthly, retireTarget, retireReturn]);
+  const retireTicks = useMemo(() => buildYearTicks(retireForecast.points.length), [retireForecast.points.length]);
 
   if (focus === 'home') {
     return (
@@ -350,7 +362,7 @@ function ForecastPageContent() {
             <ResponsiveContainer width="100%" height={340}>
               <LineChart data={homeForecast.points} margin={CHART_MARGIN}>
                 <CartesianGrid strokeDasharray={CHART_GRID} className="stroke-border/80" />
-                <XAxis dataKey="month" tickFormatter={monthTickFormatter} interval={5} tick={{ fontSize: 12 }} label={{ value: 'Timeline', position: 'insideBottom', offset: -2, fontSize: 12 }} />
+                <XAxis dataKey="month" ticks={homeTicks} tickFormatter={monthToYearTickFormatter} tick={{ fontSize: 12 }} label={{ value: 'Year', position: 'insideBottom', offset: -2, fontSize: 12 }} />
                 <YAxis tickFormatter={yAxisFormatter} width={84} label={{ value: 'Balance', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle' }, fontSize: 12 }} />
                 <Tooltip content={<ForecastTooltip labelPrefix="Month" />} />
                 <ReferenceLine y={homeForecast.target} stroke="#ef4444" strokeDasharray="4 4" />
@@ -394,7 +406,7 @@ function ForecastPageContent() {
             <ResponsiveContainer width="100%" height={340}>
               <LineChart data={emergencyForecast.points} margin={CHART_MARGIN}>
                 <CartesianGrid strokeDasharray={CHART_GRID} className="stroke-border/80" />
-                <XAxis dataKey="month" tickFormatter={monthTickFormatter} interval={5} tick={{ fontSize: 12 }} label={{ value: 'Timeline', position: 'insideBottom', offset: -2, fontSize: 12 }} />
+                <XAxis dataKey="month" ticks={emergencyTicks} tickFormatter={monthToYearTickFormatter} tick={{ fontSize: 12 }} label={{ value: 'Year', position: 'insideBottom', offset: -2, fontSize: 12 }} />
                 <YAxis tickFormatter={yAxisFormatter} width={84} label={{ value: 'Balance', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle' }, fontSize: 12 }} />
                 <Tooltip content={<ForecastTooltip labelPrefix="Month" />} />
                 <ReferenceLine y={emergencyForecast.target} stroke="#ef4444" strokeDasharray="4 4" />
@@ -438,7 +450,7 @@ function ForecastPageContent() {
             <ResponsiveContainer width="100%" height={340}>
               <LineChart data={investForecast.points} margin={CHART_MARGIN}>
                 <CartesianGrid strokeDasharray={CHART_GRID} className="stroke-border/80" />
-                <XAxis dataKey="month" tickFormatter={monthTickFormatter} interval={5} tick={{ fontSize: 12 }} label={{ value: 'Timeline', position: 'insideBottom', offset: -2, fontSize: 12 }} />
+                <XAxis dataKey="month" ticks={investTicks} tickFormatter={monthToYearTickFormatter} tick={{ fontSize: 12 }} label={{ value: 'Year', position: 'insideBottom', offset: -2, fontSize: 12 }} />
                 <YAxis tickFormatter={yAxisFormatter} width={84} label={{ value: 'Portfolio Value', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle' }, fontSize: 12 }} />
                 <Tooltip content={<ForecastTooltip labelPrefix="Month" />} />
                 <Line type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={2.75} dot={false} activeDot={{ r: 4 }} strokeLinecap="round" />
@@ -481,7 +493,7 @@ function ForecastPageContent() {
             <ResponsiveContainer width="100%" height={340}>
               <LineChart data={retireForecast.points} margin={CHART_MARGIN}>
                 <CartesianGrid strokeDasharray={CHART_GRID} className="stroke-border/80" />
-                <XAxis dataKey="month" tickFormatter={monthTickFormatter} interval={11} tick={{ fontSize: 12 }} label={{ value: 'Timeline', position: 'insideBottom', offset: -2, fontSize: 12 }} />
+                <XAxis dataKey="month" ticks={retireTicks} tickFormatter={monthToYearTickFormatter} tick={{ fontSize: 12 }} label={{ value: 'Year', position: 'insideBottom', offset: -2, fontSize: 12 }} />
                 <YAxis tickFormatter={yAxisFormatter} width={84} label={{ value: 'Portfolio Value', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle' }, fontSize: 12 }} />
                 <Tooltip content={<ForecastTooltip labelPrefix="Month" />} />
                 <ReferenceLine y={retireTarget} stroke="#ef4444" strokeDasharray="4 4" />
