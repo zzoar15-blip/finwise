@@ -2,10 +2,16 @@ import Anthropic from '@anthropic-ai/sdk';
 import { NextRequest, NextResponse } from 'next/server';
 import type { PlanInputs } from '@/types/plan';
 import type { PlanMetrics } from '@/lib/planCalculations';
+import type { BonusProfile } from '@/lib/bonusProfile';
+import { getBonusAllocationAmounts, monthName } from '@/lib/bonusProfile';
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-function buildContext(inputs: PlanInputs, metrics: PlanMetrics): string {
+function buildContext(
+  inputs: PlanInputs,
+  metrics: PlanMetrics,
+  bonusProfile?: BonusProfile | null,
+): string {
   const fmt = (n: number) => `$${Math.round(n).toLocaleString()}`;
 
   const lines = [
@@ -71,6 +77,25 @@ function buildContext(inputs: PlanInputs, metrics: PlanMetrics): string {
     );
   }
 
+  if (bonusProfile && bonusProfile.frequency !== 'none' && bonusProfile.annualBonusAmount > 0) {
+    const allocs = getBonusAllocationAmounts(bonusProfile);
+    const nextYear =
+      new Date().getMonth() + 1 > bonusProfile.bonusMonth
+        ? new Date().getFullYear() + 1
+        : new Date().getFullYear();
+    lines.push(`BONUS:
+Annual bonus (post-tax): ${fmt(bonusProfile.annualBonusAmount)}
+Paid in: ${monthName(bonusProfile.bonusMonth)}
+Allocation:
+  Debt payoff: ${bonusProfile.allocations.debtPayoff}% = ${fmt(allocs.debtPayoff)}
+  Emergency fund: ${bonusProfile.allocations.emergencyFund}% = ${fmt(allocs.emergencyFund)}
+  Home down payment: ${bonusProfile.allocations.homeDownPayment}% = ${fmt(allocs.homeDownPayment)}
+  Brokerage: ${bonusProfile.allocations.brokerage}% = ${fmt(allocs.brokerage)}
+  Roth IRA: ${bonusProfile.allocations.rothIra}% = ${fmt(allocs.rothIra)}
+  Cash/spending: ${bonusProfile.allocations.cash}% = ${fmt(allocs.cash)}
+Next bonus: ${monthName(bonusProfile.bonusMonth)} ${nextYear}`);
+  }
+
   return lines.join('\n');
 }
 
@@ -79,13 +104,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'ANTHROPIC_API_KEY not configured' }, { status: 503 });
   }
 
-  const { inputs, metrics } = await req.json() as { inputs: PlanInputs; metrics: PlanMetrics };
+  const { inputs, metrics, bonusProfile } = await req.json() as {
+    inputs: PlanInputs;
+    metrics: PlanMetrics;
+    bonusProfile?: BonusProfile | null;
+  };
 
   if (!inputs || !metrics) {
     return NextResponse.json({ error: 'Missing inputs or metrics' }, { status: 400 });
   }
 
-  const context = buildContext(inputs, metrics);
+  const context = buildContext(inputs, metrics, bonusProfile);
 
   const message = await client.messages.create({
     model: 'claude-sonnet-4-6',

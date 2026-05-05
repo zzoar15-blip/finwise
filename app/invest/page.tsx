@@ -11,6 +11,13 @@ import { SimpleRowsPDF } from '@/lib/pdf/SimpleRowsPDF';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { formatCurrency } from '@/lib/format';
 import { useFinWiseStore } from '@/lib/store';
+import {
+  getAnnualCategoryBonusTotal,
+  getBonusAmountForMonth,
+  getBonusMonths,
+  getTotalAnnualBonusPostTax,
+  splitBonusAllocations,
+} from '@/lib/bonusProfile';
 import { computeUnifiedMonthlyFlow } from '@/lib/calculations';
 import { SyncMeta } from '@/components/SyncMeta';
 import {
@@ -56,6 +63,7 @@ function SliderRow({
   step,
   onChange,
   note,
+  disabled,
 }: {
   label: string;
   value: number;
@@ -65,6 +73,7 @@ function SliderRow({
   step: number;
   onChange: (v: number) => void;
   note?: string;
+  disabled?: boolean;
 }) {
   return (
     <div className="space-y-1.5">
@@ -74,11 +83,12 @@ function SliderRow({
       </div>
       <input
         type="range"
-        className="w-full accent-[#3b82f6]"
+        className="w-full accent-[#3b82f6] disabled:opacity-40"
         min={min}
         max={max}
         step={step}
         value={value}
+        disabled={disabled}
         onChange={(e) => onChange(Number(e.target.value))}
       />
       {note && (
@@ -118,6 +128,27 @@ export default function InvestPage() {
   const budgetInputs = useFinWiseStore((s) => s.budgetInputs);
   const debts = useFinWiseStore((s) => s.debts);
   const planLastUpdated = useFinWiseStore((s) => s.planLastUpdated);
+  const bonusProfile = useFinWiseStore((s) => s.bonusProfile);
+
+  const bonusCalendarDeposits = useMemo(() => {
+    if (bonusProfile.frequency === 'none') return undefined;
+    const map: Partial<Record<number, number>> = {};
+    for (const m of getBonusMonths(bonusProfile)) {
+      const lump = getBonusAmountForMonth(m, bonusProfile);
+      const br = splitBonusAllocations(lump, bonusProfile.allocations).brokerage;
+      if (br > 0) map[m] = (map[m] ?? 0) + br;
+    }
+    return Object.keys(map).length ? map : undefined;
+  }, [bonusProfile]);
+
+  const brokerageBonusAnnual = useMemo(
+    () => getAnnualCategoryBonusTotal(bonusProfile, 'brokerage'),
+    [bonusProfile],
+  );
+  const rothBonusAnnual = useMemo(
+    () => getAnnualCategoryBonusTotal(bonusProfile, 'rothIra'),
+    [bonusProfile],
+  );
 
   const flow = useMemo(
     () => computeUnifiedMonthlyFlow(paycheckInputs, paycheckResults, budgetInputs, debts),
@@ -266,7 +297,8 @@ export default function InvestPage() {
   const inputs: InvestInputs = useMemo(
     () => ({
       monthlyBuy,
-      annualBonus,
+      annualBonus: bonusCalendarDeposits ? 0 : annualBonus,
+      bonusCalendarDeposits,
       dividendYield,
       taxRate: holdInRoth ? 0 : taxRate,
       qualifiedPercent,
@@ -274,7 +306,18 @@ export default function InvestPage() {
       years,
       annualAppreciation,
     }),
-    [monthlyBuy, annualBonus, dividendYield, taxRate, qualifiedPercent, payFrequency, years, annualAppreciation, holdInRoth]
+    [
+      monthlyBuy,
+      annualBonus,
+      bonusCalendarDeposits,
+      dividendYield,
+      taxRate,
+      qualifiedPercent,
+      payFrequency,
+      years,
+      annualAppreciation,
+      holdInRoth,
+    ]
   );
 
   const result: InvestResult = useMemo(() => simulateInvestment(inputs), [inputs]);
@@ -283,7 +326,9 @@ export default function InvestPage() {
     [inputs]
   );
 
-  const totalInvested = monthlyBuy * years * 12 + annualBonus * years;
+  const totalInvested =
+    monthlyBuy * years * 12 +
+    (bonusCalendarDeposits ? brokerageBonusAnnual * years : annualBonus * years);
   const yearlyTicks = useMemo(() => getYearlyTicks(result.monthly), [result.monthly]);
 
   const incomeData = useMemo(
@@ -341,6 +386,23 @@ export default function InvestPage() {
       />
       <div className="px-8">
         <SyncMeta updatedAt={planLastUpdated} badges={['Unified Flow']} />
+        {brokerageBonusAnnual > 0 && bonusCalendarDeposits && (
+          <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50/90 px-3 py-2 text-sm text-emerald-950">
+            <span className="font-semibold">✓ Bonus allocation:</span>{' '}
+            {formatCurrency(brokerageBonusAnnual)}/yr to brokerage (
+            {formatCurrency(getTotalAnnualBonusPostTax(bonusProfile))} total bonus ×{' '}
+            {bonusProfile.allocations.brokerage}% brokerage).{' '}
+            <Link href="/settings/bonus" className="font-medium text-emerald-800 underline underline-offset-2">
+              Adjust →
+            </Link>
+          </div>
+        )}
+        {rothBonusAnnual > 0 && (
+          <p className="mt-2 text-xs text-cyan-900">
+            Your {formatCurrency(rothBonusAnnual)} annual Roth IRA bonus allocation is invested tax-advantaged — not
+            included in taxable DRIP above.
+          </p>
+        )}
         <Link href="/tools/rent-vs-buy" className="mt-1 inline-block text-sm text-blue-600 hover:underline">
           Compare against rent-vs-buy opportunity cost
         </Link>
@@ -418,14 +480,31 @@ export default function InvestPage() {
               </p>
             </div>
             <SliderRow
-              label="Annual Bonus (February)"
+              label={
+                bonusCalendarDeposits
+                  ? 'Annual bonus to brokerage (from Settings — slider disabled)'
+                  : 'Annual Bonus (February)'
+              }
               value={annualBonus}
-              display={formatCurrency(annualBonus)}
+              display={
+                bonusCalendarDeposits ? formatCurrency(brokerageBonusAnnual) : formatCurrency(annualBonus)
+              }
               min={0}
               max={50000}
               step={500}
               onChange={setAnnualBonus}
+              disabled={!!bonusCalendarDeposits}
+              note={
+                bonusCalendarDeposits
+                  ? 'Timing follows your bonus months; amounts come from Bonus Allocation.'
+                  : undefined
+              }
             />
+            {bonusCalendarDeposits && (
+              <p className="text-xs text-muted-foreground">
+                Turn off bonus in Settings or set frequency to &quot;none&quot; to use the manual February lump instead.
+              </p>
+            )}
             <SliderRow
               label="Dividend Yield %"
               value={dividendYield}

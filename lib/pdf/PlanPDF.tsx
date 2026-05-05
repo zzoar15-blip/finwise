@@ -23,6 +23,11 @@ export type PlanPdfData = {
   taxEfficiencyScore: number;
   taxRows: Array<{ benefit: string; yourContribution: number; max: number; gap: number; savings: number }>;
   insights?: string[];
+  bonusPlan?: {
+    headline: string;
+    totalPostTax: string;
+    rows: Array<{ category: string; pct: string; amount: string }>;
+  } | null;
 };
 
 export function PlanPDF({ data }: { data: PlanPdfData }) {
@@ -73,6 +78,20 @@ export function PlanPDF({ data }: { data: PlanPdfData }) {
             </View>
           </View>
         ))}
+        {data.bonusPlan ? (
+          <>
+            <SectionHeader title="Annual Bonus Plan" />
+            <MetricsRow metrics={[
+              { label: data.bonusPlan.headline, value: data.bonusPlan.totalPostTax, color: 'amber' },
+            ]} />
+            <DataTable
+              headers={[{ label: 'Category' }, { label: 'Allocation', align: 'right' }, { label: 'Amount', align: 'right' }]}
+              rows={data.bonusPlan.rows.map((r) => ({
+                cells: [r.category, r.pct, r.amount],
+              }))}
+            />
+          </>
+        ) : null}
       </PageWrapper>
 
       <PageWrapper title="Debt Payoff Plan" generatedAt={generatedAt} pageNumber={4}>

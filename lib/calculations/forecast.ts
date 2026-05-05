@@ -9,10 +9,23 @@ export interface Scenario {
   startingNetWorth: number;
 }
 
+export interface ForecastBonusOptions {
+  /** Total post-tax bonus per year (before growth). */
+  annualBonusPostTax: number;
+  /** Percent of bonus (0–100) allocated to brokerage + Roth–style wealth building. */
+  bonusInvestPercent: number;
+  /** When true, bonus dollars grow each year at the same rate as `Scenario.annualRaise`. */
+  bonusGrowsWithSalary: boolean;
+}
+
 export interface YearPoint {
   year: number;
   salary: number;
+  /** Post-tax bonus income recognized this year (for display). */
+  bonusIncome: number;
   annualSavings: number;
+  salarySavings: number;
+  bonusSavings: number;
   investmentGrowth: number;
   netWorth: number;
 }
@@ -35,17 +48,38 @@ export interface ConfidenceBandPoint {
   p90: number;
 }
 
-export function forecastScenario(scenario: Scenario, years = 10): YearPoint[] {
+export function forecastScenario(
+  scenario: Scenario,
+  years = 10,
+  bonus?: ForecastBonusOptions | null,
+): YearPoint[] {
   const points: YearPoint[] = [];
   let netWorth = scenario.startingNetWorth;
   let salary = scenario.startingSalary;
+  let bonusIncome = Math.max(0, bonus?.annualBonusPostTax ?? 0);
+  const investPct = Math.min(100, Math.max(0, bonus?.bonusInvestPercent ?? 0));
+  const growBonus = bonus?.bonusGrowsWithSalary ?? false;
 
   for (let y = 1; y <= years; y++) {
     const investmentGrowth = netWorth * (scenario.investmentReturn / 100);
-    const annualSavings = salary * (scenario.savingsRate / 100);
+    const salarySavings = salary * (scenario.savingsRate / 100);
+    const bonusSavings = bonusIncome * (investPct / 100);
+    const annualSavings = salarySavings + bonusSavings;
     netWorth = netWorth + investmentGrowth + annualSavings;
-    points.push({ year: y, salary, annualSavings, investmentGrowth, netWorth });
+    points.push({
+      year: y,
+      salary,
+      bonusIncome,
+      annualSavings,
+      salarySavings,
+      bonusSavings,
+      investmentGrowth,
+      netWorth,
+    });
     salary *= 1 + scenario.annualRaise / 100;
+    if (growBonus) {
+      bonusIncome *= 1 + scenario.annualRaise / 100;
+    }
   }
   return points;
 }
@@ -62,6 +96,7 @@ export function findBreakeven(a: YearPoint[], b: YearPoint[]): number | null {
 export function buildConfidenceBands(
   scenario: Scenario,
   years = 10,
+  bonus?: ForecastBonusOptions | null,
 ): ConfidenceBandPoint[] {
   const pessimistic = forecastScenario(
     {
@@ -71,8 +106,9 @@ export function buildConfidenceBands(
       investmentReturn: Math.max(1, scenario.investmentReturn - 3),
     },
     years,
+    bonus,
   );
-  const baseline = forecastScenario(scenario, years);
+  const baseline = forecastScenario(scenario, years, bonus);
   const optimistic = forecastScenario(
     {
       ...scenario,
@@ -81,6 +117,7 @@ export function buildConfidenceBands(
       investmentReturn: scenario.investmentReturn + 3,
     },
     years,
+    bonus,
   );
 
   return baseline.map((point, idx) => ({

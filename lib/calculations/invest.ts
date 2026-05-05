@@ -2,7 +2,12 @@ import { yearMonth } from '@/lib/calculations/shared';
 
 export interface InvestInputs {
   monthlyBuy: number;
-  annualBonus: number; // hits in February
+  annualBonus: number; /** Legacy: single deposit in February when bonusCalendarDeposits unset */
+  /**
+   * Optional map of calendar month (1–12) → brokerage deposit from bonus allocation.
+   * When set, overrides February-only annualBonus timing.
+   */
+  bonusCalendarDeposits?: Partial<Record<number, number>>;
   dividendYield: number; // annual %
   taxRate: number; // marginal ordinary income tax rate %
   qualifiedPercent: number; // % of dividends that are qualified
@@ -79,13 +84,16 @@ export function simulateInvestment(inp: InvestInputs): InvestResult {
     const dateObj = new Date(startYear, startMonth + m + 1, 1);
     const calMonth = dateObj.getMonth() + 1; // 1-12
     const year = dateObj.getFullYear() - startYear + 1;
-    const isFebruary = calMonth === 2;
     const isYearEnd = calMonth === 12;
+
+    const calendarBonus =
+      inp.bonusCalendarDeposits?.[calMonth] ??
+      (!inp.bonusCalendarDeposits && calMonth === 2 ? inp.annualBonus : 0);
 
     // Purchases
     portfolioValue += inp.monthlyBuy;
-    if (isFebruary && inp.annualBonus > 0) {
-      portfolioValue += inp.annualBonus;
+    if (calendarBonus > 0) {
+      portfolioValue += calendarBonus;
     }
 
     // Price appreciation
@@ -106,7 +114,7 @@ export function simulateInvestment(inp: InvestInputs): InvestResult {
       portfolioValue,
       grossMonthlyIncome: grossIncome,
       afterTaxMonthlyIncome: afterTaxIncome,
-      isBonus: isFebruary,
+      isBonus: calendarBonus > 0,
       isYearEnd,
       year,
     });
@@ -123,7 +131,17 @@ export function simulateInvestment(inp: InvestInputs): InvestResult {
       grossAnnualIncome: yearMonths.reduce((s, m) => s + m.grossMonthlyIncome, 0),
       afterTaxAnnualIncome: yearMonths.reduce((s, m) => s + m.afterTaxMonthlyIncome, 0),
       totalInvested:
-        y * inp.monthlyBuy * 12 + (inp.annualBonus > 0 ? y * inp.annualBonus : 0),
+        y * inp.monthlyBuy * 12 +
+        (() => {
+          if (inp.bonusCalendarDeposits) {
+            const annualBonusSum = Object.values(inp.bonusCalendarDeposits).reduce<number>(
+              (acc, v) => acc + (v ?? 0),
+              0,
+            );
+            return y * annualBonusSum;
+          }
+          return inp.annualBonus > 0 ? y * inp.annualBonus : 0;
+        })(),
     });
   }
 
@@ -132,7 +150,7 @@ export function simulateInvestment(inp: InvestInputs): InvestResult {
     .filter(m => m.isBonus || m.isYearEnd)
     .map(m => ({
       date: m.date,
-      label: m.isBonus ? `Feb ${m.date.slice(0, 4)} (Bonus)` : `Dec ${m.date.slice(0, 4)}`,
+      label: m.isBonus ? `Bonus ${m.date}` : `Dec ${m.date.slice(0, 4)}`,
       portfolioValue: m.portfolioValue,
       grossMonthlyIncome: m.grossMonthlyIncome,
       afterTaxMonthlyIncome: m.afterTaxMonthlyIncome,

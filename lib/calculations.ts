@@ -19,6 +19,10 @@ export interface StorePaycheckInputs {
   otherPostTaxAnnual: number;
   additionalWithholding: number;
   nycResident: boolean;
+  /** Gross annual bonus (before withholding). Used to estimate net bonus for Bonus Profile. */
+  annualBonusGross: number;
+  /** Typical supplemental withholding on bonus (federal + state blended estimate). */
+  bonusSupplementalWithholdingPct: number;
 }
 
 export interface StorePaycheckResults {
@@ -96,6 +100,8 @@ export const DEFAULT_PAYCHECK_INPUTS: StorePaycheckInputs = {
   k401TraditionalPct: 0, k401RothPct: 0, hsaAnnual: 0, fsaAnnual: 0,
   healthInsuranceAnnual: 0, dentalAnnual: 0, visionAnnual: 0, commuterAnnual: 0,
   otherPreTaxAnnual: 0, otherPostTaxAnnual: 0, additionalWithholding: 0, nycResident: false,
+  annualBonusGross: 0,
+  bonusSupplementalWithholdingPct: 22,
 };
 
 export const DEFAULT_PAYCHECK_RESULTS: StorePaycheckResults = {
@@ -329,3 +335,19 @@ export function buildFinancialContext(
   if (goals.length > 0) lines.push(`Goals: ${goals.join(', ')}`);
   return lines.join('\n') || 'No financial data entered yet.';
 }
+
+export type {
+  BonusAllocations,
+  BonusAllocationAmounts,
+  BonusProfile,
+} from '@/lib/bonusProfile';
+export {
+  DEFAULT_BONUS_PROFILE,
+  getBonusAllocationAmounts,
+  getBonusAmountForMonth,
+  getBonusMonths,
+  getTotalAnnualBonusPostTax,
+  isBonusMonth,
+  normalizeBonusAllocations,
+  splitBonusAllocations,
+} from '@/lib/bonusProfile';

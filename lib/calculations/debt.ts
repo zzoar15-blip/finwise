@@ -34,8 +34,7 @@ export interface SensitivityRow {
 function runSimulation(
   debts: Debt[],
   monthlyBudget: number, // total payment budget including minimums
-  bonusAmount: number,
-  bonusCalMonth: number, // 1-12
+  bonusDebtForCalendarMonth: (calendarMonth: number) => number,
   strategy: 'avalanche' | 'snowball',
   startCalMonth: number // 1-12, the month simulation begins
 ): { snapshots: MonthSnapshot[]; totalInterest: number } {
@@ -48,6 +47,7 @@ function runSimulation(
     if (!current.some(d => d.balance > EPSILON)) break;
 
     const calMonth = ((startCalMonth - 1 + m) % 12) + 1;
+    const bonusExtra = Math.max(0, bonusDebtForCalendarMonth(calMonth));
 
     // Accrue interest
     let interestThisMonth = 0;
@@ -60,8 +60,8 @@ function runSimulation(
     }
     cumulativeInterest += interestThisMonth;
 
-    // Total available this month
-    let available = monthlyBudget + (calMonth === bonusCalMonth ? bonusAmount : 0);
+    // Total available this month (minimums + extra + bonus principal toward debt)
+    let available = monthlyBudget + bonusExtra;
 
     // Pay minimums first
     for (const d of current) {
@@ -105,12 +105,12 @@ function runSimulation(
   return { snapshots, totalInterest: cumulativeInterest };
 }
 
-export function simulateDebtPayoff(
+/** Bonus lump toward debt by calendar month (1–12). */
+export function simulateDebtPayoffDynamic(
   debts: Debt[],
   monthlyOverpayment: number,
-  annualBonus: number,
-  bonusMonth: number,
-  strategy: 'avalanche' | 'snowball'
+  bonusDebtForCalendarMonth: (calendarMonth: number) => number,
+  strategy: 'avalanche' | 'snowball',
 ): DebtResult {
   if (!debts.length || !debts.some(d => d.balance > 0)) {
     return { snapshots: [], monthsToPayoff: 0, totalInterestPaid: 0, interestSavedVsMinimum: 0, debtFreeDate: '' };
@@ -121,12 +121,12 @@ export function simulateDebtPayoff(
   const startMonth = new Date().getMonth() + 1;
 
   const { snapshots, totalInterest } = runSimulation(
-    debts, budget, annualBonus, bonusMonth, strategy, startMonth
+    debts, budget, bonusDebtForCalendarMonth, strategy, startMonth,
   );
 
   // Minimum-only simulation for comparison
   const { totalInterest: minOnlyInterest } = runSimulation(
-    debts, minBudget, 0, 0, strategy, startMonth
+    debts, minBudget, () => 0, strategy, startMonth,
   );
 
   const lastPayoffMonth = snapshots.findIndex(s => s.totalBalance < EPSILON);
@@ -142,6 +142,21 @@ export function simulateDebtPayoff(
   };
 }
 
+export function simulateDebtPayoff(
+  debts: Debt[],
+  monthlyOverpayment: number,
+  annualBonus: number,
+  bonusMonth: number,
+  strategy: 'avalanche' | 'snowball',
+): DebtResult {
+  return simulateDebtPayoffDynamic(
+    debts,
+    monthlyOverpayment,
+    (m) => (m === bonusMonth ? annualBonus : 0),
+    strategy,
+  );
+}
+
 export function buildSensitivityTable(
   debts: Debt[],
   baseOverpayment: number,
@@ -154,7 +169,7 @@ export function buildSensitivityTable(
 
   // Minimum-only for baseline
   const { totalInterest: minInterest } = runSimulation(
-    debts, minBudget, 0, 0, strategy, startMonth
+    debts, minBudget, () => 0, strategy, startMonth,
   );
 
   const increments = [0, 100, 200, 300, 400, 500];
@@ -162,7 +177,11 @@ export function buildSensitivityTable(
     const overpayment = baseOverpayment + extra;
     const budget = minBudget + overpayment;
     const { snapshots, totalInterest } = runSimulation(
-      debts, budget, annualBonus, bonusMonth, strategy, startMonth
+      debts,
+      budget,
+      (m) => (m === bonusMonth ? annualBonus : 0),
+      strategy,
+      startMonth,
     );
     const lastPayoff = snapshots.findIndex(s => s.totalBalance < EPSILON);
     const months = lastPayoff >= 0 ? lastPayoff + 1 : snapshots.length;

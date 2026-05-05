@@ -19,6 +19,8 @@ import { calculatePaycheck, PAY_PERIODS } from '@/lib/calculations/paycheck';
 import { formatCurrency } from '@/lib/format';
 
 import type { PlanInputs, PlanDebt, PlanExpenses, Goal, DebtPresetType } from '@/types/plan';
+import type { BonusProfile } from '@/lib/bonusProfile';
+import { DEFAULT_BONUS_PROFILE, normalizeBonusAllocations } from '@/lib/bonusProfile';
 
 // ---------------------------------------------------------------------------
 // Types & constants
@@ -26,10 +28,10 @@ import type { PlanInputs, PlanDebt, PlanExpenses, Goal, DebtPresetType } from '@
 
 interface OnboardingWizardProps {
   initialValues?: Partial<PlanInputs>;
-  onComplete: (inputs: PlanInputs) => void;
+  onComplete: (inputs: PlanInputs, bonusProfilePatch?: Partial<BonusProfile>) => void;
 }
 
-const STEP_LABELS = ['Income', 'Benefits', 'Expenses', 'Debts', 'Goals'] as const;
+const STEP_LABELS = ['Income', 'Benefits', 'Bonus', 'Expenses', 'Debts', 'Goals'] as const;
 const TOTAL_STEPS = STEP_LABELS.length;
 
 const DEFAULT_INPUTS: PlanInputs = {
@@ -106,6 +108,44 @@ const DEBT_PRESETS: Record<
     minPaymentFn: (bal) => Math.max(500, bal * 0.005),
   },
 };
+
+type BonusWizardState = {
+  receivesBonus: boolean | null;
+  amount: number;
+  month: number;
+  debtPct: number;
+  investPct: number;
+  homePct: number;
+  otherPct: number;
+};
+
+function normalizeFourWay(
+  d: Pick<BonusWizardState, 'debtPct' | 'investPct' | 'homePct' | 'otherPct'>,
+): Pick<BonusWizardState, 'debtPct' | 'investPct' | 'homePct' | 'otherPct'> {
+  const raw = [
+    Math.max(0, d.debtPct),
+    Math.max(0, d.investPct),
+    Math.max(0, d.homePct),
+    Math.max(0, d.otherPct),
+  ];
+  const sum = raw.reduce((a, b) => a + b, 0);
+  if (sum <= 0) return { debtPct: 25, investPct: 25, homePct: 25, otherPct: 25 };
+  const scaled = raw.map((v) => Math.floor((v / sum) * 100));
+  let drift = 100 - scaled.reduce((a, b) => a + b, 0);
+  let i = 0;
+  while (drift !== 0 && i < 100) {
+    const idx = i % 4;
+    if (drift > 0) {
+      scaled[idx] += 1;
+      drift -= 1;
+    } else if (scaled[idx] > 0) {
+      scaled[idx] -= 1;
+      drift += 1;
+    }
+    i += 1;
+  }
+  return { debtPct: scaled[0], investPct: scaled[1], homePct: scaled[2], otherPct: scaled[3] };
+}
 
 const GOAL_CARDS: {
   id: Goal;
@@ -433,22 +473,6 @@ function StepIncome({
           </Select>
         </Field>
 
-        {/* Annual bonus */}
-        <Field label="Annual bonus (post-tax, $)" hint="Optional — enter 0 if none">
-          <div className="relative">
-            <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-gray-500">
-              $
-            </span>
-            <Input
-              type="number"
-              min={0}
-              step={500}
-              className="pl-6"
-              value={inputs.annualBonus || ''}
-              onChange={(e) => onChange({ annualBonus: numericValue(e.target.value) })}
-            />
-          </div>
-        </Field>
       </div>
 
       {/* NYC resident — only visible when NY is selected */}
@@ -702,7 +726,168 @@ function StepBenefits({
 }
 
 // ---------------------------------------------------------------------------
-// Step 3 — Monthly Expenses
+// Step 3 — Annual bonus (quick allocation)
+// ---------------------------------------------------------------------------
+
+function StepBonus({
+  bonus,
+  onBonusChange,
+}: {
+  bonus: BonusWizardState;
+  onBonusChange: (patch: Partial<BonusWizardState>) => void;
+}) {
+  const pctSum = bonus.debtPct + bonus.investPct + bonus.homePct + bonus.otherPct;
+  const lump = Math.max(0, bonus.amount);
+  const previewDebt = Math.round((lump * bonus.debtPct) / 100);
+  const previewInvest = Math.round((lump * bonus.investPct) / 100);
+  const previewHome = Math.round((lump * bonus.homePct) / 100);
+
+  const monthItems = useMemo(
+    () =>
+      Array.from({ length: 12 }, (_, i) => ({
+        value: String(i + 1),
+        label: new Date(2000, i, 1).toLocaleDateString('en-US', { month: 'long' }),
+      })),
+    [],
+  );
+
+  return (
+    <div className="flex flex-col gap-5">
+      <div>
+        <h2 className="text-xl font-semibold text-gray-900">Your annual bonus</h2>
+        <p className="mt-1 text-sm text-gray-500">
+          Do you receive an annual bonus or lump sum payment?
+        </p>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => onBonusChange({ receivesBonus: true })}
+          className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+            bonus.receivesBonus === true
+              ? 'bg-[#3b82f6] text-white shadow-sm'
+              : 'border border-gray-200 bg-white text-gray-700 hover:border-[#3b82f6]'
+          }`}
+        >
+          Yes, I receive a bonus
+        </button>
+        <button
+          type="button"
+          onClick={() => onBonusChange({ receivesBonus: false })}
+          className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+            bonus.receivesBonus === false
+              ? 'bg-gray-800 text-white shadow-sm'
+              : 'border border-gray-200 bg-white text-gray-700 hover:border-gray-400'
+          }`}
+        >
+          No bonus / skip
+        </button>
+      </div>
+
+      {bonus.receivesBonus === true && (
+        <>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field label="Annual bonus (post-tax, $)" hint="What lands in your bank after taxes">
+              <div className="relative">
+                <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-gray-500">
+                  $
+                </span>
+                <Input
+                  type="number"
+                  min={0}
+                  step={500}
+                  className="pl-6"
+                  value={bonus.amount || ''}
+                  onChange={(e) => onBonusChange({ amount: numericValue(e.target.value) })}
+                />
+              </div>
+            </Field>
+            <Field label="Typically paid in">
+              <Select
+                value={String(bonus.month)}
+                onValueChange={(v) => v && onBonusChange({ month: Number(v) })}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {monthItems.map((m) => (
+                    <SelectItem key={m.value} value={m.value}>
+                      {m.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
+
+          <div>
+            <p className="mb-2 text-sm font-medium text-gray-800">Quick allocation — how do you want to use it?</p>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {[
+                { key: 'debtPct' as const, icon: '💳', label: 'Pay off debt' },
+                { key: 'investPct' as const, icon: '📈', label: 'Invest' },
+                { key: 'homePct' as const, icon: '🏠', label: 'Save for home' },
+                { key: 'otherPct' as const, icon: '💰', label: 'Other / spending' },
+              ].map((row) => (
+                <div
+                  key={row.key}
+                  className="flex items-center gap-3 rounded-xl border border-gray-100 bg-gray-50 p-3"
+                >
+                  <span className="text-xl">{row.icon}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium text-gray-600">{row.label}</p>
+                    <div className="relative mt-1">
+                      <Input
+                        type="number"
+                        min={0}
+                        max={100}
+                        step={1}
+                        className="bg-white pr-8"
+                        value={bonus[row.key] || ''}
+                        onChange={(e) =>
+                          onBonusChange({ [row.key]: Math.min(100, Math.max(0, numericValue(e.target.value))) })
+                        }
+                      />
+                      <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+                        %
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className={`mt-2 text-sm font-medium ${pctSum === 100 ? 'text-green-600' : 'text-amber-600'}`}>
+              Running total: {pctSum}% of {formatCurrency(lump)} ={' '}
+              {formatCurrency(Math.round((lump * Math.min(pctSum, 100)) / 100))} allocated
+              {pctSum !== 100 ? ' — target 100%' : ''}
+            </p>
+            <p className="mt-1 text-xs text-gray-500">You can refine this anytime in Settings → Bonus Allocation.</p>
+          </div>
+
+          <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm text-gray-800">
+            <p className="font-semibold text-[#1e40af]">Live preview</p>
+            <p className="mt-1">
+              Your bonus will eliminate about {formatCurrency(previewDebt)} of debt each{' '}
+              {monthItems.find((x) => x.value === String(bonus.month))?.label ?? 'bonus month'}, invest{' '}
+              {formatCurrency(previewInvest)}, and save {formatCurrency(previewHome)} toward your home.
+            </p>
+          </div>
+        </>
+      )}
+
+      {bonus.receivesBonus === false && (
+        <p className="text-sm text-gray-600">
+          No problem — you can add a bonus later from the Paycheck Calculator or Settings.
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Step 4 — Monthly Expenses
 // ---------------------------------------------------------------------------
 
 function StepExpenses({
@@ -1270,6 +1455,33 @@ const SLIDE_VARIANTS = {
   exit: (dir: number) => ({ x: dir > 0 ? -80 : 80, opacity: 0 }),
 };
 
+function bonusPatchFromWizard(b: BonusWizardState): Partial<BonusProfile> | undefined {
+  if (b.receivesBonus === null) return undefined;
+  if (b.receivesBonus === false) {
+    return {
+      annualBonusAmount: 0,
+      frequency: 'none',
+      allocations: DEFAULT_BONUS_PROFILE.allocations,
+    };
+  }
+  const four = normalizeFourWay(b);
+  return {
+    annualBonusAmount: Math.max(0, b.amount),
+    bonusMonth: b.month,
+    frequency: 'annual',
+    secondBonusAmount: 0,
+    secondBonusMonth: 8,
+    allocations: normalizeBonusAllocations({
+      debtPayoff: four.debtPct,
+      emergencyFund: 0,
+      homeDownPayment: four.homePct,
+      brokerage: four.investPct,
+      rothIra: 0,
+      cash: four.otherPct,
+    }),
+  };
+}
+
 export function OnboardingWizard({ initialValues, onComplete }: OnboardingWizardProps) {
   const [inputs, setInputs] = useState<PlanInputs>(() => ({
     ...DEFAULT_INPUTS,
@@ -1277,6 +1489,17 @@ export function OnboardingWizard({ initialValues, onComplete }: OnboardingWizard
     expenses: { ...DEFAULT_INPUTS.expenses, ...initialValues?.expenses },
     debts: initialValues?.debts ?? DEFAULT_INPUTS.debts,
     goals: initialValues?.goals ?? DEFAULT_INPUTS.goals,
+  }));
+
+  const [bonusWizard, setBonusWizard] = useState<BonusWizardState>(() => ({
+    receivesBonus:
+      initialValues?.annualBonus != null && initialValues.annualBonus > 0 ? true : null,
+    amount: initialValues?.annualBonus ?? 0,
+    month: 2,
+    debtPct: 40,
+    investPct: 20,
+    homePct: 20,
+    otherPct: 20,
   }));
 
   const [step, setStep] = useState(0); // 0-indexed internally
@@ -1287,12 +1510,20 @@ export function OnboardingWizard({ initialValues, onComplete }: OnboardingWizard
     setInputs((prev) => ({ ...prev, ...patch }));
   }, []);
 
+  const bonusStepComplete =
+    bonusWizard.receivesBonus !== null &&
+    (bonusWizard.receivesBonus === false ||
+      (bonusWizard.receivesBonus === true && bonusWizard.amount > 0));
+
   const goNext = useCallback(() => {
+    if (step === 2 && bonusWizard.receivesBonus === true) {
+      setBonusWizard((prev) => ({ ...prev, ...normalizeFourWay(prev) }));
+    }
     if (step < TOTAL_STEPS - 1) {
       setDirection(1);
       setStep((s) => s + 1);
     }
-  }, [step]);
+  }, [step, bonusWizard.receivesBonus]);
 
   const goBack = useCallback(() => {
     if (step > 0) {
@@ -1305,9 +1536,13 @@ export function OnboardingWizard({ initialValues, onComplete }: OnboardingWizard
     setGenerating(true);
     setTimeout(() => {
       setGenerating(false);
-      onComplete(inputs);
+      const inputsFinal: PlanInputs = {
+        ...inputs,
+        annualBonus: bonusWizard.receivesBonus === true ? Math.max(0, bonusWizard.amount) : 0,
+      };
+      onComplete(inputsFinal, bonusPatchFromWizard(bonusWizard));
     }, 1500);
-  }, [inputs, onComplete]);
+  }, [inputs, bonusWizard, onComplete]);
 
   const progressPct = ((step + 1) / TOTAL_STEPS) * 100;
 
@@ -1397,16 +1632,19 @@ export function OnboardingWizard({ initialValues, onComplete }: OnboardingWizard
                   <StepBenefits inputs={inputs} onChange={patchInputs} />
                 )}
                 {step === 2 && (
-                  <StepExpenses inputs={inputs} onChange={patchInputs} />
+                  <StepBonus bonus={bonusWizard} onBonusChange={(patch) => setBonusWizard((p) => ({ ...p, ...patch }))} />
                 )}
                 {step === 3 && (
+                  <StepExpenses inputs={inputs} onChange={patchInputs} />
+                )}
+                {step === 4 && (
                   <StepDebts
                     inputs={inputs}
                     onChange={patchInputs}
                     onSkip={goNext}
                   />
                 )}
-                {step === 4 && (
+                {step === 5 && (
                   <StepGoals inputs={inputs} onChange={patchInputs} />
                 )}
               </motion.div>
@@ -1438,6 +1676,7 @@ export function OnboardingWizard({ initialValues, onComplete }: OnboardingWizard
             {step < TOTAL_STEPS - 1 ? (
               <Button
                 onClick={goNext}
+                disabled={step === 2 && !bonusStepComplete}
                 className="min-w-[80px] bg-[#3b82f6] text-white hover:bg-[#1547a0]"
               >
                 Next →

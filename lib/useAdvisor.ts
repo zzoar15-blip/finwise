@@ -4,6 +4,7 @@ import { useState, useCallback, useRef } from 'react';
 import { useFinanceStore } from '@/lib/store';
 import { useFinWiseStore } from '@/lib/store';
 import { formatCurrency } from '@/lib/format';
+import { getBonusAllocationAmounts, monthName } from '@/lib/bonusProfile';
 
 export interface Message {
   role: 'user' | 'assistant';
@@ -72,6 +73,16 @@ function buildFinancialContext(
   lines.push(`  Monthly housing: ${formatCurrency(planningStore.budgetInputs.housing)}`);
   lines.push(`  Monthly transportation: ${formatCurrency(transportTotal)}`);
   lines.push(`  Debts tracked: ${planningStore.debts.length}`);
+
+  const bp = planningStore.bonusProfile;
+  if (bp && bp.frequency !== 'none' && bp.annualBonusAmount > 0) {
+    const a = getBonusAllocationAmounts(bp);
+    lines.push('');
+    lines.push('BONUS (post-tax):');
+    lines.push(`  Annual bonus: ${formatCurrency(bp.annualBonusAmount)}`);
+    lines.push(`  Paid in: ${monthName(bp.bonusMonth)}`);
+    lines.push(`  Allocation — Debt ${bp.allocations.debtPayoff}% (${formatCurrency(a.debtPayoff)}), EF ${bp.allocations.emergencyFund}% (${formatCurrency(a.emergencyFund)}), Home ${bp.allocations.homeDownPayment}% (${formatCurrency(a.homeDownPayment)}), Brokerage ${bp.allocations.brokerage}% (${formatCurrency(a.brokerage)}), Roth ${bp.allocations.rothIra}% (${formatCurrency(a.rothIra)}), Cash ${bp.allocations.cash}% (${formatCurrency(a.cash)})`);
+  }
 
   return lines.join('\n');
 }

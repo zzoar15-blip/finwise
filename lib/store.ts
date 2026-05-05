@@ -33,6 +33,11 @@ import {
   type NetWorthSnapshot,
 } from '@/lib/calculations/netWorth';
 import type { Scenario } from '@/lib/calculations/forecast';
+import {
+  DEFAULT_BONUS_PROFILE,
+  normalizeBonusAllocations,
+  type BonusProfile,
+} from '@/lib/bonusProfile';
 
 function normalizeGoalOrder(goals: string[]): string[] {
   const seen = new Set<string>();
@@ -62,6 +67,7 @@ interface FinWiseStore {
   netWorthHistory: NetWorthSnapshot[];
   forecastScenarios: Scenario[];
   forecastBaselineScenarioId: string | null;
+  bonusProfile: BonusProfile;
 
   setPaycheckInputs: (inputs: Partial<StorePaycheckInputs>) => void;
   setBudgetInputs: (inputs: Partial<StoreBudgetInputs>) => void;
@@ -75,6 +81,7 @@ interface FinWiseStore {
   addNetWorthSnapshot: () => void;
   setForecastScenarios: (items: Scenario[]) => void;
   setForecastBaselineScenarioId: (id: string) => void;
+  setBonusProfile: (profile: Partial<BonusProfile>) => void;
 }
 
 type PersistedStateV1 = {
@@ -129,6 +136,7 @@ export const useFinWiseStore = create<FinWiseStore>()(
       netWorthHistory: [],
       forecastScenarios: DEFAULT_FORECAST_SCENARIOS,
       forecastBaselineScenarioId: DEFAULT_FORECAST_SCENARIOS[0].id,
+      bonusProfile: DEFAULT_BONUS_PROFILE,
 
       setPaycheckInputs: (inputs) =>
         set((state) => {
@@ -240,15 +248,34 @@ export const useFinWiseStore = create<FinWiseStore>()(
           forecastBaselineScenarioId: id,
           planLastUpdated: new Date().toISOString(),
         }),
+
+      setBonusProfile: (profile) =>
+        set((state) => {
+          const cur = state.bonusProfile;
+          const nextAlloc = profile.allocations
+            ? normalizeBonusAllocations({ ...cur.allocations, ...profile.allocations })
+            : cur.allocations;
+          const merged: BonusProfile = {
+            ...cur,
+            ...profile,
+            allocations: nextAlloc,
+          };
+          return {
+            bonusProfile: merged,
+            planLastUpdated: new Date().toISOString(),
+          };
+        }),
     }),
     {
       name: 'finwise-unified-store',
-      version: 2,
+      version: 3,
       migrate: (persistedState: unknown) => {
         const state = (persistedState ?? {}) as PersistedStateV1;
         const budget = state.budgetInputs ?? {};
         const legacyTransportation =
           typeof budget.transportation === 'number' ? budget.transportation : 0;
+        const prev = state as Record<string, unknown>;
+        const prevBonus = prev.bonusProfile as BonusProfile | undefined;
         return {
           ...state,
           budgetInputs: {
@@ -259,6 +286,10 @@ export const useFinWiseStore = create<FinWiseStore>()(
                 ? (budget.otherTransport as number)
                 : legacyTransportation,
           },
+          bonusProfile:
+            prevBonus && typeof prevBonus === 'object'
+              ? { ...DEFAULT_BONUS_PROFILE, ...prevBonus }
+              : DEFAULT_BONUS_PROFILE,
         } as FinWiseStore;
       },
       /** Ensure debts persist with the unified profile (explicit list for predictable rehydrates). */
@@ -279,6 +310,7 @@ export const useFinWiseStore = create<FinWiseStore>()(
         netWorthHistory: state.netWorthHistory,
         forecastScenarios: state.forecastScenarios,
         forecastBaselineScenarioId: state.forecastBaselineScenarioId,
+        bonusProfile: state.bonusProfile,
       }),
     }
   )

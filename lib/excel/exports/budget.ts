@@ -1,6 +1,13 @@
 import XLSX from 'xlsx-js-style';
 import type { StorePaycheckInputs, StorePaycheckResults, StoreBudgetInputs } from '@/lib/calculations';
 import { getTotalTransportation } from '@/lib/calculations';
+import type { BonusProfile } from '@/lib/bonusProfile';
+import {
+  DEFAULT_BONUS_PROFILE,
+  getBonusAmountForMonth,
+  isBonusMonth,
+  splitBonusAllocations,
+} from '@/lib/bonusProfile';
 import { XLS } from '../styles';
 import {
   cell,
@@ -26,14 +33,15 @@ export function exportBudgetWorkbook(
   paycheckInputs: StorePaycheckInputs,
   paycheckResults: StorePaycheckResults,
   budgetInputs: StoreBudgetInputs,
-  debts: Debt[]
+  debts: Debt[],
+  bonusProfile?: BonusProfile,
 ) {
   const wb = XLSX.utils.book_new();
 
   const ws1 = buildBudgetModelSheet(paycheckInputs, paycheckResults, budgetInputs, debts);
   XLSX.utils.book_append_sheet(wb, ws1, 'Budget Model');
 
-  const ws2 = buildMonthlyProjectionSheet(paycheckResults, budgetInputs, debts);
+  const ws2 = buildMonthlyProjectionSheet(paycheckResults, budgetInputs, debts, bonusProfile);
   XLSX.utils.book_append_sheet(wb, ws2, 'Monthly Projection');
 
   const ws3 = buildTaxEfficiencySheet(paycheckInputs, paycheckResults);
@@ -191,7 +199,8 @@ function buildBudgetModelSheet(
 function buildMonthlyProjectionSheet(
   pr: StorePaycheckResults,
   bi: StoreBudgetInputs,
-  debts: Debt[]
+  debts: Debt[],
+  bonusProfile?: BonusProfile,
 ): XLSX.WorkSheet {
   const totalDebtMinimums = debts.reduce((s, d) => s + d.minPayment, 0);
   const totalTransportation = getTotalTransportation(bi);
@@ -204,6 +213,9 @@ function buildMonthlyProjectionSheet(
   const savingsFromBank = optionalMonthly;
 
   const today = new Date();
+  const bp = bonusProfile ?? DEFAULT_BONUS_PROFILE;
+  const bonusActive = bp.frequency !== 'none' && bp.annualBonusAmount > 0;
+
   const rows: XLSX.CellObject[][] = [
     ...workbookHeader('Monthly Projection'),
     [
@@ -217,6 +229,17 @@ function buildMonthlyProjectionSheet(
       columnHeaderCell('Surplus'),
       columnHeaderCell('Cum Surplus'),
       columnHeaderCell('Cum Savings'),
+      ...(bonusActive
+        ? [
+            columnHeaderCell('Bonus (net)'),
+            columnHeaderCell('→ Debt'),
+            columnHeaderCell('→ Emergency'),
+            columnHeaderCell('→ Home'),
+            columnHeaderCell('→ Brokerage'),
+            columnHeaderCell('→ Roth'),
+            columnHeaderCell('→ Cash'),
+          ]
+        : []),
     ],
   ];
 
@@ -225,35 +248,55 @@ function buildMonthlyProjectionSheet(
   for (let m = 0; m < 12; m++) {
     const d = new Date(today.getFullYear(), today.getMonth() + m, 1);
     const dateStr = d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+    const monthNum = d.getMonth() + 1;
+    const alt = m % 2 === 1;
+    const isBm = bonusActive && isBonusMonth(monthNum, bp);
+    const rowBase = isBm ? XLS.bonusRow : alt ? XLS.altRow : XLS.formula;
+    const lump = bonusActive && isBm ? getBonusAmountForMonth(monthNum, bp) : 0;
+    const sp = lump > 0 ? splitBonusAllocations(lump, bp.allocations) : null;
     cumSurplus += monthlySurplus;
     cumSavings += savingsFromBank;
-    const alt = m % 2 === 1;
     rows.push([
       formulaCell(m + 1, XLS.fmt.integer, alt),
-      cell(dateStr, alt ? XLS.altRow : XLS.formula),
+      cell(dateStr, rowBase),
       formulaCell(monthlyIncome, XLS.fmt.currency, alt),
       formulaCell(totalExpenses, XLS.fmt.currency, alt),
       formulaCell(totalDebtMinimums, XLS.fmt.currency, alt),
       formulaCell(savingsFromBank, XLS.fmt.currency, alt),
       formulaCell(totalExpenses + totalDebtMinimums + savingsFromBank, XLS.fmt.currency, alt),
-      cell(monthlySurplus, { ...(alt ? XLS.altRow : XLS.formula), font: { sz: 10, color: { rgb: monthlySurplus >= 0 ? '166534' : 'dc2626' } } }, XLS.fmt.currency),
-      cell(cumSurplus, { ...(alt ? XLS.altRow : XLS.formula), font: { sz: 10, color: { rgb: cumSurplus >= 0 ? '166534' : 'dc2626' } } }, XLS.fmt.currency),
+      cell(monthlySurplus, { ...rowBase, font: { sz: 10, color: { rgb: monthlySurplus >= 0 ? '166534' : 'dc2626' } } }, XLS.fmt.currency),
+      cell(cumSurplus, { ...rowBase, font: { sz: 10, color: { rgb: cumSurplus >= 0 ? '166534' : 'dc2626' } } }, XLS.fmt.currency),
       formulaCell(cumSavings, XLS.fmt.currency, alt),
+      ...(bonusActive
+        ? [
+            formulaCell(lump, XLS.fmt.currency, alt),
+            formulaCell(sp?.debtPayoff ?? 0, XLS.fmt.currency, alt),
+            formulaCell(sp?.emergencyFund ?? 0, XLS.fmt.currency, alt),
+            formulaCell(sp?.homeDownPayment ?? 0, XLS.fmt.currency, alt),
+            formulaCell(sp?.brokerage ?? 0, XLS.fmt.currency, alt),
+            formulaCell(sp?.rothIra ?? 0, XLS.fmt.currency, alt),
+            formulaCell(sp?.cash ?? 0, XLS.fmt.currency, alt),
+          ]
+        : []),
     ]);
   }
 
   rows.push([blankCell()], [workbookFooter()[0]]);
 
   const ws = aoa2sheet(rows);
-  ws['!cols'] = [
+  const baseCols = [
     XLS.cols.small, XLS.cols.date, XLS.cols.amount, XLS.cols.amount,
     XLS.cols.amount, XLS.cols.amount, XLS.cols.amount,
     XLS.cols.amount, XLS.cols.amount, XLS.cols.amount,
   ];
+  ws['!cols'] = bonusActive
+    ? [...baseCols, ...Array(7).fill(XLS.cols.amount)]
+    : baseCols;
+  const lastCol = bonusActive ? 16 : 9;
   (ws as Record<string, unknown>)['!freeze'] = { xSplit: 2, ySplit: 5 };
-  addMerge(ws, 0, 0, 0, 9);
-  addMerge(ws, 1, 0, 1, 9);
-  addMerge(ws, 2, 0, 2, 9);
+  addMerge(ws, 0, 0, 0, lastCol);
+  addMerge(ws, 1, 0, 1, lastCol);
+  addMerge(ws, 2, 0, 2, lastCol);
   return ws;
 }
 

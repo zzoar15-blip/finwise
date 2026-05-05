@@ -1,6 +1,6 @@
 import { calculatePaycheck, PAY_PERIODS } from '@/lib/calculations/paycheck';
 import type { PaycheckResult } from '@/lib/calculations/paycheck';
-import { simulateDebtPayoff } from '@/lib/calculations/debt';
+import { simulateDebtPayoff, simulateDebtPayoffDynamic } from '@/lib/calculations/debt';
 import type { Debt, DebtResult } from '@/lib/calculations/debt';
 import { simulateInvestment } from '@/lib/calculations/invest';
 import type { InvestResult } from '@/lib/calculations/invest';
@@ -16,6 +16,16 @@ import {
   computeTotalExpenses,
   getTotalTransportation,
 } from '@/lib/calculations';
+import {
+  DEFAULT_BONUS_PROFILE,
+  getAnnualCategoryBonusTotal,
+  getBonusAmountForMonth,
+  getBonusDebtPortionForMonth,
+  getBonusMonths,
+  isBonusMonth,
+  splitBonusAllocations,
+  type BonusProfile,
+} from '@/lib/bonusProfile';
 import { formatCurrency } from '@/lib/format';
 import type { PlanInputs, PlanDebt, Goal } from '@/types/plan';
 import type { ActionChecklistItem } from '@/types/plan';
@@ -52,6 +62,14 @@ export interface ProjectionMonth {
   savingsBalance: number;
   passiveIncome: number;
   milestone?: string;
+  isBonusMonth?: boolean;
+  bonusReceived?: number;
+  bonusToDebt?: number;
+  bonusToEmergency?: number;
+  bonusToHome?: number;
+  bonusToBrokerage?: number;
+  bonusToRoth?: number;
+  bonusToCash?: number;
 }
 
 export interface PlanMetrics {
@@ -815,6 +833,7 @@ function build12MonthProjection(
   monthlySurplus: number,
   debtResult: DebtResult | null,
   investResult: InvestResult | null,
+  bonusProfile: BonusProfile = DEFAULT_BONUS_PROFILE,
 ): ProjectionMonth[] {
   const now = new Date();
   const months: ProjectionMonth[] = [];
@@ -824,6 +843,7 @@ function build12MonthProjection(
   for (let i = 0; i < 12; i++) {
     const date = addMonths(now, i);
     const label = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+    const calMonth = date.getMonth() + 1;
 
     const snap = debtResult?.snapshots[i];
     const debtBalance = snap?.totalBalance ?? 0;
@@ -835,6 +855,16 @@ function build12MonthProjection(
     savingsBalance += Math.max(0, monthlySurplus);
 
     const milestones: string[] = [];
+
+    const isBon =
+      bonusProfile.frequency !== 'none' && isBonusMonth(calMonth, bonusProfile);
+    const bonusAmt = isBon ? getBonusAmountForMonth(calMonth, bonusProfile) : 0;
+    const splits =
+      isBon && bonusAmt > 0 ? splitBonusAllocations(bonusAmt, bonusProfile.allocations) : null;
+
+    if (isBon && bonusAmt > 0) {
+      milestones.push('Bonus month');
+    }
 
     if (debtResult && i > 0 && debtResult.snapshots[i - 1]?.totalBalance > 0 && debtBalance <= 0) {
       milestones.push('Debt paid off!');
@@ -853,6 +883,14 @@ function build12MonthProjection(
       savingsBalance: Math.round(savingsBalance),
       passiveIncome: Math.round(passiveIncome * 100) / 100,
       milestone: milestones.length > 0 ? milestones.join(' · ') : undefined,
+      isBonusMonth: isBon && bonusAmt > 0,
+      bonusReceived: bonusAmt > 0 ? bonusAmt : undefined,
+      bonusToDebt: splits?.debtPayoff,
+      bonusToEmergency: splits?.emergencyFund,
+      bonusToHome: splits?.homeDownPayment,
+      bonusToBrokerage: splits?.brokerage,
+      bonusToRoth: splits?.rothIra,
+      bonusToCash: splits?.cash,
     });
   }
 
@@ -1082,6 +1120,7 @@ export function mergePlanMetricsWithUnifiedBudget(
   debts: Array<{ id?: string; name?: string; balance?: number; apr?: number; minPayment: number }>,
   inputs: PlanInputs,
   debtOverrides: PlanDebtSimulationOverrides = {},
+  bonusProfile: BonusProfile = DEFAULT_BONUS_PROFILE,
 ): PlanMetrics {
   if (!paycheckResults.isComplete) {
     return base;
@@ -1109,24 +1148,48 @@ export function mergePlanMetricsWithUnifiedBudget(
     }));
   const hasDebts = unifiedDebts.length > 0;
   const totalDebtBalance = unifiedDebts.reduce((s, d) => s + d.balance, 0);
+  const debtBonusForCalendarMonth = (calMonth: number) => {
+    const hasStoreBonus =
+      bonusProfile.frequency !== 'none' &&
+      (bonusProfile.annualBonusAmount > 0 ||
+        (bonusProfile.frequency === 'semiannual' && bonusProfile.secondBonusAmount > 0));
+    if (hasStoreBonus) {
+      return getBonusDebtPortionForMonth(calMonth, bonusProfile);
+    }
+    const bm = debtOverrides.bonusMonth ?? 2;
+    return calMonth === bm ? Math.max(0, debtOverrides.annualBonus ?? 0) : 0;
+  };
+
   const debtResult = hasDebts
-    ? simulateDebtPayoff(
-      unifiedDebts,
-      Math.max(0, debtOverrides.monthlyOverpayment ?? 0),
-      Math.max(0, debtOverrides.annualBonus ?? 0),
-      debtOverrides.bonusMonth ?? 2,
-      debtOverrides.strategy ?? 'avalanche',
-    )
+    ? simulateDebtPayoffDynamic(
+        unifiedDebts,
+        Math.max(0, debtOverrides.monthlyOverpayment ?? 0),
+        debtBonusForCalendarMonth,
+        debtOverrides.strategy ?? 'avalanche',
+      )
     : null;
   const debtFreeDate = debtResult?.debtFreeDate ?? null;
 
   const monthlyInvestCapacity = Math.max(0, unifiedSurplus);
 
+  const annualBrokerageBonus = getAnnualCategoryBonusTotal(bonusProfile, 'brokerage');
+
+  const bonusCalendarDeposits: Partial<Record<number, number>> = {};
+  if (bonusProfile.frequency !== 'none') {
+    for (const m of getBonusMonths(bonusProfile)) {
+      const lump = getBonusAmountForMonth(m, bonusProfile);
+      if (lump <= 0) continue;
+      bonusCalendarDeposits[m] = splitBonusAllocations(lump, bonusProfile.allocations).brokerage;
+    }
+  }
+
   const investResult =
-    monthlyInvestCapacity > 0
+    monthlyInvestCapacity > 0 || annualBrokerageBonus > 0
       ? simulateInvestment({
           monthlyBuy: monthlyInvestCapacity,
-          annualBonus: 0,
+          annualBonus: annualBrokerageBonus,
+          bonusCalendarDeposits:
+            Object.keys(bonusCalendarDeposits).length > 0 ? bonusCalendarDeposits : undefined,
           dividendYield: 7,
           taxRate: Math.round(Math.min(paycheckResults.marginalCombinedRate, 0.5) * 100),
           qualifiedPercent: 70,
@@ -1252,6 +1315,7 @@ export function mergePlanMetricsWithUnifiedBudget(
     unifiedSurplus,
     debtResult,
     investResult,
+    bonusProfile,
   );
 
   const grossMonthly = paycheckResults.grossAnnual / 12;

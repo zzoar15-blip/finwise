@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import { simulateDebtPayoff, buildSensitivityTable } from '@/lib/calculations/debt';
 import type { Debt, DebtResult, SensitivityRow } from '@/lib/calculations/debt';
 import { ExportButton } from '@/components/ExportButton';
@@ -12,6 +13,7 @@ import { formatCurrency } from '@/lib/format';
 import { useFinWiseStore } from '@/lib/store';
 import { usePlanStore } from '@/lib/planStore';
 import { computeUnifiedMonthlyFlow } from '@/lib/calculations';
+import { getBonusDebtPortionForMonth, monthName } from '@/lib/bonusProfile';
 import { SyncMeta } from '@/components/SyncMeta';
 import { EmptyState } from '@/components/ui/empty-state';
 import { EmptyChart } from '@/components/ui/empty-chart';
@@ -79,6 +81,7 @@ export default function DebtPage() {
   const paycheckInputs = useFinWiseStore((s) => s.paycheckInputs);
   const budgetInputs = useFinWiseStore((s) => s.budgetInputs);
   const planLastUpdated = useFinWiseStore((s) => s.planLastUpdated);
+  const bonusProfile = useFinWiseStore((s) => s.bonusProfile);
   const setDebtProfile = usePlanStore((s) => s.setDebtProfile);
   const debtProfile = usePlanStore((s) => s.debtProfile);
 
@@ -182,6 +185,11 @@ export default function DebtPage() {
   }
 
   const hasDebts = debts.length > 0 && debts.some((d) => d.balance > 0);
+  const suggestedDebtBonus = useMemo(
+    () => getBonusDebtPortionForMonth(bonusProfile.bonusMonth, bonusProfile),
+    [bonusProfile],
+  );
+
   const debtInputErrors = debts
     .map((d) => (d.minPayment > d.balance && d.balance > 0 ? `${d.name}: minimum payment cannot exceed balance.` : null))
     .filter(Boolean) as string[];
@@ -224,7 +232,20 @@ export default function DebtPage() {
           </div>
         }
       />
-      <div className="px-8"><SyncMeta updatedAt={planLastUpdated} badges={['Unified Flow']} /></div>
+      <div className="px-8 space-y-3">
+        <SyncMeta updatedAt={planLastUpdated} badges={['Unified Flow']} />
+        {bonusProfile.frequency !== 'none' && suggestedDebtBonus > 0 && (
+          <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900">
+            <span className="font-medium">
+              ✓ Allocation profile: {formatCurrency(suggestedDebtBonus)} toward debt each{' '}
+              {monthName(bonusProfile.bonusMonth)}
+            </span>
+            <Link href="/settings/bonus" className="ml-2 font-semibold text-green-800 underline">
+              Adjust allocation →
+            </Link>
+          </div>
+        )}
+      </div>
 
       {/* Debts Table */}
       <Card className="shadow-sm">

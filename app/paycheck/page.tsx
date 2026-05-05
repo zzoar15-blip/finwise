@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useCallback } from 'react';
+import Link from 'next/link';
 import { DollarSign, Info } from 'lucide-react';
 import { useFinWiseStore } from '@/lib/store';
 import { PAY_PERIODS } from '@/lib/calculations/paycheck';
@@ -8,6 +9,7 @@ import type { PayPeriod, FilingStatus } from '@/lib/calculations/paycheck';
 import { STATE_CONFIGS } from '@/lib/stateTax';
 import { formatCurrency } from '@/lib/format';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -172,6 +174,7 @@ export default function PaycheckPage() {
   const storeInputs = useFinWiseStore((s) => s.paycheckInputs);
   const paycheckResults = useFinWiseStore((s) => s.paycheckResults);
   const setPaycheckInputs = useFinWiseStore((s) => s.setPaycheckInputs);
+  const setBonusProfile = useFinWiseStore((s) => s.setBonusProfile);
   const planLastUpdated = useFinWiseStore((s) => s.planLastUpdated);
   const budgetInputs = useFinWiseStore((s) => s.budgetInputs);
   const debts = useFinWiseStore((s) => s.debts);
@@ -215,6 +218,16 @@ export default function PaycheckPage() {
   }
 
   const currentPeriods = PAY_PERIODS[localInputs.payPeriod] || 26;
+
+  const estimatedNetBonus = useMemo(() => {
+    const g = localInputs.annualBonusGross ?? 0;
+    const w = localInputs.bonusSupplementalWithholdingPct ?? 22;
+    return Math.max(0, Math.round(g * (1 - w / 100)));
+  }, [localInputs.annualBonusGross, localInputs.bonusSupplementalWithholdingPct]);
+
+  const applyNetBonusToProfile = useCallback(() => {
+    setBonusProfile({ annualBonusAmount: estimatedNetBonus });
+  }, [estimatedNetBonus, setBonusProfile]);
 
   // Per-period display helpers
   function perPeriodDisplay(annualValue: number) {
@@ -445,6 +458,64 @@ export default function PaycheckPage() {
                     </label>
                   </FieldRow>
                 )}
+
+                <div className="rounded-lg border border-[#e9d5ff] bg-[#faf5ff]/80 px-3 py-3 space-y-3 mt-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#6b21a8]">
+                    Bonus &amp; supplemental pay
+                  </p>
+                  <FieldRow label="Annual bonus (gross)">
+                    <Input
+                      type="number"
+                      min={0}
+                      step={500}
+                      value={localInputs.annualBonusGross || ''}
+                      placeholder="0"
+                      onChange={(e) =>
+                        updateField('annualBonusGross', Math.max(0, Number(e.target.value) || 0))
+                      }
+                      className="w-full"
+                    />
+                  </FieldRow>
+                  <FieldRow label="Bonus tax / withholding est. (%)">
+                    <Input
+                      type="number"
+                      min={0}
+                      max={60}
+                      step={1}
+                      value={localInputs.bonusSupplementalWithholdingPct ?? ''}
+                      placeholder="22"
+                      onChange={(e) =>
+                        updateField(
+                          'bonusSupplementalWithholdingPct',
+                          Math.min(60, Math.max(0, Number(e.target.value) || 0)),
+                        )
+                      }
+                      className="w-full"
+                    />
+                  </FieldRow>
+                  <p className="text-xs text-gray-600">
+                    Bonuses are often withheld at ~22% federal plus state. Approximate net bonus:{' '}
+                    <span className="font-semibold tabular-nums">{formatCurrency(estimatedNetBonus)}</span>
+                  </p>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="border-[#c4b5fd]"
+                      onClick={applyNetBonusToProfile}
+                      disabled={estimatedNetBonus <= 0}
+                    >
+                      Use net bonus in allocation profile
+                    </Button>
+                    <Link
+                      href="/settings/bonus"
+                      className="text-sm font-medium text-[#7c3aed] hover:underline"
+                    >
+                      Configure bonus allocation →
+                    </Link>
+                  </div>
+                </div>
               </div>
             </div>
 

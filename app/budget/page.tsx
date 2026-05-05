@@ -38,6 +38,7 @@ import {
   getTotalTransportation,
   getEffectivePaycheckResults,
 } from '@/lib/calculations';
+import { getBonusAllocationAmounts, monthName } from '@/lib/bonusProfile';
 import { SyncMeta } from '@/components/SyncMeta';
 import { EmptyChart } from '@/components/ui/empty-chart';
 import { PieChart as PieIcon, BarChart3 } from 'lucide-react';
@@ -146,6 +147,7 @@ export default function BudgetPage() {
   const planLastUpdated = useFinWiseStore((s) => s.planLastUpdated);
   const sinkingFundInputs = useFinWiseStore((s) => s.sinkingFundInputs);
   const sinkingFundResults = useFinWiseStore((s) => s.sinkingFundResults);
+  const bonusProfile = useFinWiseStore((s) => s.bonusProfile);
   const plan = usePlanStore((s) => s.plan);
 
   const pr = getEffectivePaycheckResults(paycheckInputs, paycheckResults);
@@ -292,7 +294,7 @@ export default function BudgetPage() {
           <ExportButton
             onExportXlsx={async () => {
               const { exportBudgetWorkbook } = await import('@/lib/excel/exports/budget');
-              exportBudgetWorkbook(pi, pr, bi, debts);
+              exportBudgetWorkbook(pi, pr, bi, debts, bonusProfile);
             }}
             onExportCsv={() => downloadCsv(exportRows(), 'finwise-budget')}
           />
@@ -558,6 +560,36 @@ export default function BudgetPage() {
                   </span>
                 </div>
               </div>
+
+              {bonusProfile.frequency !== 'none' && bonusProfile.annualBonusAmount > 0 && (
+                <div className="mt-4 rounded-lg border border-[#bfdbfe] bg-[#eff6ff] p-3 text-sm space-y-2">
+                  <p className="font-semibold text-[#1e3a8a]">
+                    📅 {monthName(bonusProfile.bonusMonth)} is a bonus month
+                  </p>
+                  <p className="text-muted-foreground text-xs">
+                    In addition to regular monthly cash flows, your {formatCurrency(bonusProfile.annualBonusAmount)}{' '}
+                    bonus will be allocated:
+                  </p>
+                  <ul className="text-xs space-y-1">
+                    {(() => {
+                      const a = getBonusAllocationAmounts(bonusProfile);
+                      return (
+                        <>
+                          <li>{formatCurrency(a.debtPayoff)} → debt payoff</li>
+                          <li>{formatCurrency(a.brokerage)} → brokerage investing</li>
+                          <li>{formatCurrency(a.homeDownPayment)} → home down payment</li>
+                          <li>{formatCurrency(a.emergencyFund)} → emergency fund</li>
+                          <li>{formatCurrency(a.cash)} → cash/spending</li>
+                          {a.rothIra > 0 && <li>{formatCurrency(a.rothIra)} → Roth IRA</li>}
+                        </>
+                      );
+                    })()}
+                  </ul>
+                  <Link href="/settings/bonus" className="inline-block text-xs font-semibold text-[#2563eb] hover:underline">
+                    Adjust allocation →
+                  </Link>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

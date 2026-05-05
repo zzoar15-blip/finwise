@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePlanStore } from '@/lib/planStore';
 import { useFinWiseStore } from '@/lib/store';
+import { DEFAULT_BONUS_PROFILE } from '@/lib/bonusProfile';
 import { ChevronDown, Info, RotateCcw, Settings } from 'lucide-react';
 
 function getInitials(name: string): string {
@@ -53,6 +54,8 @@ export function Topbar() {
       otherPreTaxAnnual: 0,
       otherPostTaxAnnual: 0,
       additionalWithholding: 0,
+      annualBonusGross: 0,
+      bonusSupplementalWithholdingPct: 22,
     });
     setBudgetInputs({
       investmentIncome: 0,
@@ -78,6 +81,7 @@ export function Topbar() {
       emergencyFundBalance: 0,
       homeDownPaymentMonthly: 0,
     });
+    useFinWiseStore.setState({ bonusProfile: DEFAULT_BONUS_PROFILE });
     setDebts([]);
     setGoals([]);
     setMenuOpen(false);

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { SummaryCards } from '@/components/dashboard/SummaryCards';
 import { SpendingChart } from '@/components/dashboard/SpendingChart';
 import { RecentTransactions } from '@/components/dashboard/RecentTransactions';
@@ -13,11 +14,18 @@ import {
 } from '@/components/ui/select';
 import { useCurrentMonth } from '@/lib/hooks';
 import { getMonthOptions, formatMonth } from '@/lib/format';
+import { usePlanStore } from '@/lib/planStore';
+import { useFinWiseStore } from '@/lib/store';
 
 export default function DashboardPage() {
   const currentMonth = useCurrentMonth();
   const [month, setMonth] = useState(currentMonth);
   const monthOptions = getMonthOptions(12);
+  const plan = usePlanStore((s) => s.plan);
+  const bonusProfile = useFinWiseStore((s) => s.bonusProfile);
+  const expectsBonus =
+    (plan?.inputs.annualBonus ?? 0) > 0 || bonusProfile.annualBonusAmount > 0;
+  const bonusAllocationConfigured = !expectsBonus || bonusProfile.annualBonusAmount > 0;
 
   return (
     <div className="space-y-6 max-w-6xl">
@@ -41,6 +49,16 @@ export default function DashboardPage() {
       </div>
 
       <SummaryCards month={month} />
+
+      {!bonusAllocationConfigured && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          <span className="font-semibold">Bonus allocation:</span> Your plan expects a bonus — add post-tax amounts in
+          Settings so projections stay aligned.{' '}
+          <Link href="/settings/bonus" className="font-medium text-amber-900 underline underline-offset-2">
+            Configure bonus →
+          </Link>
+        </div>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <SpendingChart month={month} />

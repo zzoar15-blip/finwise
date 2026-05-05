@@ -3,8 +3,17 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { forecastScenario, findBreakeven, buildConfidenceBands } from '@/lib/calculations/forecast';
-import type { Scenario, ScenarioResult } from '@/lib/calculations/forecast';
+import {
+  forecastScenario,
+  findBreakeven,
+  buildConfidenceBands,
+} from '@/lib/calculations/forecast';
+import type {
+  Scenario,
+  ScenarioResult,
+  ForecastBonusOptions,
+} from '@/lib/calculations/forecast';
+import { getTotalAnnualBonusPostTax } from '@/lib/bonusProfile';
 import { ExportButton } from '@/components/ExportButton';
 import { downloadCsv, downloadXlsxFromAoa } from '@/lib/export';
 import { PDFDownloadButton } from '@/components/pdf/PDFDownloadButton';
@@ -168,7 +177,9 @@ function ForecastPageContent() {
   const [investReturn, setInvestReturn] = useState(7);
   const [retireTarget, setRetireTarget] = useState(1_500_000);
   const [retireReturn, setRetireReturn] = useState(7);
+  const [bonusGrowsWithSalary, setBonusGrowsWithSalary] = useState(true);
   const didSeedDefaults = useRef(false);
+  const bonusProfile = useFinWiseStore((s) => s.bonusProfile);
 
   const flow = useMemo(
     () => computeUnifiedMonthlyFlow(paycheckInputs, paycheckResults, budget, debts),
@@ -178,6 +189,18 @@ function ForecastPageContent() {
     () => Math.max(0, computeSavingsRate(flow.paycheck, paycheckInputs, budget)),
     [flow.paycheck, paycheckInputs, budget]
   );
+
+  const forecastBonusOptions: ForecastBonusOptions | null = useMemo(() => {
+    const total = getTotalAnnualBonusPostTax(bonusProfile);
+    if (total <= 0 || bonusProfile.frequency === 'none') return null;
+    const investPct =
+      Math.min(100, bonusProfile.allocations.brokerage + bonusProfile.allocations.rothIra);
+    return {
+      annualBonusPostTax: total,
+      bonusInvestPercent: investPct,
+      bonusGrowsWithSalary,
+    };
+  }, [bonusProfile, bonusGrowsWithSalary]);
 
   const seededFromPaycheck = useMemo(
     () => scenarios.every((s) => s.startingSalary === 80000),
@@ -199,13 +222,17 @@ function ForecastPageContent() {
   }, [seededFromPaycheck, scenarios, paycheckResults.grossAnnual, flow.paycheck.grossAnnual, inferredSavingsRate, setScenarios]);
 
   const results: ScenarioResult[] = useMemo(
-    () => scenarios.map((s) => ({ scenario: s, points: forecastScenario(s, 10) })),
-    [scenarios]
+    () =>
+      scenarios.map((s) => ({
+        scenario: s,
+        points: forecastScenario(s, 10, forecastBonusOptions),
+      })),
+    [scenarios, forecastBonusOptions]
   );
   const baselineScenario = scenarios.find((s) => s.id === baselineScenarioId) ?? scenarios[0];
   const confidenceBands = useMemo(
-    () => (baselineScenario ? buildConfidenceBands(baselineScenario, 10) : []),
-    [baselineScenario]
+    () => (baselineScenario ? buildConfidenceBands(baselineScenario, 10, forecastBonusOptions) : []),
+    [baselineScenario, forecastBonusOptions]
   );
 
   // Build chart data: one entry per year, with each scenario's net worth
@@ -823,8 +850,31 @@ function ForecastPageContent() {
 
       {/* 10-Year Projection Table */}
       <Card>
-        <CardHeader>
-          <CardTitle>10-Year Projection Table</CardTitle>
+        <CardHeader className="space-y-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <CardTitle>10-Year Projection Table</CardTitle>
+            {forecastBonusOptions && (
+              <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
+                <input
+                  type="checkbox"
+                  className="size-4 rounded border-input accent-[#3b82f6]"
+                  checked={bonusGrowsWithSalary}
+                  onChange={(e) => setBonusGrowsWithSalary(e.target.checked)}
+                />
+                Assume bonus grows with salary (same % raise as each scenario)
+              </label>
+            )}
+          </div>
+          {forecastBonusOptions ? (
+            <p className="text-xs text-muted-foreground">
+              Includes post-tax bonus ({formatCurrency(forecastBonusOptions.annualBonusPostTax)}/yr) with{' '}
+              {forecastBonusOptions.bonusInvestPercent.toFixed(0)}% allocated to investing (brokerage + Roth from Settings).
+            </p>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Configure an annual bonus in Settings → Bonus Allocation to include it in this wealth path.
+            </p>
+          )}
         </CardHeader>
         <CardContent>
           <p className="mb-2 text-xs text-muted-foreground">← Scroll →</p>
@@ -834,6 +884,7 @@ function ForecastPageContent() {
                 <tr className="border-b border-border">
                   <th className="py-2 pr-4 text-left font-medium text-muted-foreground">Year</th>
                   <th className="py-2 px-3 text-right font-medium text-muted-foreground">Salary</th>
+                  <th className="py-2 px-3 text-right font-medium text-muted-foreground">Bonus</th>
                   <th className="py-2 px-3 text-right font-medium text-muted-foreground">Annual Savings</th>
                   <th className="py-2 px-3 text-right font-medium text-muted-foreground">401k</th>
                   {scenarios.map((s) => (
@@ -851,15 +902,18 @@ function ForecastPageContent() {
                 {Array.from({ length: 10 }, (_, i) => {
                   const year = i + 1;
                   const calendarYear = new Date().getFullYear() + i;
-                  const baseSalary = baselineScenario?.startingSalary ?? 0;
-                  const raise = (baselineScenario?.annualRaise ?? 0) / 100;
-                  const salary = baseSalary * Math.pow(1 + raise, i);
-                  const annualSavings = salary * ((baselineScenario?.savingsRate ?? 0) / 100);
+                  const baselineResult =
+                    results.find((r) => r.scenario.id === baselineScenario?.id) ?? results[0];
+                  const pt = baselineResult?.points[i];
+                  const salary = pt?.salary ?? 0;
+                  const bonusInc = pt?.bonusIncome ?? 0;
+                  const annualSavings = pt?.annualSavings ?? 0;
                   const annual401k = Math.min(23500, salary * ((paycheckInputs.k401TraditionalPct ?? 0) / 100));
                   return (
                     <tr key={year} className="border-b border-border/50">
                       <td className="py-2 pr-4 font-medium tabular-nums">{calendarYear}</td>
                       <td className="py-2 px-3 text-right tabular-nums">{formatCurrency(salary)}</td>
+                      <td className="py-2 px-3 text-right tabular-nums">{formatCurrency(bonusInc)}</td>
                       <td className="py-2 px-3 text-right tabular-nums">{formatCurrency(annualSavings)}</td>
                       <td className="py-2 px-3 text-right tabular-nums">{formatCurrency(annual401k)}</td>
                       {results.map((r) => (

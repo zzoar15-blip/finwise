@@ -31,6 +31,7 @@ import { useFinanceStore } from '@/lib/store';
 import { STATE_CONFIGS } from '@/lib/stateTax';
 import { CATEGORIES } from '@/lib/constants';
 import { PageHeader } from '@/components/layout/PageHeader';
+import BonusAllocationSection from '@/components/bonus/BonusAllocationSection';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -85,6 +86,8 @@ export default function SettingsPage() {
         title="Settings"
         subtitle="Manage profile defaults and protect your data lifecycle."
       />
+
+      <BonusAllocationSection />
 
       {/* Profile */}
       <Card className="shadow-sm">

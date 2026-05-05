@@ -41,6 +41,12 @@ import { useFinWiseStore } from '@/lib/store';
 import type { Debt } from '@/lib/calculations/debt';
 import { calcDebtAcceleration } from '@/lib/calculations/debtAcceleration';
 import { futureValueMonthlyContributions } from '@/lib/calculations/futureValueMonthly';
+import {
+  type BonusProfile,
+  getBonusAllocationAmounts,
+  getNextBonusDescription,
+  monthName,
+} from '@/lib/bonusProfile';
 import type { StoreBudgetInputs } from '@/lib/calculations';
 import {
   addMonthsToDate,
@@ -232,7 +238,7 @@ function savingsRateColor(rate: number): string {
   return 'text-red-500';
 }
 
-function buildDataHash(inputs: PlanInputs): string {
+function buildDataHash(inputs: PlanInputs, bonusProfileStore: BonusProfile): string {
   return JSON.stringify({
     salary: Math.round(inputs.annualSalary / 1000) * 1000,
     state: inputs.state,
@@ -241,6 +247,9 @@ function buildDataHash(inputs: PlanInputs): string {
     goals: inputs.goals,
     traditional401k: inputs.traditional401kPct,
     hsa: inputs.hsaPerPeriod,
+    bonusFreq: bonusProfileStore.frequency,
+    bonusAmt: bonusProfileStore.annualBonusAmount,
+    bonusAlloc: bonusProfileStore.allocations,
   });
 }
 
@@ -605,6 +614,7 @@ export default function PlanPage() {
   const budgetInputs = useFinWiseStore((s) => s.budgetInputs);
   const finWiseDebts = useFinWiseStore((s) => s.debts);
   const investmentInputsStore = useFinWiseStore((s) => s.investmentInputs);
+  const bonusProfile = useFinWiseStore((s) => s.bonusProfile);
 
   const [loading, setLoading] = useState(true);
   const [insightsLoading, setInsightsLoading] = useState(false);
@@ -618,6 +628,11 @@ export default function PlanPage() {
   const [whatIfEmergencyContrib, setWhatIfEmergencyContrib] = useState(0);
   const [efSliderUserTouched, setEfSliderUserTouched] = useState(false);
   const efSliderSeededRef = useRef(false);
+  const [whatIfBonusDebtPct, setWhatIfBonusDebtPct] = useState(40);
+
+  useEffect(() => {
+    setWhatIfBonusDebtPct(bonusProfile.allocations.debtPayoff);
+  }, [bonusProfile.allocations.debtPayoff]);
 
   // 800ms loading splash
   useEffect(() => {
@@ -714,6 +729,7 @@ export default function PlanPage() {
           bonusMonth: debtProfile?.bonusMonth ?? 2,
           strategy: debtProfile?.strategy ?? 'avalanche',
         },
+        bonusProfile,
       ),
     [
       baseMetrics,
@@ -726,8 +742,26 @@ export default function PlanPage() {
       debtProfile?.annualBonus,
       debtProfile?.bonusMonth,
       debtProfile?.strategy,
+      bonusProfile,
     ],
   );
+
+  const planPdfBonusPlan = useMemo(() => {
+    if (bonusProfile.frequency === 'none' || bonusProfile.annualBonusAmount <= 0) return null;
+    const a = getBonusAllocationAmounts(bonusProfile);
+    return {
+      headline: `Annual Bonus — ${monthName(bonusProfile.bonusMonth)}`,
+      totalPostTax: formatCurrency(bonusProfile.annualBonusAmount),
+      rows: [
+        { category: 'Debt payoff', pct: `${bonusProfile.allocations.debtPayoff}%`, amount: formatCurrency(a.debtPayoff) },
+        { category: 'Emergency fund', pct: `${bonusProfile.allocations.emergencyFund}%`, amount: formatCurrency(a.emergencyFund) },
+        { category: 'Home down payment', pct: `${bonusProfile.allocations.homeDownPayment}%`, amount: formatCurrency(a.homeDownPayment) },
+        { category: 'Brokerage', pct: `${bonusProfile.allocations.brokerage}%`, amount: formatCurrency(a.brokerage) },
+        { category: 'Roth IRA', pct: `${bonusProfile.allocations.rothIra}%`, amount: formatCurrency(a.rothIra) },
+        { category: 'Cash / spending', pct: `${bonusProfile.allocations.cash}%`, amount: formatCurrency(a.cash) },
+      ],
+    };
+  }, [bonusProfile]);
 
   useEffect(() => {
     setActionChecklist(metrics.actionChecklist);
@@ -827,14 +861,14 @@ export default function PlanPage() {
       const res = await fetch('/api/insights', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ inputs: effectiveInputs, metrics }),
+        body: JSON.stringify({ inputs: effectiveInputs, metrics, bonusProfile }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = (await res.json()) as { items: AIInsight[] };
       const cache = {
         items: data.items,
         generatedAt: new Date().toISOString(),
-        dataHash: buildDataHash(effectiveInputs),
+        dataHash: buildDataHash(effectiveInputs, bonusProfile),
       };
       setAIInsightsCache(cache);
     } catch (err) {
@@ -842,7 +876,7 @@ export default function PlanPage() {
     } finally {
       setInsightsLoading(false);
     }
-  }, [effectiveInputs, metrics, hasPaycheckData, insightsLoading, setAIInsightsCache]);
+  }, [effectiveInputs, metrics, bonusProfile, hasPaycheckData, insightsLoading, setAIInsightsCache]);
 
   // ── Loading state ──
   if (loading && hasAnyData) {
@@ -941,11 +975,17 @@ export default function PlanPage() {
   const whatIfInvestAnnualPortion = whatIfInvestBoost * 12;
   const whatIfEmergencyAnnualPortion =
     efBalanceWhatIf >= efTarget6WhatIf ? 0 : efContribWhatIf * 12;
+  const whatIfBonusReallocAnnual =
+    bonusProfile.annualBonusAmount > 0
+      ? (Math.abs(whatIfBonusDebtPct - bonusProfile.allocations.debtPayoff) / 100) *
+        bonusProfile.annualBonusAmount
+      : 0;
   const whatIfAnnualCombined =
     whatIfDebtAnnual +
     whatIfExpenseAnnualPortion +
     whatIfInvestAnnualPortion +
-    whatIfEmergencyAnnualPortion;
+    whatIfEmergencyAnnualPortion +
+    whatIfBonusReallocAnnual;
 
   const efProgressBarClass = (pct: number) =>
     pct >= 100 ? 'bg-green-600' : pct >= 66 ? 'bg-blue-600' : pct >= 33 ? 'bg-amber-500' : 'bg-red-500';
@@ -1102,6 +1142,7 @@ export default function PlanPage() {
                           savings: t.additionalSavings,
                         })),
                         insights: insightItems.map((i) => i.text),
+                        bonusPlan: planPdfBonusPlan,
                       }}
                     />
                   }
@@ -1296,6 +1337,21 @@ export default function PlanPage() {
 
         <div className="h-px bg-border my-2" />
 
+        {heroCashflowVisible && bonusProfile.annualBonusAmount <= 0 && (
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+            <span className="flex items-center gap-2">
+              <Zap className="size-4 shrink-0 text-amber-600" />
+              Set up your bonus allocation to unlock accurate forecasts across all tools.
+            </span>
+            <Link
+              href="/settings/bonus"
+              className="font-semibold text-amber-900 underline underline-offset-2"
+            >
+              Configure bonus →
+            </Link>
+          </div>
+        )}
+
         {/* ── SECTION 1: Where You Stand ── */}
         <Section delay={0.1}>
           <Card>
@@ -1397,6 +1453,112 @@ export default function PlanPage() {
             </CardContent>
           </Card>
         </Section>
+
+        {bonusProfile.frequency !== 'none' && bonusProfile.annualBonusAmount > 0 && (
+          <Section delay={0.28}>
+            <Card className="overflow-hidden border-l-4 border-l-[#8b5cf6]">
+              <CardHeader className="flex flex-row items-start justify-between gap-4">
+                <div>
+                  <CardTitle className="text-lg font-bold" style={{ color: '#0f172a' }}>
+                    Annual Bonus — {monthName(bonusProfile.bonusMonth)}{' '}
+                    {new Date().getFullYear()}
+                  </CardTitle>
+                  <CardDescription>
+                    Next bonus window: {getNextBonusDescription(bonusProfile) || '—'}
+                  </CardDescription>
+                </div>
+                <div className="text-right space-y-1">
+                  <p className="text-lg font-bold tabular-nums">
+                    {formatCurrency(bonusProfile.annualBonusAmount)} post-tax
+                  </p>
+                  <Link
+                    href="/settings/bonus"
+                    className="text-xs font-medium text-[#8b5cf6] hover:underline inline-flex items-center gap-0.5"
+                  >
+                    Edit allocation <ChevronRight className="size-3" />
+                  </Link>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {(() => {
+                  const b = getBonusAllocationAmounts(bonusProfile);
+                  const rows: Array<{ label: string; pct: number; amt: number; note: string }> = [
+                    {
+                      label: 'Debt payoff',
+                      pct: bonusProfile.allocations.debtPayoff,
+                      amt: b.debtPayoff,
+                      note: hasDebts && debtFreeDate ? `Toward debt-free ${formatMonthYear(debtFreeDate)}` : '—',
+                    },
+                    {
+                      label: 'Brokerage invest',
+                      pct: bonusProfile.allocations.brokerage,
+                      amt: b.brokerage,
+                      note: monthlyInvestCapacity > 0 ? 'Adds to DRIP model' : '—',
+                    },
+                    {
+                      label: 'Roth IRA',
+                      pct: bonusProfile.allocations.rothIra,
+                      amt: b.rothIra,
+                      note: 'Tax-advantaged bucket',
+                    },
+                    {
+                      label: 'Home down payment',
+                      pct: bonusProfile.allocations.homeDownPayment,
+                      amt: b.homeDownPayment,
+                      note: 'Sinking / savings',
+                    },
+                    {
+                      label: 'Emergency fund',
+                      pct: bonusProfile.allocations.emergencyFund,
+                      amt: b.emergencyFund,
+                      note: `${emergencyFundMonthsCovered.toFixed(1)} mo covered`,
+                    },
+                    {
+                      label: 'Cash / spending',
+                      pct: bonusProfile.allocations.cash,
+                      amt: b.cash,
+                      note: '—',
+                    },
+                  ];
+                  return (
+                    <div className="overflow-x-auto rounded-lg border border-border">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b bg-muted/40 text-left text-xs font-medium text-muted-foreground">
+                            <th className="py-2 pl-3">Category</th>
+                            <th className="py-2 text-right">Allocation</th>
+                            <th className="py-2 text-right">Amount</th>
+                            <th className="py-2 pr-3">Impact</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {rows.map((r) => (
+                            <tr key={r.label} className="border-b border-border/50">
+                              <td className="py-2 pl-3">{r.label}</td>
+                              <td className="py-2 text-right tabular-nums">{r.pct}%</td>
+                              <td className="py-2 text-right font-medium tabular-nums">
+                                {formatCurrency(r.amt)}
+                              </td>
+                              <td className="py-2 pr-3 text-muted-foreground text-xs">{r.note}</td>
+                            </tr>
+                          ))}
+                          <tr className="bg-muted/20 font-semibold">
+                            <td className="py-2 pl-3">Total</td>
+                            <td className="py-2 text-right">100%</td>
+                            <td className="py-2 text-right tabular-nums">
+                              {formatCurrency(bonusProfile.annualBonusAmount)}
+                            </td>
+                            <td className="py-2 pr-3" />
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  );
+                })()}
+              </CardContent>
+            </Card>
+          </Section>
+        )}
 
         {/* ── SECTION 3: Debt Plan — always render ── */}
         <Section delay={0.3}>
@@ -1834,6 +1996,7 @@ export default function PlanPage() {
                       <thead>
                         <tr className="border-b border-border bg-muted/30">
                           <th className="py-2 pl-3 pr-4 text-left font-medium text-muted-foreground">Month</th>
+                          <th className="py-2 pr-4 text-right font-medium text-muted-foreground">Bonus</th>
                           {hasDebtData && (
                             <th className="py-2 pr-4 text-right font-medium text-muted-foreground">Debt Balance</th>
                           )}
@@ -1848,7 +2011,11 @@ export default function PlanPage() {
                           <tr
                             key={p.month}
                             className={`border-b border-border/50 last:border-0 ${
-                              p.milestone ? 'bg-amber-50 dark:bg-amber-950/20' : ''
+                              p.isBonusMonth
+                                ? 'bg-[#fff7ed]'
+                                : p.milestone
+                                  ? 'bg-amber-50 dark:bg-amber-950/20'
+                                  : ''
                             }`}
                           >
                             <td className="py-2 pl-3 pr-4">
@@ -1860,6 +2027,9 @@ export default function PlanPage() {
                                   </Badge>
                                 )}
                               </div>
+                            </td>
+                            <td className="py-2 pr-4 text-right tabular-nums text-[#c2410c] font-medium">
+                              {p.bonusReceived ? `+${formatCurrency(p.bonusReceived)}` : '—'}
                             </td>
                             {hasDebtData && (
                               <td className="py-2 pr-4 text-right tabular-nums text-red-500 font-medium">
@@ -1897,7 +2067,7 @@ export default function PlanPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
-              <div className="grid gap-4 lg:grid-cols-4">
+              <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-5">
                 <div className="rounded-lg border border-border p-3 flex flex-col gap-3">
                   <p className="text-sm font-semibold">Debt acceleration</p>
                   {whatIfDebtsForAccel.length === 0 ? (
@@ -2164,6 +2334,51 @@ export default function PlanPage() {
                     </>
                   )}
                 </div>
+
+                <div className="rounded-lg border border-border p-3 flex flex-col gap-3">
+                  <div>
+                    <p className="text-sm font-semibold">Bonus reallocation</p>
+                    <p className="text-xs text-muted-foreground">% of bonus to debt payoff</p>
+                  </div>
+                  {bonusProfile.annualBonusAmount <= 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      Add your post-tax bonus in{' '}
+                      <Link href="/settings/bonus" className="text-[#3b82f6] font-medium hover:underline">
+                        Bonus allocation
+                      </Link>{' '}
+                      to model shifts between debt and investing.
+                    </p>
+                  ) : (
+                    <>
+                      <input
+                        type="range"
+                        min={0}
+                        max={100}
+                        step={5}
+                        value={whatIfBonusDebtPct}
+                        onChange={(e) => setWhatIfBonusDebtPct(Number(e.target.value))}
+                        className="w-full accent-[#8b5cf6]"
+                        aria-label="Percent of bonus to debt"
+                      />
+                      <p className="text-sm font-medium tabular-nums">
+                        {whatIfBonusDebtPct}% to debt (
+                        {formatCurrency((whatIfBonusDebtPct / 100) * bonusProfile.annualBonusAmount)})
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Saved plan: {bonusProfile.allocations.debtPayoff}% · Annual movement delta{' '}
+                        <span className="font-semibold text-foreground tabular-nums">
+                          {formatCurrency(whatIfBonusReallocAnnual)}
+                        </span>
+                      </p>
+                      <Link
+                        href="/settings/bonus"
+                        className="text-xs font-medium text-[#8b5cf6] hover:underline"
+                      >
+                        Edit allocation →
+                      </Link>
+                    </>
+                  )}
+                </div>
               </div>
               <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 space-y-1">
                 <p>
@@ -2174,7 +2389,8 @@ export default function PlanPage() {
                   Debt paydown {formatCurrency(whatIfDebtAnnual)} + expense trim{' '}
                   {formatCurrency(whatIfExpenseAnnualPortion)} + investments{' '}
                   {formatCurrency(whatIfInvestAnnualPortion)} + emergency fund{' '}
-                  {formatCurrency(whatIfEmergencyAnnualPortion)}
+                  {formatCurrency(whatIfEmergencyAnnualPortion)} + bonus scenario delta{' '}
+                  {formatCurrency(whatIfBonusReallocAnnual)}
                 </p>
               </div>
             </CardContent>
@@ -2302,6 +2518,7 @@ export default function PlanPage() {
                     savings: t.additionalSavings,
                   })),
                   insights: insightItems.map((i) => i.text),
+                  bonusPlan: planPdfBonusPlan,
                 }}
               />
             }

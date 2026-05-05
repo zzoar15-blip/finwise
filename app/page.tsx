@@ -31,6 +31,7 @@ import { PAY_PERIODS } from '@/lib/calculations/paycheck';
 import { formatCurrency, formatDate } from '@/lib/format';
 import { CATEGORY_ICONS } from '@/lib/constants';
 import type { PlanInputs } from '@/types/plan';
+import type { BonusProfile } from '@/lib/bonusProfile';
 import { EmptyState } from '@/components/ui/empty-state';
 import { PageSkeleton } from '@/components/ui/page-skeleton';
 
@@ -215,6 +216,8 @@ function DashboardPageContent() {
   const setBudgetInputs = useFinWiseStore((s) => s.setBudgetInputs);
   const setDebts = useFinWiseStore((s) => s.setDebts);
   const setGoals = useFinWiseStore((s) => s.setGoals);
+  const setBonusProfile = useFinWiseStore((s) => s.setBonusProfile);
+  const bonusProfileStore = useFinWiseStore((s) => s.bonusProfile);
 
   const [showWizard, setShowWizard] = useState(
     (wizardOpen || (!plan && settings.acceptedInstitutionalDisclosure)) && settings.acceptedInstitutionalDisclosure,
@@ -288,7 +291,7 @@ function DashboardPageContent() {
     setShowWizard(true);
   }, [updateSettings]);
 
-  function handleUpdatePlan(inputs: PlanInputs) {
+  function handleUpdatePlan(inputs: PlanInputs, bonusProfilePatch?: Partial<BonusProfile>) {
     const periods = PAY_PERIODS[inputs.payPeriod] || 26;
     const homeGoalMonthly =
       inputs.goals.includes('save-home') && inputs.homeTarget > 0
@@ -349,6 +352,9 @@ function DashboardPageContent() {
     );
     setGoals(inputs.goals as string[]);
     setPlan(inputs);
+    if (bonusProfilePatch) {
+      setBonusProfile(bonusProfilePatch);
+    }
     setShowWizard(false);
   }
 
@@ -572,9 +578,14 @@ function DashboardPageContent() {
         </Card>
 
         {(() => {
+          const expectsBonus =
+            (plan?.inputs.annualBonus ?? 0) > 0 || bonusProfileStore.annualBonusAmount > 0;
+          const bonusAllocationDone =
+            !expectsBonus || bonusProfileStore.annualBonusAmount > 0;
           const checks = [
             { label: 'Paycheck configured', done: !!effectivePaycheckResults.isComplete, href: '/paycheck' },
             { label: 'Budget set up', done: Object.values(budgetInputs).some((v) => typeof v === 'number' && v > 0), href: '/budget' },
+            { label: 'Bonus allocation', done: bonusAllocationDone, href: '/settings/bonus' },
             { label: 'Debts added', done: debts.length > 0, href: '/debt' },
             { label: 'Investment goals set', done: budgetInputs.brokerageMonthly > 0 || budgetInputs.rothIraMonthly > 0, href: '/invest' },
             { label: 'Goals selected', done: (plan?.inputs.goals?.length ?? 0) > 0, href: '/plan' },
