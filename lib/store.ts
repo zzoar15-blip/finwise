@@ -33,6 +33,17 @@ import {
   type NetWorthSnapshot,
 } from '@/lib/calculations/netWorth';
 
+function normalizeGoalOrder(goals: string[]): string[] {
+  const seen = new Set<string>();
+  const ordered: string[] = [];
+  for (const goal of goals) {
+    if (seen.has(goal)) continue;
+    seen.add(goal);
+    ordered.push(goal);
+  }
+  return ordered;
+}
+
 interface FinWiseStore {
   paycheckInputs: StorePaycheckInputs;
   paycheckResults: StorePaycheckResults;
@@ -101,7 +112,7 @@ export const useFinWiseStore = create<FinWiseStore>()(
         set({ debts, planLastUpdated: new Date().toISOString() }),
 
       setGoals: (goals) =>
-        set({ goals, planLastUpdated: new Date().toISOString() }),
+        set({ goals: normalizeGoalOrder(goals), planLastUpdated: new Date().toISOString() }),
 
       setInvestmentInputs: (inputs) =>
         set((state) => ({

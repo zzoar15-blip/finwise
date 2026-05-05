@@ -304,9 +304,9 @@ function ForecastPageContent() {
           <div>
             <h1 className="text-2xl font-bold">Home Down Payment Forecast</h1>
             <p className="text-sm text-muted-foreground">
-              Goal-aware forecast using your current home savings plan with assumption toggles.
+              Goal-aware forecast using your current priority cash flow for home savings, with assumption toggles.
             </p>
-            <Link href="/forecast" className="text-sm text-blue-600 hover:underline">Open generic scenario forecaster</Link>
+            <Link href="/forecast" className="text-sm text-blue-600 hover:underline">Compare in full scenario forecaster</Link>
           </div>
         </div>
 
@@ -321,7 +321,7 @@ function ForecastPageContent() {
 
         <div className="grid gap-3 sm:grid-cols-4">
           <Stat label="Target" value={formatCurrency(homeForecast.target)} />
-          <Stat label="Current Monthly Plan" value={formatCurrency(homeForecast.baseMonthly)} />
+          <Stat label="Priority Monthly Cash Flow" value={formatCurrency(homeForecast.baseMonthly)} />
           <Stat label="Plan Timeline Goal" value={`${homeForecast.timeline} months`} />
           <Stat label="Projected Hit Date" value={homeForecast.reachedMonth ? `${homeForecast.reachedMonth} months` : 'Not reached'} />
         </div>
@@ -353,21 +353,21 @@ function ForecastPageContent() {
           <div>
             <h1 className="text-2xl font-bold">Emergency Fund Forecast</h1>
             <p className="text-sm text-muted-foreground">
-              Goal-aware emergency runway forecast from your current monthly contribution.
+              Goal-aware emergency runway forecast from your current priority cash flow.
             </p>
-            <Link href="/forecast" className="text-sm text-blue-600 hover:underline">Open generic scenario forecaster</Link>
+            <Link href="/forecast" className="text-sm text-blue-600 hover:underline">Compare in full scenario forecaster</Link>
           </div>
         </div>
         <Card className="shadow-sm">
           <CardHeader><CardTitle>Assumptions</CardTitle></CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
-            <ScenarioField label="Monthly contribution" value={emergencyForecast.monthly} prefix="$" onChange={() => {}} />
+            <ScenarioField label="Priority monthly cash flow" value={emergencyForecast.monthly} prefix="$" onChange={() => {}} />
             <ScenarioField label="HYSA/APY (%)" value={emergencyApy} suffix="%" onChange={setEmergencyApy} />
           </CardContent>
         </Card>
         <div className="grid gap-3 sm:grid-cols-3">
           <Stat label="Target" value={formatCurrency(emergencyForecast.target)} />
-          <Stat label="Monthly Contribution" value={formatCurrency(emergencyForecast.monthly)} />
+          <Stat label="Priority Monthly Cash Flow" value={formatCurrency(emergencyForecast.monthly)} />
           <Stat label="Projected Hit Date" value={emergencyForecast.reachedMonth ? `${emergencyForecast.reachedMonth} months` : 'Not reached'} />
         </div>
         <Card className="shadow-sm">
@@ -397,9 +397,9 @@ function ForecastPageContent() {
           <div>
             <h1 className="text-2xl font-bold">Investment Growth Forecast</h1>
             <p className="text-sm text-muted-foreground">
-              Forecast based on your synced 401(k), Roth IRA, and brokerage contribution stream.
+              Forecast based on your synced 401(k), Roth IRA, and brokerage priority cash flow stream.
             </p>
-            <Link href="/forecast" className="text-sm text-blue-600 hover:underline">Open generic scenario forecaster</Link>
+            <Link href="/forecast" className="text-sm text-blue-600 hover:underline">Compare in full scenario forecaster</Link>
           </div>
         </div>
         <Card className="shadow-sm">
@@ -410,8 +410,8 @@ function ForecastPageContent() {
           </CardContent>
         </Card>
         <div className="grid gap-3 sm:grid-cols-3">
-          <Stat label="Synced Base Contribution" value={formatCurrency(investForecast.baseMonthly)} />
-          <Stat label="Total Monthly Contribution" value={formatCurrency(investForecast.monthly)} />
+          <Stat label="Synced Base Priority Flow" value={formatCurrency(investForecast.baseMonthly)} />
+          <Stat label="Total Priority Monthly Flow" value={formatCurrency(investForecast.monthly)} />
           <Stat label="Projected 10Y Value" value={formatCurrency(investForecast.points[investForecast.points.length - 1]?.value ?? 0)} />
         </div>
         <Card className="shadow-sm">
@@ -440,9 +440,9 @@ function ForecastPageContent() {
           <div>
             <h1 className="text-2xl font-bold">Retirement Timeline Forecast</h1>
             <p className="text-sm text-muted-foreground">
-              Estimate when your current contribution stream reaches your retirement target.
+              Estimate when your current priority cash flow stream reaches your retirement target.
             </p>
-            <Link href="/forecast" className="text-sm text-blue-600 hover:underline">Open generic scenario forecaster</Link>
+            <Link href="/forecast" className="text-sm text-blue-600 hover:underline">Compare in full scenario forecaster</Link>
           </div>
         </div>
         <Card className="shadow-sm">
@@ -453,7 +453,7 @@ function ForecastPageContent() {
           </CardContent>
         </Card>
         <div className="grid gap-3 sm:grid-cols-3">
-          <Stat label="Monthly Investment Stream" value={formatCurrency(retireForecast.monthly)} />
+          <Stat label="Priority Monthly Investment Flow" value={formatCurrency(retireForecast.monthly)} />
           <Stat label="Retirement Target" value={formatCurrency(retireTarget)} />
           <Stat label="Estimated Time to Target" value={retireForecast.hitMonth ? `${retireForecast.hitMonth} months` : 'Not reached'} />
         </div>

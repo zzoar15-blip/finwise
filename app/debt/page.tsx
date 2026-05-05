@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { simulateDebtPayoff, buildSensitivityTable } from '@/lib/calculations/debt';
 import type { Debt, DebtResult, SensitivityRow } from '@/lib/calculations/debt';
@@ -9,6 +9,7 @@ import { downloadCsv } from '@/lib/export';
 import { exportDomToPdf } from '@/lib/exportPdf';
 import { formatCurrency } from '@/lib/format';
 import { useFinWiseStore } from '@/lib/store';
+import { usePlanStore } from '@/lib/planStore';
 import { computeUnifiedMonthlyFlow } from '@/lib/calculations';
 import { SyncMeta } from '@/components/SyncMeta';
 import {
@@ -73,6 +74,7 @@ export default function DebtPage() {
   const paycheckInputs = useFinWiseStore((s) => s.paycheckInputs);
   const budgetInputs = useFinWiseStore((s) => s.budgetInputs);
   const planLastUpdated = useFinWiseStore((s) => s.planLastUpdated);
+  const setDebtProfile = usePlanStore((s) => s.setDebtProfile);
 
   const [debts, setDebts] = useState<Debt[]>(storeDebts.length > 0 ? storeDebts : []);
   const flow = useMemo(
@@ -91,6 +93,20 @@ export default function DebtPage() {
     setDebts(newDebts);
     setStoreDebts(newDebts);
   }
+
+  useEffect(() => {
+    setDebtProfile({
+      debts: debts.map((d) => ({
+        id: d.id,
+        name: d.name,
+        balance: d.balance,
+        apr: d.apr,
+        minPayment: d.minPayment,
+      })),
+      monthlyOverpayment,
+      annualBonus,
+    });
+  }, [debts, monthlyOverpayment, annualBonus, setDebtProfile]);
 
   const result: DebtResult = useMemo(
     () => simulateDebtPayoff(debts, monthlyOverpayment, annualBonus, bonusMonth, strategy),

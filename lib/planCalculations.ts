@@ -210,110 +210,139 @@ function buildPriorities(
   const cards: PriorityCard[] = [];
   let rank = 1;
 
-  const surplus = metrics.monthlySurplus ?? 0;
+  const surplus = Math.max(0, metrics.monthlySurplus ?? 0);
   const debtResult = metrics.debtResult;
   const debtFreeDate = metrics.debtFreeDate;
   const homeMonthlyContribution = metrics.homeMonthlyContribution ?? 0;
   const emergencyMonthlyContribution = metrics.emergencyMonthlyContribution ?? 0;
+  let remainingPriorityCashflow = surplus;
 
-  if (inputs.goals.includes('pay-debt') && debtResult && inputs.debts.length > 0) {
-    const months = debtResult.monthsToPayoff;
-    const interestSaved = Math.round(debtResult.interestSavedVsMinimum);
-    cards.push({
-      goal: 'pay-debt',
-      rank: rank++,
-      headline: 'Pay off your debt',
-      body: `Debt-free in ${months} months${debtFreeDate ? ` (${formatMonthYear(debtFreeDate)})` : ''}. You'll save ${interestSaved > 0 ? `$${interestSaved.toLocaleString()} vs. minimums-only` : 'as much as possible'}.`,
-      action: 'Adjust payment',
-      href: '/debt',
-      color: 'red',
-    });
-  }
+  const goalOrder = inputs.goals.filter((g, idx, arr) => arr.indexOf(g) === idx);
+  const allocateForGoal = (preferred: number | null = null) => {
+    if (remainingPriorityCashflow <= 0) return 0;
+    if (preferred === null) {
+      const all = remainingPriorityCashflow;
+      remainingPriorityCashflow = 0;
+      return all;
+    }
+    const allocation = Math.max(0, Math.min(remainingPriorityCashflow, preferred));
+    remainingPriorityCashflow -= allocation;
+    return allocation;
+  };
 
-  if (inputs.goals.includes('emergency-fund')) {
-    const effectiveEmergencySavings =
-      emergencyMonthlyContribution > 0 ? emergencyMonthlyContribution : Math.max(0, surplus);
-    const monthsToFund = inputs.emergencyFundTarget > 0 && effectiveEmergencySavings > 0
-      ? Math.ceil(inputs.emergencyFundTarget / effectiveEmergencySavings)
-      : null;
-    const covered = metrics.emergencyFundMonthsCovered ?? 0;
-    cards.push({
-      goal: 'emergency-fund',
-      rank: rank++,
-      headline: `Build $${inputs.emergencyFundTarget.toLocaleString()} emergency fund`,
-      body: monthsToFund
-        ? `Currently allocating $${Math.round(effectiveEmergencySavings).toLocaleString()}/mo, you'll hit your target in ${monthsToFund} months. Current coverage: ${covered.toFixed(1)} months of expenses.`
-        : 'Set a savings rate in your plan to see your timeline.',
-      action: 'See timeline',
-      href: '/forecast?focus=emergency',
-      color: 'yellow',
-    });
-  }
+  for (const goal of goalOrder) {
+    if (goal === 'pay-debt') {
+      if (!debtResult || inputs.debts.length === 0) continue;
+      const months = debtResult.monthsToPayoff;
+      const interestSaved = Math.round(debtResult.interestSavedVsMinimum);
+      const debtCashflow = allocateForGoal(null);
+      cards.push({
+        goal,
+        rank: rank++,
+        headline: 'Pay off your debt',
+        body: `Priority cash flow for debt: $${Math.round(debtCashflow).toLocaleString()}/mo. Debt-free in ${months} months${debtFreeDate ? ` (${formatMonthYear(debtFreeDate)})` : ''}. You'll save ${interestSaved > 0 ? `$${interestSaved.toLocaleString()} vs. minimums-only` : 'as much as possible'}.`,
+        action: 'Adjust payment',
+        href: '/debt',
+        color: 'red',
+      });
+      continue;
+    }
 
-  if (inputs.goals.includes('invest-income') || inputs.goals.includes('dividend-income')) {
-    const investCap = metrics.monthlyInvestCapacity ?? 0;
-    const annual = metrics.investResult?.annual ?? [];
-    const yr3Value = annual[2]?.portfolioValue ?? 0;
-    const yr3Income = annual[2]?.afterTaxAnnualIncome ?? 0;
-    cards.push({
-      goal: 'invest-income',
-      rank: rank++,
-      headline: 'Grow dividend income',
-      body: investCap > 0
-        ? `Investing $${Math.round(investCap).toLocaleString()}/mo generates a $${Math.round(yr3Value).toLocaleString()} portfolio and $${Math.round(yr3Income / 12).toLocaleString()}/mo in passive income after 3 years.`
-        : 'Free up surplus to begin investing.',
-      action: 'Run simulation',
-      href: '/forecast?focus=invest',
-      color: 'green',
-    });
-  }
+    if (goal === 'emergency-fund') {
+      const preferredEmergency = emergencyMonthlyContribution > 0 ? emergencyMonthlyContribution : null;
+      const effectiveEmergencySavings = preferredEmergency !== null
+        ? allocateForGoal(preferredEmergency)
+        : allocateForGoal(null);
+      const monthsToFund = inputs.emergencyFundTarget > 0 && effectiveEmergencySavings > 0
+        ? Math.ceil(inputs.emergencyFundTarget / effectiveEmergencySavings)
+        : null;
+      const covered = metrics.emergencyFundMonthsCovered ?? 0;
+      cards.push({
+        goal,
+        rank: rank++,
+        headline: `Build $${inputs.emergencyFundTarget.toLocaleString()} emergency fund`,
+        body: monthsToFund
+          ? `Priority cash flow for emergency fund: $${Math.round(effectiveEmergencySavings).toLocaleString()}/mo. You'll hit your target in ${monthsToFund} months. Current coverage: ${covered.toFixed(1)} months of expenses.`
+          : 'Set a savings rate in your plan to see your timeline.',
+        action: 'See timeline',
+        href: '/forecast?focus=emergency',
+        color: 'yellow',
+      });
+      continue;
+    }
 
-  if (inputs.goals.includes('save-home') && inputs.homeTarget > 0) {
-    const effectiveHomeSavings = homeMonthlyContribution > 0 ? homeMonthlyContribution : Math.max(0, surplus);
-    const monthsNeeded = effectiveHomeSavings > 0 ? Math.ceil(inputs.homeTarget / effectiveHomeSavings) : null;
-    cards.push({
-      goal: 'save-home',
-      rank: rank++,
-      headline: `Save $${inputs.homeTarget.toLocaleString()} for a home`,
-      body: monthsNeeded
-        ? `Currently allocating $${Math.round(effectiveHomeSavings).toLocaleString()}/mo toward your home fund, you'll hit your target in ${monthsNeeded} months${inputs.homeTimelineMonths ? ` (goal: ${inputs.homeTimelineMonths} months)` : ''}.`
-        : 'Update your expenses to free up more savings.',
-      action: 'View forecast',
-      href: '/forecast?focus=home',
-      color: 'blue',
-    });
-  }
+    if (goal === 'save-home' && inputs.homeTarget > 0) {
+      const preferredHome = homeMonthlyContribution > 0 ? homeMonthlyContribution : null;
+      const effectiveHomeSavings = preferredHome !== null
+        ? allocateForGoal(preferredHome)
+        : allocateForGoal(null);
+      const monthsNeeded = effectiveHomeSavings > 0 ? Math.ceil(inputs.homeTarget / effectiveHomeSavings) : null;
+      cards.push({
+        goal,
+        rank: rank++,
+        headline: `Save $${inputs.homeTarget.toLocaleString()} for a home`,
+        body: monthsNeeded
+          ? `Priority cash flow for home goal: $${Math.round(effectiveHomeSavings).toLocaleString()}/mo, so you'll hit your target in ${monthsNeeded} months${inputs.homeTimelineMonths ? ` (goal: ${inputs.homeTimelineMonths} months)` : ''}.`
+          : 'Update your expenses to free up more savings.',
+        action: 'View forecast',
+        href: '/forecast?focus=home',
+        color: 'blue',
+      });
+      continue;
+    }
 
-  if (inputs.goals.includes('tax-efficiency')) {
-    const score = metrics.taxEfficiencyScore ?? 0;
-    const suggestions = metrics.taxSuggestions ?? [];
-    const potentialSavings = suggestions.reduce((s, t) => s + t.additionalSavings, 0);
-    cards.push({
-      goal: 'tax-efficiency',
-      rank: rank++,
-      headline: `Boost tax efficiency (score: ${score}/100)`,
-      body: potentialSavings > 0
-        ? `You could save $${potentialSavings.toLocaleString()} more per year in taxes by optimizing your pre-tax contributions.`
-        : 'Your pre-tax contributions are well optimized.',
-      action: 'See tax details',
-      href: '/paycheck',
-      color: 'blue',
-    });
-  }
+    if (goal === 'invest-income' || goal === 'dividend-income') {
+      const investCap = allocateForGoal(null);
+      const annual = metrics.investResult?.annual ?? [];
+      const yr3Value = annual[2]?.portfolioValue ?? 0;
+      const yr3Income = annual[2]?.afterTaxAnnualIncome ?? 0;
+      cards.push({
+        goal,
+        rank: rank++,
+        headline: 'Grow dividend income',
+        body: investCap > 0
+          ? `Priority cash flow for investing: $${Math.round(investCap).toLocaleString()}/mo. This can generate a $${Math.round(yr3Value).toLocaleString()} portfolio and $${Math.round(yr3Income / 12).toLocaleString()}/mo in passive income after 3 years.`
+          : 'Free up surplus to begin investing.',
+        action: 'Run simulation',
+        href: '/forecast?focus=invest',
+        color: 'green',
+      });
+      continue;
+    }
 
-  if (inputs.goals.includes('retire-early')) {
-    const investCap = metrics.monthlyInvestCapacity ?? 0;
-    cards.push({
-      goal: 'retire-early',
-      rank: rank++,
-      headline: 'Plan for early retirement',
-      body: investCap > 0
-        ? `Investing $${Math.round(investCap).toLocaleString()}/mo at a 7% return builds significant retirement wealth. Use the Forecaster to model your timeline.`
-        : 'Reduce expenses or debt to free up investment capacity.',
-      action: 'Model scenarios',
-      href: '/forecast?focus=retire',
-      color: 'green',
-    });
+    if (goal === 'retire-early') {
+      const retireCashflow = allocateForGoal(null);
+      cards.push({
+        goal,
+        rank: rank++,
+        headline: 'Plan for early retirement',
+        body: retireCashflow > 0
+          ? `Priority cash flow for retirement: $${Math.round(retireCashflow).toLocaleString()}/mo. Use the Forecaster to model your timeline and assumptions.`
+          : 'Reduce expenses or debt to free up retirement investment capacity.',
+        action: 'Model scenarios',
+        href: '/forecast?focus=retire',
+        color: 'green',
+      });
+      continue;
+    }
+
+    if (goal === 'tax-efficiency') {
+      const score = metrics.taxEfficiencyScore ?? 0;
+      const suggestions = metrics.taxSuggestions ?? [];
+      const potentialSavings = suggestions.reduce((s, t) => s + t.additionalSavings, 0);
+      cards.push({
+        goal,
+        rank: rank++,
+        headline: `Boost tax efficiency (score: ${score}/100)`,
+        body: potentialSavings > 0
+          ? `You could save $${potentialSavings.toLocaleString()} more per year in taxes by optimizing your pre-tax contributions.`
+          : 'Your pre-tax contributions are well optimized.',
+        action: 'See tax details',
+        href: '/paycheck',
+        color: 'blue',
+      });
+      continue;
+    }
   }
 
   return cards;

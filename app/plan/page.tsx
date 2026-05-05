@@ -117,7 +117,8 @@ function buildDataHash(inputs: PlanInputs): string {
     salary: Math.round(inputs.annualSalary / 1000) * 1000,
     state: inputs.state,
     debtTotal: inputs.debts.reduce((s, d) => s + d.balance, 0),
-    goals: [...inputs.goals].sort(),
+    // Preserve selected goal order so hierarchy changes invalidate stale insights.
+    goals: inputs.goals,
     traditional401k: inputs.traditional401kPct,
     hsa: inputs.hsaPerPeriod,
   });
