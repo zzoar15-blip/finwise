@@ -210,18 +210,19 @@ export default function BudgetPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-7xl" id="tool-budget-export">
-      <div className="flex items-center justify-between gap-4">
+    <div className="mx-auto max-w-7xl space-y-6" id="tool-budget-export">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold">Budget Planner</h1>
           <Link href="/tools/rent-vs-buy" className="text-sm text-blue-600 hover:underline">
             Wondering if you can afford to buy? →
           </Link>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto">
           <Button
             variant="outline"
             size="sm"
+            className="flex-1 sm:flex-none"
             onClick={() =>
               exportDomToPdf({ elementId: 'tool-budget-export', filenamePrefix: 'finwise-budget' })
             }
@@ -267,7 +268,7 @@ export default function BudgetPage() {
             </div>
           )}
 
-          <Card>
+          <Card className="shadow-sm">
             <CardContent className="space-y-0.5 pt-4">
               {/* INCOME */}
               <SectionLabel label="Income" />
@@ -409,7 +410,7 @@ export default function BudgetPage() {
 
         {/* RIGHT PANEL — Charts */}
         <div className="space-y-4">
-          <Card>
+          <Card className="shadow-sm">
             <CardHeader>
               <CardTitle>Spending Breakdown</CardTitle>
               <p className="text-xs text-muted-foreground pt-1">
@@ -443,7 +444,7 @@ export default function BudgetPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="shadow-sm">
             <CardHeader>
               <CardTitle>Category Breakdown</CardTitle>
             </CardHeader>
@@ -464,7 +465,7 @@ export default function BudgetPage() {
           </Card>
 
           {/* Summary card */}
-          <Card>
+          <Card className="shadow-sm">
             <CardHeader>
               <CardTitle>Annual Summary</CardTitle>
             </CardHeader>

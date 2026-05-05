@@ -146,17 +146,18 @@ export default function DebtPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-5xl" id="tool-debt-export">
+    <div className="mx-auto max-w-5xl space-y-6" id="tool-debt-export">
       <div className="space-y-3">
         <Link href="/plan" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
           <ChevronLeft className="size-3" /> My Plan
         </Link>
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-2xl font-bold">Debt Payoff Simulator</h1>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto">
             <Button
               variant="outline"
               size="sm"
+              className="flex-1 sm:flex-none"
               onClick={() =>
                 exportDomToPdf({ elementId: 'tool-debt-export', filenamePrefix: `finwise-debt-${strategy}` })
               }
@@ -177,7 +178,7 @@ export default function DebtPage() {
       </div>
 
       {/* Debts Table */}
-      <Card>
+      <Card className="shadow-sm">
         <CardHeader>
           <CardTitle>Your Debts</CardTitle>
         </CardHeader>
@@ -283,7 +284,7 @@ export default function DebtPage() {
       </Card>
 
       {/* Payment Strategy */}
-      <Card>
+      <Card className="shadow-sm">
         <CardHeader>
           <CardTitle>Payment Strategy</CardTitle>
         </CardHeader>
@@ -392,7 +393,7 @@ export default function DebtPage() {
 
       {/* Results Summary Cards */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Card>
+        <Card className="shadow-sm">
           <CardContent className="pt-4">
             <div className="flex items-start justify-between">
               <div>
@@ -406,7 +407,7 @@ export default function DebtPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="shadow-sm">
           <CardContent className="pt-4">
             <div className="flex items-start justify-between">
               <div>
@@ -420,7 +421,7 @@ export default function DebtPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="shadow-sm">
           <CardContent className="pt-4">
             <div className="flex items-start justify-between">
               <div>
@@ -434,7 +435,7 @@ export default function DebtPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="shadow-sm">
           <CardContent className="pt-4">
             <div className="flex items-start justify-between">
               <div>

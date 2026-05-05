@@ -255,23 +255,24 @@ export default function PaycheckPage() {
   }
 
   return (
-    <div className="max-w-6xl space-y-6" id="tool-paycheck-export">
+    <div className="mx-auto max-w-6xl space-y-6" id="tool-paycheck-export">
       {/* Header */}
-      <div className="space-y-1">
+      <div className="space-y-1.5">
         <Link href="/plan" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
           <ChevronLeft className="size-3" /> My Plan
         </Link>
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Paycheck Calculator</h1>
             <p className="mt-1 text-sm text-gray-500">
               Estimate your take-home pay after federal and state taxes for 2025. Changes auto-save.
             </p>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto">
             <Button
               variant="outline"
               size="sm"
+              className="flex-1 sm:flex-none"
               onClick={() =>
                 exportDomToPdf({ elementId: 'tool-paycheck-export', filenamePrefix: 'finwise-paycheck' })
               }

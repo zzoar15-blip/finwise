@@ -193,14 +193,14 @@ export default function InvestPage() {
     : undefined;
 
   return (
-    <div className="max-w-7xl space-y-6" id="tool-invest-export">
+    <div className="mx-auto max-w-7xl space-y-6" id="tool-invest-export">
       {/* Header */}
       <div className="space-y-3">
         <Link href="/plan" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
           <ChevronLeft className="size-3" /> My Plan
         </Link>
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
             <TrendingUp className="size-6 text-[#3b82f6]" />
             <div>
               <h1 className="text-2xl font-bold">Investment Income Simulator</h1>
@@ -212,10 +212,11 @@ export default function InvestPage() {
               </Link>
             </div>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto">
             <Button
               variant="outline"
               size="sm"
+              className="flex-1 sm:flex-none"
               onClick={() =>
                 exportDomToPdf({ elementId: 'tool-invest-export', filenamePrefix: 'finwise-invest' })
               }
@@ -235,7 +236,7 @@ export default function InvestPage() {
 
       <div className="grid gap-6 lg:grid-cols-[380px_1fr]">
         {/* LEFT PANEL — Investment Settings */}
-        <Card>
+        <Card className="shadow-sm">
           <CardHeader>
             <CardTitle>Investment Settings</CardTitle>
           </CardHeader>
@@ -384,7 +385,7 @@ export default function InvestPage() {
           {tab === 'charts' && (
             <div className="space-y-4">
               {/* Portfolio Value */}
-              <Card>
+              <Card className="shadow-sm">
                 <CardHeader>
                   <CardTitle>Portfolio Value Over Time</CardTitle>
                 </CardHeader>
@@ -417,7 +418,7 @@ export default function InvestPage() {
               </Card>
 
               {/* Monthly Income */}
-              <Card>
+              <Card className="shadow-sm">
                 <CardHeader>
                   <CardTitle>
                     Monthly Income Over Time
@@ -462,7 +463,7 @@ export default function InvestPage() {
 
           {/* Milestones tab */}
           {tab === 'milestones' && (
-            <Card>
+            <Card className="shadow-sm">
               <CardHeader>
                 <CardTitle>Milestones — February (Bonus) &amp; December (Year-End)</CardTitle>
               </CardHeader>
@@ -514,7 +515,7 @@ export default function InvestPage() {
 
           {/* Income Targets tab */}
           {tab === 'targets' && (
-            <Card>
+            <Card className="shadow-sm">
               <CardHeader>
                 <CardTitle>Income Targets</CardTitle>
               </CardHeader>

@@ -353,8 +353,8 @@ function DashboardPageContent() {
         </div>
       )}
 
-      <div className="max-w-6xl space-y-8">
-        <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="mx-auto max-w-6xl space-y-8">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
               {name ? `Welcome back, ${name}!` : 'Welcome back!'}
@@ -363,28 +363,28 @@ function DashboardPageContent() {
               Last updated: {timeAgo(plan.updatedAt)}
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex w-full gap-2 sm:w-auto">
             <Link
               href="/plan"
-              className="inline-flex items-center rounded-md bg-[#3b82f6] px-4 py-2 text-sm font-medium text-white hover:bg-[#2563eb] transition-colors"
+              className="inline-flex flex-1 items-center justify-center rounded-md bg-[#3b82f6] px-4 py-2 text-sm font-medium text-white hover:bg-[#2563eb] transition-colors sm:flex-none"
             >
               View Full Plan
               <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
             </Link>
-            <Button variant="outline" onClick={openPlanWizardOrDisclosure}>
+            <Button variant="outline" className="flex-1 sm:flex-none" onClick={openPlanWizardOrDisclosure}>
               Update Plan
             </Button>
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <Card className="shadow-sm">
+          <Card className="h-full shadow-sm">
             <CardHeader className="pb-1">
               <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wide">
                 Monthly Take-Home
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex min-h-[72px] flex-col justify-between">
               <p className="text-2xl font-bold text-gray-900">{formatCurrency(takeHome)}</p>
               {effectivePaycheckResults.isComplete && (
                 <p className="text-[10px] text-muted-foreground mt-1">Net pay from Paycheck Calculator</p>
@@ -392,13 +392,13 @@ function DashboardPageContent() {
             </CardContent>
           </Card>
 
-          <Card className="shadow-sm">
+          <Card className="h-full shadow-sm">
             <CardHeader className="pb-1">
               <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wide">
                 Monthly Surplus
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex min-h-[72px] flex-col justify-between">
               <p
                 className={`text-2xl font-bold ${
                   surplus >= 0 ? 'text-green-600' : 'text-red-600'
@@ -412,13 +412,13 @@ function DashboardPageContent() {
             </CardContent>
           </Card>
 
-          <Card className="shadow-sm">
+          <Card className="h-full shadow-sm">
             <CardHeader className="pb-1">
               <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wide">
                 Savings Rate
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex min-h-[72px] flex-col justify-between">
               <p className={`text-2xl font-bold ${savingsRateColor(savingsRate)}`}>
                 {savingsRate.toFixed(1)}%
               </p>
@@ -428,13 +428,13 @@ function DashboardPageContent() {
             </CardContent>
           </Card>
 
-          <Card className="shadow-sm">
+          <Card className="h-full shadow-sm">
             <CardHeader className="pb-1">
               <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wide">
                 Debt-Free Date
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex min-h-[72px] items-center">
               {debtFreeDate ? (
                 <p className="text-xl font-bold text-gray-900">{debtFreeDate}</p>
               ) : (
@@ -449,7 +449,7 @@ function DashboardPageContent() {
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
             {QUICK_LINKS.map(({ href, icon: Icon, title, description }) => (
               <Link key={href} href={href} className="group block">
-                <div className="flex h-full flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-all group-hover:border-[#3b82f6] group-hover:shadow-md">
+                <div className="flex h-full flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-all group-hover:-translate-y-0.5 group-hover:border-[#3b82f6] group-hover:shadow-md">
                   <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-[#3b82f6]">
                     <Icon className="h-5 w-5" />
                   </div>
@@ -465,7 +465,7 @@ function DashboardPageContent() {
 
         <Card className="shadow-sm">
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <CardTitle>Recent Transactions</CardTitle>
               <Link
                 href="/transactions"

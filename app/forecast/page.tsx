@@ -204,10 +204,10 @@ export default function ForecastPage() {
   }
 
   return (
-    <div className="max-w-7xl space-y-6" id="tool-forecast-export">
+    <div className="mx-auto max-w-7xl space-y-6" id="tool-forecast-export">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex items-start gap-3">
           <TrendingUp className="size-6 text-[#3b82f6]" />
           <div>
             <h1 className="text-2xl font-bold">Scenario Forecaster</h1>
@@ -216,10 +216,11 @@ export default function ForecastPage() {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full items-center gap-2 sm:w-auto">
           <Button
             variant="outline"
             size="sm"
+            className="flex-1 sm:flex-none"
             onClick={() =>
               exportDomToPdf({ elementId: 'tool-forecast-export', filenamePrefix: 'finwise-forecast' })
             }
@@ -234,7 +235,7 @@ export default function ForecastPage() {
             onExportCsv={() => downloadCsv(buildExportRows(), 'finwise-forecast')}
           />
           {scenarios.length < 3 && (
-            <Button onClick={addScenario} variant="outline" size="sm">
+            <Button onClick={addScenario} variant="outline" size="sm" className="flex-1 sm:flex-none">
               <Plus className="size-4" />
               Add Scenario
             </Button>
@@ -255,7 +256,7 @@ export default function ForecastPage() {
         {scenarios.map((scenario) => {
           const year10 = results.find((r) => r.scenario.id === scenario.id)?.points[9]?.netWorth ?? 0;
           return (
-            <Card key={scenario.id}>
+            <Card key={scenario.id} className="shadow-sm">
               <CardHeader className="border-b pb-3">
                 <div className="flex items-center gap-2">
                   <span
@@ -325,7 +326,7 @@ export default function ForecastPage() {
       </div>
 
       {/* 10-Year Net Worth Projection Chart */}
-      <Card>
+      <Card className="shadow-sm">
         <CardHeader>
           <CardTitle>10-Year Net Worth Projection</CardTitle>
         </CardHeader>
@@ -362,7 +363,7 @@ export default function ForecastPage() {
       </Card>
 
       {/* Breakeven Analysis */}
-      <Card>
+      <Card className="shadow-sm">
         <CardHeader>
           <CardTitle>Breakeven Analysis</CardTitle>
         </CardHeader>

@@ -254,15 +254,15 @@ function MetricCard({
   sub?: string;
 }) {
   return (
-    <Card className="flex-1 min-w-0">
-      <CardContent className="pt-4 pb-4">
+    <Card className="flex-1 min-w-0 h-full">
+      <CardContent className="pt-4 pb-4 min-h-[108px]">
         <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1">
               {label}
             </p>
-            <p className={`text-2xl font-bold tabular-nums truncate ${valueClass}`}>{value}</p>
-            {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
+            <p className={`text-2xl font-bold tabular-nums leading-tight ${valueClass}`}>{value}</p>
+            {sub && <p className="text-xs text-muted-foreground mt-1 leading-snug">{sub}</p>}
           </div>
           <div className="shrink-0 rounded-lg bg-muted/50 p-2">{icon}</div>
         </div>
@@ -642,7 +642,7 @@ export default function PlanPage() {
   }));
 
   return (
-    <div className="max-w-5xl space-y-8 print:space-y-6">
+    <div className="mx-auto max-w-5xl space-y-8 print:space-y-6">
       <div id="financial-plan-content">
         {/* ── HEADER ── */}
         <Section delay={0}>
@@ -657,10 +657,11 @@ export default function PlanPage() {
                 </p>
               )}
             </div>
-            <div className="flex items-center gap-2 print:hidden">
+            <div className="flex w-full items-center gap-2 print:hidden sm:w-auto">
               <Button
                 variant="outline"
                 size="sm"
+                className="flex-1 sm:flex-none"
                 onClick={() => exportPDF(setExporting)}
                 disabled={exporting}
               >
@@ -669,6 +670,7 @@ export default function PlanPage() {
               </Button>
               <Button
                 size="sm"
+                className="flex-1 sm:flex-none"
                 onClick={generateInsights}
                 disabled={insightsLoading}
                 style={{ background: '#3b82f6' }}
