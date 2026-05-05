@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,8 +14,10 @@ interface Props {
 }
 
 export function RecentTransactions({ month }: Props) {
-  const transactions = useFinanceStore((s) =>
-    s.transactions.filter((t) => t.date.startsWith(month)).slice(0, 5)
+  const allTransactions = useFinanceStore((s) => s.transactions);
+  const transactions = useMemo(
+    () => allTransactions.filter((t) => t.date.startsWith(month)).slice(0, 5),
+    [allTransactions, month]
   );
 
   return (
