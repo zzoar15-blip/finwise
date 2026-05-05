@@ -2,15 +2,25 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { NAV } from './Sidebar';
+import {
+  LayoutDashboard, FileText, Calculator, CreditCard, Sparkles,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
+
+const MOBILE_NAV = [
+  { href: '/', label: 'Home', icon: LayoutDashboard },
+  { href: '/plan', label: 'My Plan', icon: FileText },
+  { href: '/paycheck', label: 'Paycheck', icon: Calculator },
+  { href: '/debt', label: 'Debt', icon: CreditCard },
+  { href: '/advisor', label: 'Advisor', icon: Sparkles },
+];
 
 export function MobileNav() {
   const pathname = usePathname();
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#1a2744] z-50">
       <div className="flex overflow-x-auto no-scrollbar">
-        {NAV.map(({ href, label, icon: Icon }) => {
+        {MOBILE_NAV.map(({ href, label, icon: Icon }) => {
           const active = href === '/' ? pathname === '/' : pathname.startsWith(href);
           return (
             <Link
