@@ -21,6 +21,7 @@ export default function HousingAffordabilityPage() {
   const didSeedDownPaymentFromPlan = useRef(false);
 
   const [partnerMonthlyIncome, setPartnerMonthlyIncome] = useState(0);
+  const [partnerMonthlyGrossIncome, setPartnerMonthlyGrossIncome] = useState(0);
   const [partnerMonthlyDebt, setPartnerMonthlyDebt] = useState(0);
   const [targetMonthlySavings, setTargetMonthlySavings] = useState(300);
   const [annualMortgageRate, setAnnualMortgageRate] = useState(0.0675);
@@ -32,6 +33,9 @@ export default function HousingAffordabilityPage() {
     getPropertyTaxRate(paycheckInputs.state || 'Massachusetts')
   );
   const [annualHomeInsuranceRate, setAnnualHomeInsuranceRate] = useState(0.005);
+  const [annualMaintenanceRate, setAnnualMaintenanceRate] = useState(0.01);
+  const [pmiRateAnnual, setPmiRateAnnual] = useState(0.008);
+  const [closingCostPct, setClosingCostPct] = useState(0.03);
 
   useEffect(() => {
     const homeGoal = plan?.inputs?.homeTarget ?? 0;
@@ -53,6 +57,7 @@ export default function HousingAffordabilityPage() {
         flow,
         currentHousing: budgetInputs.housing,
         partnerMonthlyIncome,
+        partnerMonthlyGrossIncome,
         partnerMonthlyDebt,
         targetMonthlySavings,
         annualMortgageRate,
@@ -61,12 +66,16 @@ export default function HousingAffordabilityPage() {
         downPaymentPct,
         annualPropertyTaxRate,
         annualHomeInsuranceRate,
+        annualMaintenanceRate,
         monthlyHoa,
+        pmiRateAnnual,
+        closingCostPct,
       }),
     [
       flow,
       budgetInputs.housing,
       partnerMonthlyIncome,
+      partnerMonthlyGrossIncome,
       partnerMonthlyDebt,
       targetMonthlySavings,
       annualMortgageRate,
@@ -75,7 +84,10 @@ export default function HousingAffordabilityPage() {
       downPaymentPct,
       annualPropertyTaxRate,
       annualHomeInsuranceRate,
+      annualMaintenanceRate,
       monthlyHoa,
+      pmiRateAnnual,
+      closingCostPct,
     ]
   );
 
@@ -103,6 +115,7 @@ export default function HousingAffordabilityPage() {
         <div className="space-y-4 rounded-xl border bg-card p-4">
           <h2 className="text-base font-semibold">Scenario Inputs</h2>
           <Field label="Partner monthly take-home (optional)" value={partnerMonthlyIncome} onChange={setPartnerMonthlyIncome} step={100} />
+          <Field label="Partner monthly gross (optional)" value={partnerMonthlyGrossIncome} onChange={setPartnerMonthlyGrossIncome} step={100} />
           <Field label="Partner debt minimums" value={partnerMonthlyDebt} onChange={setPartnerMonthlyDebt} step={25} />
           <Field label="Target extra monthly savings buffer" value={targetMonthlySavings} onChange={setTargetMonthlySavings} step={50} />
           <Field
@@ -139,6 +152,27 @@ export default function HousingAffordabilityPage() {
             onChange={(n) => setAnnualHomeInsuranceRate(n / 100)}
             suffix="%"
             step={0.05}
+          />
+          <Field
+            label="Maintenance reserve rate"
+            value={annualMaintenanceRate * 100}
+            onChange={(n) => setAnnualMaintenanceRate(n / 100)}
+            suffix="%"
+            step={0.05}
+          />
+          <Field
+            label="PMI rate (if <20% down)"
+            value={pmiRateAnnual * 100}
+            onChange={(n) => setPmiRateAnnual(n / 100)}
+            suffix="%"
+            step={0.05}
+          />
+          <Field
+            label="Closing costs"
+            value={closingCostPct * 100}
+            onChange={(n) => setClosingCostPct(n / 100)}
+            suffix="%"
+            step={0.1}
           />
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">Loan term</span>
@@ -178,9 +212,27 @@ export default function HousingAffordabilityPage() {
             <Row label="Cashflow-based max" value={affordability.maxByCashflow} />
             <Row label="28% gross income max (housing)" value={affordability.maxByFrontEndRatio} />
             <Row label="36% gross income max (housing + debt)" value={affordability.maxByBackEndRatio} />
+            <Row label="Buffer-adjusted cashflow limit" value={affordability.availableForHousingAfterBuffer} />
             <Row label="Household monthly income" value={affordability.monthlyIncomeHousehold} />
             <Row label="Current non-housing outflows + savings target" value={affordability.nonHousingOutflows} />
             <Row label="Estimated monthly principal + interest" value={affordability.estimatedMonthlyMortgagePI} />
+            <Row label="Estimated monthly tax" value={affordability.estimatedMonthlyTax} />
+            <Row label="Estimated monthly insurance" value={affordability.estimatedMonthlyInsurance} />
+            <Row label="Estimated monthly maintenance reserve" value={affordability.estimatedMonthlyMaintenance} />
+            <Row label="Estimated monthly PMI" value={affordability.estimatedMonthlyPmi} />
+            <Row label="Estimated total ownership cost" value={affordability.estimatedMonthlyAllInOwnership} />
+            <Row label="Estimated cash to close" value={affordability.estimatedCashToClose} />
+            <Row label="Max price by cash-to-close" value={affordability.maxPriceByCashToClose} />
+            <div className="pt-2 text-sm text-muted-foreground">
+              Binding constraint:{' '}
+              <span className="font-medium text-foreground">
+                {affordability.bindingConstraint === 'cashflow'
+                  ? 'Cashflow'
+                  : affordability.bindingConstraint === 'front-end-dti'
+                    ? 'Front-end DTI'
+                    : 'Back-end DTI'}
+              </span>
+            </div>
             {!readiness ? (
               <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
                 Complete your paycheck inputs to unlock a more realistic affordability range.
